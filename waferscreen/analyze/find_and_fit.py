@@ -1,9 +1,10 @@
 import os
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
+from ref import s21_dir, output_dir, s21_file_extensions
 import waferscreen.analyze.find_resonances as find_res
 import waferscreen.analyze.resonator_fitter as fit_res
-from ref import s21_dir, output_dir
 from waferscreen.read.table_read import num_format
 
 
@@ -12,6 +13,7 @@ class ResFit:
         self.filename = file
         file_basename = os.path.basename(file)
         base_handle, _extension = file_basename.rsplit(".", 1)
+        self.wafer_name, self.trace_number, self.data_str = base_handle.split("_")
         self.verbose = verbose
         self.freq_units = freq_units
         self.group_delay = group_delay  # nanoseconds
@@ -33,11 +35,15 @@ class ResFit:
         self.fit_model = 'simple_res_gain_slope_complex'  # name of model to fit to resonance
         self.error_est = 'prop'  # 'prop' or 'flat', proportional or constant errors
         self.fit_guess_plots = False  # make plots of each fit guess
-        output_folder = os.path.join(output_dir, "s21")
-        if not os.path.isdir(output_folder):
-            os.mkdir(output_folder)
 
-        self.fit_filename = os.path.join(output_folder, base_handle + "_fit.txt")
+        output_folder = output_dir
+        for dir_name in ['s21', self.wafer_name, self.trace_number, self.data_str]:
+            output_folder = os.path.join(output_folder, dir_name)
+            if not os.path.isdir(output_folder):
+                os.mkdir(output_folder)
+        self.output_folder = output_folder
+        shutil.copyfile(self.filename, os.path.join(self.output_folder, file_basename))
+        self.fit_filename = os.path.join(self.output_folder, base_handle + "_fit.txt")
 
         self.freqs = None
         self.s21 = None
@@ -222,7 +228,7 @@ class ResFit:
         ax33 = fig3.add_subplot(223)
         ax34 = fig3.add_subplot(224)
 
-        ax31.hist(1e6*(self.res_fit_params[:, 4]-self.res_freqs), bins=np.linspace(-100,100,51))
+        ax31.hist(1e6 * (self.res_fit_params[:, 4] - self.res_freqs), bins=np.linspace(-100, 100, 51))
         ax31.set_xlabel("Fit - Found Resonance Freq. (kHz)")
         ax31.set_ylabel("# of occurrences")
         ax32.hist(self.res_fit_params[:, 5], bins=np.linspace(0, 150000, 31))
@@ -234,11 +240,24 @@ class ResFit:
         ax34.hist(self.res_fit_params[:, 7], bins = np.linspace(-1, 1, 21))
         ax34.set_xlabel("Fano Parameter")
         ax34.set_ylabel("# of occurrences")
-
         plt.show()
 
 
+def process_all(s21_data_dir, group_delay):
+    all_files = [os.path.join(s21_data_dir, f) for f in os.listdir(s21_data_dir)
+                 if os.path.isfile(os.path.join(s21_data_dir, f))]
+    s21_files = []
+    for single_file in all_files:
+        _, file_extension = single_file.rsplit(".", 1)
+        if file_extension in s21_file_extensions:
+            s21_files.append(single_file)
+    return {single_file: ResFit(file=single_file, group_delay=group_delay,
+                                verbose=True, freq_units="MHz", auto_process=True) for single_file in s21_files}
+
+
 if __name__ == "__main__":
-    file = os.path.join(s21_dir, 'umux', "s4data", "s21_56_pre.txt")
+    data_dir = os.path.join(s21_dir, 'umux', "s4data")
+    example_file = os.path.join(data_dir, "WaferName_TraceNumber_2020-07-13.csv")
     group_delay = 31.839
-    res_fit = ResFit(file=file, group_delay=group_delay, verbose=True, freq_units="MHz", auto_process=True)
+    # res_fit = ResFit(file=file, group_delay=group_delay, verbose=True, freq_units="MHz", auto_process=True)
+    fits_dict = process_all(s21_data_dir=data_dir, group_delay=group_delay)
