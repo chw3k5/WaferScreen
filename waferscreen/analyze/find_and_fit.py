@@ -50,7 +50,13 @@ class ResFit:
         self.filename = file
         file_basename = os.path.basename(file)
         base_handle, _extension = file_basename.rsplit(".", 1)
-        self.wafer_name, self.trace_number, self.data_str = base_handle.split("_")
+        self.wafer_name, self.trace_number, self.data_str, *self.run_details = base_handle.split("_", 3)
+        self.plot_prefix = ""
+        if self.run_details:
+            for an_item in self.run_details:
+                self.plot_prefix += an_item
+            self.plot_prefix += "_"
+
         self.verbose = verbose
         self.freq_units = freq_units
         self.group_delay = group_delay  # nanoseconds
@@ -134,6 +140,7 @@ class ResFit:
                                                   verbose=self.verbose,
                                                   make_plots=self.make_plots_find_res,
                                                   plot_dir=self.output_folder,
+                                                  file_prefix=self.plot_prefix,
                                                   show_plot=show_plot)
 
         self.plot_resonances(show=show_plot)
@@ -159,7 +166,7 @@ class ResFit:
             ax11.text(self.res_freqs[i], 1.0, str(i), fontsize=12)
         if show:
             plt.show()
-        fig6.savefig(os.path.join(self.output_folder, 'fig6_resonances.pdf'))
+        fig6.savefig(os.path.join(self.output_folder, self.plot_prefix + 'fig6_resonances.pdf'))
         fig6.clf()
 
     def extract_params(self, show_plot=False):
@@ -198,7 +205,7 @@ class ResFit:
             popt, pcov = fit_res.fit_resonator(fit_freqs, fit_s21data, data_format='COM', model=self.fit_model,
                                                error_est=self.error_est, throw_out=self.throw_out,
                                                make_plot=self.fit_guess_plots, plot_dir=self.resonator_output_folder,
-                                               show_plot=show_plot)
+                                               file_prefix=self.plot_prefix, show_plot=show_plot)
 
             fit_Amag  = popt[0]
             fit_Aphase = popt[1]
@@ -277,7 +284,7 @@ class ResFit:
         ax24.set_xlabel("Found Resonance Freq. (GHz)")
         ax24.set_ylabel("Fano Parameter")
         ax24.set_ylim([-1, 1])
-        fig2.savefig(os.path.join(self.output_folder, 'fig2_scatter.pdf'))
+        fig2.savefig(os.path.join(self.output_folder, self.plot_prefix +'fig2_scatter.pdf'))
         fig2.clf()
 
         # plot histograms of fit results
@@ -301,7 +308,7 @@ class ResFit:
         ax34.set_ylabel("# of occurrences")
         if show:
             plt.show()
-        fig3.savefig(os.path.join(self.output_folder, 'fig3_histogram.pdf'))
+        fig3.savefig(os.path.join(self.output_folder, self.plot_prefix + 'fig3_histogram.pdf'))
         fig3.clf()
 
     def write_results(self):

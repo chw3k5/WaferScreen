@@ -37,7 +37,7 @@ def renormalize_smat(smat, z0, z0_new):
 
 
 def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_est='prop', throw_out=0,
-                  make_plot=True, plot_dir=output_dir, show_plot=False):
+                  make_plot=True, plot_dir=output_dir, file_prefix="", show_plot=False):
     """
     Function which returns fit parameters to a resonator model
     freqs are the measured frequencies, s21data is the S21 data
@@ -188,7 +188,7 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
         ax0.plot([f0_guess, f0_guess], [s21_min, 1], c='b', linestyle='--')
         if show_plot:
             plt.show()
-        fig0.savefig(os.path.join(plot_dir, str("%1.5f" % f0_guess) + "_GHz_resonator_fit.pdf"))
+        fig0.savefig(os.path.join(plot_dir, file_prefix + str("%1.5f" % f0_guess) + "_GHz_resonator_fit.pdf"))
         fig0.clf()
     # unravel fit parameters and errors to 1D vector
     error_params = np.array(error_params)

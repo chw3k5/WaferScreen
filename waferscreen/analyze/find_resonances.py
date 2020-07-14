@@ -24,6 +24,7 @@ def find_resonances(freqs,
                     verbose=False,
                     make_plots=False,
                     plot_dir=output_dir,
+                    file_prefix="",
                     show_plot=False):
     """
     Resonance Finding Script
@@ -203,7 +204,7 @@ def find_resonances(freqs,
         ax12.set_xlabel("Freq. (GHz)")
         ax12.set_ylabel(r"$\angle S_{21}$ (Deg)")
         ax12.legend(loc='upper right')
-        fig1.savefig(os.path.join(plot_dir, "fig1_results.pdf"))
+        fig1.savefig(os.path.join(plot_dir, file_prefix + "fig1_results.pdf"))
         fig1.clf()
 
         # plot 1st derivative in r-hat and theta-hat vs. freq
@@ -219,7 +220,7 @@ def find_resonances(freqs,
         ax32.set_ylim([-15000, 1.1*np.amax(first_deriv_rot_smooth[:,1]*(first_deriv_freqs/2.0))])
         ax32.scatter(frs, Qts, color='b', s=20.0)
         ax32.plot([np.amin(freqs), np.amax(freqs)], [cutoff_rate, cutoff_rate], linestyle='--', color='k')
-        fig4.savefig(os.path.join(plot_dir, "fig4_rhat_theata_hat.pdf"))
+        fig4.savefig(os.path.join(plot_dir, file_prefix + "fig4_rhat_theata_hat.pdf"))
         fig4.clf()
         
         if remove_baseline_ripple:
@@ -244,6 +245,6 @@ def find_resonances(freqs,
             ax42.legend(loc='upper right')
             if show_plot:
                 plt.show()
-            fig5.savefig(os.path.join(plot_dir, "fig5_baseline_ripple.pdf"))
+            fig5.savefig(os.path.join(plot_dir, file_prefix + "fig5_baseline_ripple.pdf"))
             fig5.clf()
     return frs
