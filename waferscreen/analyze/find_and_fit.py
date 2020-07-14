@@ -1,11 +1,48 @@
 import os
 import shutil
+from typing import NamedTuple, Optional, Union
 import numpy as np
 import matplotlib.pyplot as plt
 from ref import s21_dir, output_dir, s21_file_extensions
 import waferscreen.analyze.find_resonances as find_res
 import waferscreen.analyze.resonator_fitter as fit_res
 from waferscreen.read.table_read import num_format
+
+primary_res_params = ["Amag", "Aphase", "Aslope", "tau", "f0", "Qi", "Qc", "Zratio"]
+res_params_header = ""
+for param_type in primary_res_params:
+    res_params_header += param_type + "," + param_type + "_error,"
+res_params_header = res_params_header[:-1]
+
+
+class ResParams(NamedTuple):
+    Amag: float
+    Aphase: float
+    Aslope: float
+    tau: float
+    f0: float
+    Qi: float
+    Qc: float
+    Zratio: float
+    Amag_error: Optional[float] = None
+    Aphase_error: Optional[float] = None
+    Aslope_error: Optional[float] = None
+    tau_error: Optional[float] = None
+    f0_error: Optional[float] = None
+    Qi_error: Optional[float] = None
+    Qc_error: Optional[float] = None
+    Zratio_error: Optional[float] = None
+
+    def __str__(self):
+        output_string = ""
+        for attr in primary_res_params:
+            error_value = str(self.__getattribute__(attr + "_error"))
+            if error_value is None:
+                error_str = ""
+            else:
+                error_str = str(error_value)
+            output_string += str(self.__getattribute__(attr)) + "," + error_str + ","
+        return output_string[:-1]
 
 
 class ResFit:
@@ -34,22 +71,27 @@ class ResFit:
         self.throw_out = 0  # doesnt use N points on the edge of each sweep
         self.fit_model = 'simple_res_gain_slope_complex'  # name of model to fit to resonance
         self.error_est = 'prop'  # 'prop' or 'flat', proportional or constant errors
-        self.fit_guess_plots = False  # make plots of each fit guess
+        self.fit_guess_plots = True  # make plots of each fit guess
 
+        """File name a directory determinations"""
         output_folder = output_dir
         for dir_name in ['s21', self.wafer_name, self.trace_number, self.data_str]:
             output_folder = os.path.join(output_folder, dir_name)
             if not os.path.isdir(output_folder):
                 os.mkdir(output_folder)
         self.output_folder = output_folder
+        self.resonator_output_folder = os.path.join(self.output_folder, 'resonators')
+        if not os.path.isdir(self.resonator_output_folder):
+            os.mkdir(self.resonator_output_folder)
         shutil.copyfile(self.filename, os.path.join(self.output_folder, file_basename))
-        self.fit_filename = os.path.join(self.output_folder, base_handle + "_fit.txt")
 
+        self.fit_filename = os.path.join(self.output_folder, base_handle + "_fit.csv")
+
+        """Data containers populated by the methods of this class"""
         self.freqs = None
         self.s21 = None
         self.res_freqs = None
-        self.res_fit_params = None
-        self.res_fit_errors = None
+        self.res_params = None
 
         if auto_process:
             self.open()
@@ -80,7 +122,7 @@ class ResFit:
             phase_factors = np.exp(-1j * 2.0 * np.pi * self.freqs * self.group_delay)
             self.s21 = self.s21 / phase_factors
 
-    def find_resonances(self, show_plot=True):
+    def find_resonances(self, show_plot=False):
         # pass this s21 sweep to find_resonances_fast
         self.res_freqs = find_res.find_resonances(self.freqs, self.s21, edge_search_depth=self.edge_search_depth,
                                                   smoothing_scale_kHz=self.smoothing_scale_kHz,
@@ -90,48 +132,54 @@ class ResFit:
                                                   baseline_scale_kHz=self.baseline_scale_kHz_find_res,
                                                   baseline_order=self.baseline_order_find_res,
                                                   verbose=self.verbose,
-                                                  make_plots=self.make_plots_find_res)
+                                                  make_plots=self.make_plots_find_res,
+                                                  plot_dir=self.output_folder,
+                                                  show_plot=show_plot)
 
-        if show_plot:
-            self.plot_resonances()
+        self.plot_resonances(show=show_plot)
 
-    def plot_resonances(self):
+    def plot_resonances(self, show=False):
         if self.res_freqs is None:
             self.find_resonances(show_plot=False)
         # plot s21 vs. freq and show plot
-        fig1 = plt.figure(1)
-        ax11 = fig1.add_subplot(121)
-        ax12 = fig1.add_subplot(122)
-
-        ax11.plot(self.freqs, 20.0*np.log10(np.absolute(self.s21)))
-        ax12.plot(self.freqs, 180.0/np.pi * np.arctan2(np.imag(self.s21), np.real(self.s21)))
+        fig6 = plt.figure(6)
+        ax11 = fig6.add_subplot(121)
+        ax12 = fig6.add_subplot(122)
 
         ax11.plot(self.freqs, 20.0 * np.log10(np.absolute(self.s21)))
-        ax12.plot(self.freqs, 180.0/np.pi * np.arctan2(np.imag(self.s21), np.real(self.s21)))
+        ax12.plot(self.freqs, 180.0 / np.pi * np.arctan2(np.imag(self.s21), np.real(self.s21)))
+
+        # ax11.plot(self.freqs, 20.0 * np.log10(np.absolute(self.s21)))
+        # ax12.plot(self.freqs, 180.0/np.pi * np.arctan2(np.imag(self.s21), np.real(self.s21)))
 
         # label found resonators
         for i in range(0, len(self.res_freqs)):
             ax11.plot([self.res_freqs[i], self.res_freqs[i]], [0, -15], linestyle='--', color='k')
             ax12.plot([self.res_freqs[i], self.res_freqs[i]], [-180, 180], linestyle='--', color='k')
             ax11.text(self.res_freqs[i], 1.0, str(i), fontsize=12)
-        plt.show()
+        if show:
+            plt.show()
+        fig6.savefig(os.path.join(self.output_folder, 'fig6_resonances.pdf'))
+        fig6.clf()
 
-    def extract_params(self, show_plot=True):
+    def extract_params(self, show_plot=False):
         # loop over found resonators and fit to a model to extract Qt, Qc, Qi, f0, Fano etc
-        self.res_fit_params = []
-        self.res_fit_errors = []
+        self.res_params = []
         delta_f = (self.freqs[1] - self.freqs[0]) * 1e6
         float_samples = self.fitting_range_kHz / delta_f
         n_samples = np.floor(float_samples) + 1  # only need to take data this far around a given resonance
-        print("Data frequency spacing is " + str(delta_f) + "kHz")
-        print("Fitting range is +/- " + str(self.fitting_range_kHz) + "kHz")
-        print("Need to fit +/-" + str(n_samples) + " samples around each resonance center")
+        if self.verbose:
+            print("Data frequency spacing is " + str(delta_f) + "kHz")
+            print("Fitting range is +/- " + str(self.fitting_range_kHz) + "kHz")
+            print("Need to fit +/-" + str(n_samples) + " samples around each resonance center")
         prev_res_index = 0
         # make file to write results out to
-        f = open(self.fit_filename, "w")
-        f.close()
+        # Caleb changed how this file is outputted on July 14, 2020, see the write_results method
+        # f = open(self.fit_filename, "w")
+        # f.close()
         for i in range(0, len(self.res_freqs)):
-            print("Fitting found resonance #" + str(i+1) + "/" + str(len(self.res_freqs)))
+            if self.verbose:
+                print("Fitting found resonance #" + str(i+1) + "/" + str(len(self.res_freqs)))
             # only pass section of data that's within range of the resonance
             res_index = prev_res_index
             res_found = False
@@ -149,7 +197,8 @@ class ResFit:
             # now fit the resonance
             popt, pcov = fit_res.fit_resonator(fit_freqs, fit_s21data, data_format='COM', model=self.fit_model,
                                                error_est=self.error_est, throw_out=self.throw_out,
-                                               make_plot=self.fit_guess_plots)
+                                               make_plot=self.fit_guess_plots, plot_dir=self.resonator_output_folder,
+                                               show_plot=show_plot)
 
             fit_Amag  = popt[0]
             fit_Aphase = popt[1]
@@ -169,57 +218,67 @@ class ResFit:
             error_Qc = np.sqrt(pcov[6, 6])
             error_Zratio = np.sqrt(pcov[7, 7])
 
-            print('Fit Result')
-            print('Amag          : %.4f +/- %.6f' %(fit_Amag,error_Amag))
-            print('Aphase        : %.2f +/- %.4f Deg' % (fit_Aphase,error_Aphase))
-            print('Aslope        : %.3f +/- %.3f /GHz' %(fit_Aslope,error_Aslope))
-            print('Tau           : %.3f +/- %.3f ns' %(fit_tau,error_tau))
-            print('f0            : %.6f +/- %.8f GHz' % (fit_f0,error_f0))
-            print('Qi            : %.0f +/- %.0f' %(fit_Qi,error_Qi))
-            print('Qc            : %.0f +/- %.0f' %(fit_Qc,error_Qc))
-            print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' %(fit_Zratio,error_Zratio))
-            print('')
+            if self.verbose:
+                print('Fit Result')
+                print('Amag          : %.4f +/- %.6f' % (fit_Amag, error_Amag))
+                print('Aphase        : %.2f +/- %.4f Deg' % (fit_Aphase, error_Aphase))
+                print('Aslope        : %.3f +/- %.3f /GHz' % (fit_Aslope, error_Aslope))
+                print('Tau           : %.3f +/- %.3f ns' % (fit_tau, error_tau))
+                print('f0            : %.6f +/- %.8f GHz' % (fit_f0, error_f0))
+                print('Qi            : %.0f +/- %.0f' % (fit_Qi, error_Qi))
+                print('Qc            : %.0f +/- %.0f' % (fit_Qc, error_Qc))
+                print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_Zratio, error_Zratio))
+                print('')
 
-            with open(self.fit_filename, "a") as f:
-                f.write(str(popt[0]) + "," + str(np.sqrt(pcov[0, 0])) + "," + str(popt[1]) + "," +
-                        str(np.sqrt(pcov[1, 1])) + "," + str(popt[2]) + "," + str(np.sqrt(pcov[2, 2])) + "," +
-                        str(popt[3]) + "," + str(np.sqrt(pcov[3,3])) + "," + str(popt[4]) + "," +
-                        str(np.sqrt(pcov[4, 4])) + "," + str(popt[5]) + "," + str(np.sqrt(pcov[5, 5])) + "," +
-                        str(popt[6]) + "," + str(np.sqrt(pcov[6,6])) + "," + str(popt[7]) + "," +
-                        str(np.sqrt(pcov[7, 7])) + "\n")
-            self.res_fit_params.append([fit_Amag, fit_Aphase, fit_Aslope, fit_tau, fit_f0, fit_Qi, fit_Qc, fit_Zratio])
-            self.res_fit_errors.append([error_Amag, error_Aphase, error_Aslope, error_tau, error_f0, error_Qi, error_Qc,
-                                        error_Zratio])
-        self.res_fit_params = np.array(self.res_fit_params)
-        self.res_fit_errors = np.array(self.res_fit_errors)
+            # Caleb changed how this file is outputted on July 14, 2020, see the write_results method
+            # with open(self.fit_filename, "a") as f:
+            #     f.write(str(popt[0]) + "," + str(np.sqrt(pcov[0, 0])) + "," + str(popt[1]) + "," +
+            #             str(np.sqrt(pcov[1, 1])) + "," + str(popt[2]) + "," + str(np.sqrt(pcov[2, 2])) + "," +
+            #             str(popt[3]) + "," + str(np.sqrt(pcov[3, 3])) + "," + str(popt[4]) + "," +
+            #             str(np.sqrt(pcov[4, 4])) + "," + str(popt[5]) + "," + str(np.sqrt(pcov[5, 5])) + "," +
+            #             str(popt[6]) + "," + str(np.sqrt(pcov[6, 6])) + "," + str(popt[7]) + "," +
+            #             str(np.sqrt(pcov[7, 7])) + "\n")
+            self.res_params.append(ResParams(Amag=fit_Amag, Amag_error=error_Amag,
+                                             Aphase=fit_Aphase, Aphase_error=error_Aphase,
+                                             Aslope=fit_Aslope, Aslope_error=error_Aslope,
+                                             tau=fit_tau, tau_error=error_tau,
+                                             f0=fit_f0, f0_error=error_f0,
+                                             Qi=fit_Qi, Qi_error=error_Qi,
+                                             Qc=fit_Qc, Qc_error=error_Qc,
+                                             Zratio=fit_Zratio, Zratio_error=error_Zratio))
+        self.write_results()
+        self.plot_results(show=show_plot)
 
-        if show_plot:
-            self.plot_results()
-
-    def plot_results(self):
+    def plot_results(self, show=False):
         # plot fit results vs. frequency
         fig2 = plt.figure(2)
         ax21 = fig2.add_subplot(221)
         ax22 = fig2.add_subplot(222)
         ax23 = fig2.add_subplot(223)
         ax24 = fig2.add_subplot(224)
-
-        ax21.scatter(self.res_freqs, 1.0e6 * (self.res_fit_params[:, 4] - self.res_freqs))
+        # ["Amag", "Aphase", "Aslope", "tau", "f0", "Qi", "Qc", "Zratio"]
+        f0_vec = np.array([single_params.f0 for single_params in self.res_params])
+        Qi_vec = np.array([single_params.Qi for single_params in self.res_params])
+        Qc_vec = np.array([single_params.Qc for single_params in self.res_params])
+        Zratio_vec = np.array([single_params.Zratio for single_params in self.res_params])
+        ax21.scatter(self.res_freqs, 1.0e6 * (f0_vec - self.res_freqs))
         ax21.set_xlabel("Found Resonance Freq. (GHz)")
         ax21.set_ylabel("Fit - Found Resonance Freq. (kHz)")
-        ax21.set_ylim([-100,100])
-        ax22.scatter(self.res_freqs, self.res_fit_params[:, 5])
+        ax21.set_ylim([-100, 100])
+        ax22.scatter(self.res_freqs, Qi_vec)
         ax22.set_xlabel("Found Resonance Freq. (GHz)")
         ax22.set_ylabel(r"$Q_i$")
         ax22.set_ylim([0, 1.5e5])
-        ax23.scatter(self.res_freqs, self.res_fit_params[:, 6])
+        ax23.scatter(self.res_freqs, Qc_vec)
         ax23.set_xlabel("Found Resonance Freq. (GHz)")
         ax23.set_ylabel(r"$Q_c$")
         ax23.set_ylim([0, 1.5e5])
-        ax24.scatter(self.res_freqs, self.res_fit_params[:, 7])
+        ax24.scatter(self.res_freqs, Zratio_vec)
         ax24.set_xlabel("Found Resonance Freq. (GHz)")
         ax24.set_ylabel("Fano Parameter")
         ax24.set_ylim([-1, 1])
+        fig2.savefig(os.path.join(self.output_folder, 'fig2_scatter.pdf'))
+        fig2.clf()
 
         # plot histograms of fit results
         fig3 = plt.figure(3)
@@ -228,19 +287,28 @@ class ResFit:
         ax33 = fig3.add_subplot(223)
         ax34 = fig3.add_subplot(224)
 
-        ax31.hist(1e6 * (self.res_fit_params[:, 4] - self.res_freqs), bins=np.linspace(-100, 100, 51))
+        ax31.hist(1e6 * (f0_vec - self.res_freqs), bins=np.linspace(-100, 100, 51))
         ax31.set_xlabel("Fit - Found Resonance Freq. (kHz)")
         ax31.set_ylabel("# of occurrences")
-        ax32.hist(self.res_fit_params[:, 5], bins=np.linspace(0, 150000, 31))
+        ax32.hist(Qi_vec, bins=np.linspace(0, 150000, 31))
         ax32.set_xlabel(r"$Q_i$")
         ax32.set_ylabel("# of occurrences")
-        ax33.hist(self.res_fit_params[:, 6], bins = np.linspace(0, 150000, 31))
+        ax33.hist(Qc_vec, bins = np.linspace(0, 150000, 31))
         ax33.set_xlabel(r"$Q_c$")
         ax33.set_ylabel("# of occurrences")
-        ax34.hist(self.res_fit_params[:, 7], bins = np.linspace(-1, 1, 21))
+        ax34.hist(Zratio_vec, bins = np.linspace(-1, 1, 21))
         ax34.set_xlabel("Fano Parameter")
         ax34.set_ylabel("# of occurrences")
-        plt.show()
+        if show:
+            plt.show()
+        fig3.savefig(os.path.join(self.output_folder, 'fig3_histogram.pdf'))
+        fig3.clf()
+
+    def write_results(self):
+        with open(self.fit_filename, 'w') as f:
+            f.write(res_params_header + "\n")
+            for single_res_params in self.res_params:
+                f.write(str(single_res_params) + "\n")
 
 
 def process_all(s21_data_dir, group_delay):

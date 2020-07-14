@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import os
 import numpy as np
 import math
 import cmath
@@ -6,6 +7,7 @@ import scipy.special as specfunc
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
+from ref import output_dir
 
 
 def rebound_starting_vals(bounds, starting_vals):
@@ -34,7 +36,8 @@ def renormalize_smat(smat, z0, z0_new):
     return smat_new
 
 
-def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_est='prop', throw_out=0, make_plot=True):
+def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_est='prop', throw_out=0,
+                  make_plot=True, plot_dir=output_dir, show_plot=False):
     """
     Function which returns fit parameters to a resonator model
     freqs are the measured frequencies, s21data is the S21 data
@@ -183,8 +186,10 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
         ax0.plot([f_lower, f_lower], [s21_min, 1], c='r', linestyle='--')
         ax0.plot([f_upper, f_upper], [s21_min, 1], c='r', linestyle='--')
         ax0.plot([f0_guess, f0_guess], [s21_min, 1], c='b', linestyle='--')
-        plt.show()
-
+        if show_plot:
+            plt.show()
+        fig0.savefig(os.path.join(plot_dir, str("%1.5f" % f0_guess) + "_GHz_resonator_fit.pdf"))
+        fig0.clf()
     # unravel fit parameters and errors to 1D vector
     error_params = np.array(error_params)
     fit_params = fit_params.ravel()
