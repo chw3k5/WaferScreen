@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 from waferscreen.inst_control.Keysight_USB_VNA import USBVNA
 
 #####
-#Code which will take an S21 measurement with a Keysight USB VNA (P937XA) and plot it LM and in a Smith Chart
-#And then write the data to a file with (freq, s21A, s21B) where A and B are determined by the data_format
+# Code which will take an S21 measurement with a Keysight USB VNA (P937XA) and plot it LM and in a Smith Chart
+# And then write the data to a file with (freq, s21A, s21B) where A and B are determined by the data_format
 #####
 
-outputfilename = "C:\\Users\\jac15\\Code\\VNA\\Data\\test_sweep" # leave extension off, added according to file type
+outputfilename = "C:\\Users\\jac15\\Code\\VNA\\Data\\test_sweep"  # leave extension off, added according to file type
 
 #group delay removel settings
 group_delay = 2.787 #nanoseconds
