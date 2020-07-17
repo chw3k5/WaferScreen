@@ -65,7 +65,7 @@ def find_resonances(freqs,
     for j in range(0,edge_search_depth):
         ave_left_gain = ave_left_gain + sdata[j]/edge_search_depth
         ave_right_gain = ave_right_gain + sdata[len(sdata)-1-j]/edge_search_depth
-    left_freq =  freqs[int(edge_search_depth/2.0)]
+    left_freq = freqs[int(edge_search_depth/2.0)]
     right_freq = freqs[len(freqs)-1-int(edge_search_depth/2.0)]
     gain_slope = (ave_right_gain-ave_left_gain)/(right_freq-left_freq)
     if verbose:

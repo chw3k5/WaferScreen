@@ -142,6 +142,8 @@ if output_format == "TXT" or output_format == "BOTH":
         fout.write(out)
     fout.close()
     print('TXT file written')
+
+
 if output_format == "CSV" or output_format == "BOTH":
     with open(outputfilename + '.csv', 'w') as csvfile:
         csvwriter = csv.writer(csvfile, delimiter=',')
