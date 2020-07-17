@@ -41,13 +41,13 @@ def find_resonances(freqs,
 
     # start by converting frequencies to GHz and making sure it is in array form
     if input_freq_units == "Hz":
-        freqs = np.array(freqs)*1e-9 #convert to GHz from Hz
+        freqs = np.array(freqs)*1e-9  # convert to GHz from Hz
     elif input_freq_units == "kHz":
-        freqs = np.array(freqs)*1e-6 #convert to GHz from kHz
+        freqs = np.array(freqs)*1e-6  # convert to GHz from kHz
     elif input_freq_units == "MHz":
-        freqs = np.array(freqs)*1e-3 #convert to GHz from MHz
+        freqs = np.array(freqs)*1e-3  # convert to GHz from MHz
     elif input_freq_units == "GHz":
-        freqs = np.array(freqs) #no need to convert
+        freqs = np.array(freqs)  # no need to convert
         
     if verbose:
         print("Taken in Data")

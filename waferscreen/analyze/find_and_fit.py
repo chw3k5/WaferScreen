@@ -300,10 +300,10 @@ class ResFit:
         ax32.hist(Qi_vec, bins=np.linspace(0, 150000, 31))
         ax32.set_xlabel(r"$Q_i$")
         ax32.set_ylabel("# of occurrences")
-        ax33.hist(Qc_vec, bins = np.linspace(0, 150000, 31))
+        ax33.hist(Qc_vec, bins=np.linspace(0, 150000, 31))
         ax33.set_xlabel(r"$Q_c$")
         ax33.set_ylabel("# of occurrences")
-        ax34.hist(Zratio_vec, bins = np.linspace(-1, 1, 21))
+        ax34.hist(Zratio_vec, bins=np.linspace(-1, 1, 21))
         ax34.set_xlabel("Fano Parameter")
         ax34.set_ylabel("# of occurrences")
         if show:
