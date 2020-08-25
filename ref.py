@@ -12,11 +12,15 @@ parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
 working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
 s21_dir = os.path.join(working_dir, 's21')
 output_dir = os.path.join(working_dir, "output")
+resonances_dir = os.path.join(output_dir, 'resonances')
 if not os.path.isdir(output_dir):
     os.mkdir(output_dir)
+if not os.path.isdir(resonances_dir):
+    os.mkdir(resonances_dir)
 
-# allow data type
+# data types
 s21_file_extensions = {"txt", "csv"}
+file_extension_to_delimiter = {'csv': ",", 'psv': "|", 'txt': " ", "tsv": '\t'}
 
 # Constants used in WaferScreen
 h = 6.6260755E-34  # Js

@@ -457,7 +457,9 @@ def fit_mb_tls(temps, f0, FdeltaTLS):  # , delta, alphaK):
 
 
 def mb_tls_model(temp, f0, FdeltaTLS):  # , delta, alphaK):
-    """Mattis-Bardeen + TLS model for quarter wave resonators"""
+    """
+    Mattis-Bardeen + TLS model for quarter wave resonators
+    """
     hbar = 1.0545718e-34
     kB = 1.38064852e-23
     # for now just fit f0 to TLS, so only useful at low temp
