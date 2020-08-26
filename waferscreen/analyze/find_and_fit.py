@@ -58,7 +58,7 @@ class ResFit:
             self.plot_prefix += "_"
 
         self.verbose = verbose
-        self.freq_units = freq_units
+        self.freq_units = freq_units.lower()
         self.group_delay = group_delay  # nanoseconds
     
         """resonance finding parameters """
@@ -111,28 +111,34 @@ class ResFit:
         split_data = [striped_line.split(",") for striped_line in [raw_line.strip() for raw_line in raw_data]
                       if striped_line != ""]
         data = [[num_format(single_number) for single_number in data_row] for data_row in split_data]
+        # Test to see if there is a header row in this data
         try:
+            # Is the value in the first row first column a number?
             _ = float(data[0][0])
         except ValueError:
-            # no header case
-            data_array = np.array(data)
-            freqs = data_array[:, 0]
-            self.s21 = data_array[:, 1] + 1j * data_array[:, 2]
-        else:
             # when there is a header to name the columns
             data_array = np.array(data[1:])
             data_dict = {column_name: data_array[:, column_index]
                          for column_index, column_name in list(enumerate(data[0]))}
             freqs = data_dict['freq']
             self.s21 = data_dict["real"] + 1j * data_dict["imag"]
+        else:
+            # no header case
+            data_array = np.array(data)
+            freqs = data_array[:, 0]
+            self.s21 = data_array[:, 1] + 1j * data_array[:, 2]
 
         # put freqs in GHz
-        if self.freq_units == "MHz":
+        if self.freq_units == "ghz":
+            self.freqs = freqs
+        elif self.freq_units == "mhz":
             self.freqs = freqs / 1.e3
-        elif self.freq_units == "kHz":
+        elif self.freq_units == "khz":
             self.freqs = freqs / 1.e6
-        elif self.freq_units == "Hz":
+        elif self.freq_units == "hz":
             self.freqs = freqs / 1.e9
+        else:
+            raise KeyError("Frequency Units: " + str(self.freq_units) + "  not reconized")
         
         # remove group delay
         if self.group_delay is not None:
