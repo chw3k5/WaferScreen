@@ -31,7 +31,7 @@ class VnaMeas:
         self.plot_phase = True
 
         # User VNA settings
-        self.vna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0::INSTR"  # go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
+        self.vna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"  # go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
         self.fcenter_GHz = fcenter_GHz
         self.fspan_MHz = fspan_MHz
         self.num_freq_points = num_freq_points  # number of frequency points measured
@@ -41,6 +41,9 @@ class VnaMeas:
         self.port_power_dBm = port_power_dBm
         self.vna_avg = vna_avg  # number of averages. if one, set to off
         self.preset_vna = preset_vna  # preset the VNA? Do if you don't know the state of the VNA ahead of time
+
+        # setting and tools for this class
+        self.last_output_file = None
 
         """
         Initialized Data Storage
@@ -102,12 +105,13 @@ class VnaMeas:
         phase_delays = np.exp(-1j * self.freqs * 2.0 * math.pi * self.group_delay)
 
         # calculate the 'calibrated' S21 data by dividing by phase delay
-        self.s21R = np.real(s21data) / phase_delays
-        self.s21I = np.imag(s21data) / phase_delays
+        cal_s21data = s21data / phase_delays
+        self.s21R = np.real(cal_s21data)
+        self.s21I = np.imag(cal_s21data)
 
         # convert data from data_format to both LM for plotting
         self.s21LM = 10 * np.log10(self.s21R ** 2 + self.s21I ** 2)
-        self.s21PH = 180.0 / np.pi * np.atan2(self.s21I, self.s21R)
+        self.s21PH = 180.0 / np.pi * np.arctan2(self.s21I, self.s21R)
 
     def vna_close(self):
         self.vna.close()
@@ -125,11 +129,13 @@ class VnaMeas:
                     for freq, real, imag in zip(self.freqs, self.s21R, self.s21I)]
         else:
             raise KeyError(F"Data format: '{self.data_format}' not recognized!")
-        with open(self.output_filename + "." + file_extension) as f:
+        output_filename = self.output_filename + "." + file_extension
+        with open(output_filename, 'w') as f:
             f.write(header + "\n")
             [f.write(line + "\n") for line in body]
         if self.verbose:
             print(file_extension.upper(), 'file written')
+        self.last_output_file = output_filename
 
     def plot_sweep(self):
         plot_freqs = []

@@ -25,4 +25,4 @@ def sweep_to_find_resonances(project, wafer, trace_number,
     vna_meas.write_sweep(file_extension='csv')
     if show_plot:
         vna_meas.plot_sweep()
-    return
+    return vna_meas.last_output_file

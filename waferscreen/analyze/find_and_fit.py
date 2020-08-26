@@ -111,10 +111,21 @@ class ResFit:
         split_data = [striped_line.split(",") for striped_line in [raw_line.strip() for raw_line in raw_data]
                       if striped_line != ""]
         data = [[num_format(single_number) for single_number in data_row] for data_row in split_data]
-        data_array = np.array(data)
-        freqs = data_array[:, 0]
-        self.s21 = data_array[:, 1] + 1j * data_array[:, 2]
-    
+        try:
+            _ = float(data[0][0])
+        except ValueError:
+            # no header case
+            data_array = np.array(data)
+            freqs = data_array[:, 0]
+            self.s21 = data_array[:, 1] + 1j * data_array[:, 2]
+        else:
+            # when there is a header to name the columns
+            data_array = np.array(data[1:])
+            data_dict = {column_name: data_array[:, column_index]
+                         for column_index, column_name in list(enumerate(data[0]))}
+            freqs = data_dict['freq']
+            self.s21 = data_dict["real"] + 1j * data_dict["imag"]
+
         # put freqs in GHz
         if self.freq_units == "MHz":
             self.freqs = freqs / 1.e3
