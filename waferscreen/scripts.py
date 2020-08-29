@@ -5,8 +5,8 @@ from waferscreen.measure.res_sweep import VnaMeas
 
 def sweep_to_find_resonances(project, wafer, trace_number,
                              fcenter_GHz=4.15, fspan_MHz=300, num_freq_points=20001, sweeptype='lin', if_bw_Hz=100,
-                             ifbw_track=False, port_power_dBm=-20, vna_avg=1, preset_vna=False,
-                             show_plot=False, verbose=False):
+                             ifbw_track=False, port_power_dBm=-30, vna_avg=1, preset_vna=False,
+                             show_plot=True, verbose=False):
     sweep_dir = os.path.join(s21_dir, project.lower())
     if not os.path.isdir(sweep_dir):
         os.mkdir(sweep_dir)

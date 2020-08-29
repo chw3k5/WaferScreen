@@ -164,5 +164,5 @@ class VnaMeas:
 
         # show maximized plot
         fig_manager = plt.get_current_fig_manager()
-        fig_manager.window.showMaximized()
+        # fig_manager.window.showMaximized()
         plt.show()
