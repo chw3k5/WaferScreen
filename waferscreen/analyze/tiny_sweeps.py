@@ -2,7 +2,7 @@ import numpy as np
 import math
 import time
 import os
-from ref import output_dir, today_str
+from ref import output_dir, today_str, vna_address, volt_source_address, volt_source_port
 from waferscreen.inst_control import Keysight_USB_VNA
 from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.find_and_fit import ResParams
@@ -10,76 +10,78 @@ from waferscreen.analyze.find_and_fit import ResParams
 ###
 #  This code takes a single flux ramp sweep at one RF read power over a number of resonators
 ###
-wafer = 7
-trace_number = 0
-run_number = 3
-# output location
-# datafolder = "C:\\datafolder"
-# datafilename = "datafilename" #text file of f, re,
-data_output_folder = os.path.join(output_dir, 's21', F"{wafer}", F'Trace{trace_number}', today_str, "flux_ramp")  # "C:\\Users\\uvwave\\Desktop\\Jake_VNA\\Data\\29Aug2020\\wafer7_band0_fluxramp_run2\\"
-if not os.path.isdir(data_output_folder):
-    os.mkdir(data_output_folder)
-file_delimiter = ","
-
-# resonator frequencies file
-freqs_filename = os.path.join(output_dir, 's21', F"{wafer}", F'Trace{trace_number}', today_str,
-                              F"{wafer}_Trace{str(trace_number)}_{today_str}_run{run_number}_fit.csv")  # "C:\\Users\\uvwave\\Desktop\\Jake_VNA\\Data\\29Aug2020\\wafer7_band0_150mK_freqs.txt"
-res_freq_units = "GHz"
-res_num_limits = [1, -1]  # set to -1 to ignore limits
-
-# instrument addresses
-vna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0::INSTR"  # go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
-volt_source_address = "GPIB0::16::INSTR"
-volt_source_port = 1
-
-# frequency sweep options
-meas_span = 1000  # kHz
-num_pts_per_sweep = 501  # 1601 for Aly8722ES, 100001 for P5002A
-port_power = -40  # dBm
-if_bw = 300  # Hz
-ifbw_track = False  # ifbw tracking, reduces IFBW at low freq to overcome 1/f noise
-vna_avg = 1  # number of averages. if one, set to off
-preset_vna = False  # preset the VNA? Do if you don't know the state of the VNA ahead of time
-keep_away_collisions = True  # option to modify frequency boundaries of s21 measurement so that we can fit better
-
-# flux ramp options
-rseries = 10000  # ohms
-current_min = -125  # uA
-current_max = 125  # uA
-current_steps = 251
-currents = np.linspace(current_min, current_max, current_steps)
-volts = np.linspace(current_min * rseries * 1e-6, current_max * rseries * 1e-6, current_steps)  # volts
-print("Currents to measure at:")
-print(currents)
-# make sure volts are in integer # of mV so SRS doesn't freak out
-for i in range(0, len(volts)):
-    millivolts = int(round(volts[i] * 1000))
-    volts[i] = millivolts / 1000
-print("Voltages to measure at:")
-print(volts)
-
-###group delay removal (best to get correct within 180degs over dataset) ####
-remove_group_delay = True
-group_delay = 27.292  # nanoseconds
-
-# open resonant frequencies file
-with open(freqs_filename, 'r') as f:
-    lines = f.readlines()
-header = lines[0].strip().split(",")
-res_params = []
-for line in lines[1:]:
-    datavec = line.split(",")
-    res_params.append(ResParams(**{column_name: float(value) for column_name, value in zip(header, datavec)}))
-res_freqs = np.array([res_param.f0 for res_param in res_params])
 
 
-# put res freqs into GHz since fittng code requires it
-if res_freq_units == "MHz":
-    res_freqs = res_freqs / 1e3
-elif res_freq_units == "kHz":
-    res_freqs = res_freqs / 1e6
-elif res_freq_units == "Hz":
-    res_freqs = res_freqs / 1e9
+class TinySweeps:
+    def __init__(self, wafer, band_number, run_number, verbose=True):
+        self.verbose = verbose
+        self.wafer = wafer
+        self.band_number = band_number
+        self.run_number = run_number
+
+        self.data_output_folder = os.path.join(output_dir, '../s21', F"{self.wafer}", F'Trace{self.band_number}',
+                                               today_str, "flux_ramp")
+        if not os.path.isdir(self.data_output_folder):
+            os.mkdir(self.data_output_folder)
+        self.file_delimiter = ","
+
+        # resonator frequencies file
+        self.freqs_filename = os.path.join(output_dir, '../s21', F"{wafer}", F'Trace{self.band_number}', today_str,
+                                           F"{self.wafer}_Trace{str(self.band_number)}_{today_str}_run{self.run_number}_fit.csv")  # "C:\\Users\\uvwave\\Desktop\\Jake_VNA\\Data\\29Aug2020\\wafer7_band0_150mK_freqs.txt"
+        self.res_freq_units = "GHz"
+        self.res_num_limits = [1, -1]  # set to -1 to ignore limits
+
+        # instrument addresses
+        self.vna_address = vna_address  # go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
+        self.volt_source_address = volt_source_address
+        self.volt_source_port = volt_source_port
+
+        # frequency sweep options
+        self.meas_span = 1000  # kHz
+        self.num_pts_per_sweep = 501  # 1601 for Aly8722ES, 100001 for P5002A
+        self.port_power = -40  # dBm
+        self.if_bw = 300  # Hz
+        self.ifbw_track = False  # ifbw tracking, reduces IFBW at low freq to overcome 1/f noise
+        self.vna_avg = 1  # number of averages. if one, set to off
+        self.preset_vna = False  # preset the VNA? Do if you don't know the state of the VNA ahead of time
+        self.keep_away_collisions = True  # option to modify frequency boundaries of s21 measurement so that we can fit better
+
+        # flux ramp options
+        self.rseries = 10000  # ohms
+        self.current_min = -125  # uA
+        self.current_max = 125  # uA
+        self.current_steps = 251
+        self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
+        self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps)  # volts
+
+        # make sure volts are in integer # of mV so SRS doesn't freak out
+        for i in range(0, len(self.volts)):
+            millivolts = int(round(self.volts[i] * 1000))
+            self.volts[i] = millivolts / 1000
+        if self.verbose:
+            print("Currents to measure at:")
+            print(self.currents)
+            print("Voltages to measure at:")
+            print(self.volts)
+
+        ### group delay removal (best to get correct within 180 degrees over dataset) ####
+        self.remove_group_delay = True
+        self.group_delay = 27.292  # nanoseconds
+
+        # uninitialized parameters for other methods in this class
+        self.res_params = None
+        self.res_freqs = None
+
+    def load_res_freqs(self):
+        # open resonant frequencies file
+        with open(self.freqs_filename, 'r') as f:
+            lines = f.readlines()
+        header = lines[0].strip().split(",")
+        self.res_params = []
+        for line in lines[1:]:
+            datavec = line.split(",")
+            self.res_params.append(ResParams(**{column_name: float(value) for column_name, value in zip(header, datavec)}))
+        self.res_freqs = np.array([res_param.f0 for res_param in self.res_params])
 
 # figure out boundaries between resonators so we don't measure a neighbor
 freq_bounds = []

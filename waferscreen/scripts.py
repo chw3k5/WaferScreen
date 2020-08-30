@@ -26,3 +26,8 @@ def sweep_to_find_resonances(project, wafer, trace_number,
     if show_plot:
         vna_meas.plot_sweep()
     return vna_meas.last_output_file
+
+
+def acquire_tiny_sweeps():
+
+    return

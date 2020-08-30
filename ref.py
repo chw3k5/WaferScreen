@@ -1,6 +1,12 @@
 import os
 from datetime import datetime
 
+# Instrument addresses
+# go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
+vna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
+volt_source_address = "GPIB0::16::INSTR"
+volt_source_port = 1
+
 # References used in the WaferScreen Catalog
 now = datetime.now()
 today_str = F"{'%4i' % now.year}-{'%02i' % now.month}-{'%02i' % now.day}"

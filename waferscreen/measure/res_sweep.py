@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.inst_control import Keysight_USB_VNA
 from waferscreen.plot import pySmith
-from ref import file_extension_to_delimiter
+from ref import file_extension_to_delimiter, vna_address
 
 
 class VnaMeas:
@@ -31,7 +31,7 @@ class VnaMeas:
         self.plot_phase = True
 
         # User VNA settings
-        self.vna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"  # go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
+        self.vna_address = vna_address
         self.fcenter_GHz = fcenter_GHz
         self.fspan_MHz = fspan_MHz
         self.num_freq_points = num_freq_points  # number of frequency points measured
