@@ -1,10 +1,12 @@
 import time
+from datetime import datetime
 import math
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.inst_control import Keysight_USB_VNA
 from waferscreen.plot import pySmith
-from ref import file_extension_to_delimiter, vna_address
+from ref import file_extension_to_delimiter, vna_address, output_dir
 
 
 class VnaMeas:
@@ -14,7 +16,7 @@ class VnaMeas:
     """
     def __init__(self, fcenter_GHz=4.15, fspan_MHz=300, num_freq_points=20001, sweeptype='lin', if_bw_Hz=100,
                  ifbw_track=False, port_power_dBm=-20, vna_avg=1, preset_vna=False,
-                 output_filename=None, auto_init=True, verbose=True):
+                 output_filename=None, auto_init=True, temperature_K=None, verbose=True):
         """
         Configuration and Option Settings
         """
@@ -23,6 +25,9 @@ class VnaMeas:
             self.output_filename = "C:\\Users\\uvwave\\Desktop\\Jake_VNA\\Data\\12Aug2020\\test_s21_500mK"  # leave extension off, added according to file type
         else:
             self.output_filename = output_filename
+            self.basename = os.path.basename(self.output_filename)
+        self.params_file = os.path.join(output_dir, "sweep_params.txt")
+
         # group delay removal settings
         self.group_delay = 2.787  # nanoseconds
 
@@ -41,6 +46,10 @@ class VnaMeas:
         self.port_power_dBm = port_power_dBm
         self.vna_avg = vna_avg  # number of averages. if one, set to off
         self.preset_vna = preset_vna  # preset the VNA? Do if you don't know the state of the VNA ahead of time
+        self.temperature_K = temperature_K
+        # requested output parameters
+        self.output_params = ['basename', 'group_delay', "fcenter_GHz", "fspan_MHz", 'num_freq_points', "sweeptype",
+                              'if_bw_Hz', 'ifbw_track', 'ifbw_track', 'vna_avg', "temperature_K"]
 
         # setting and tools for this class
         self.last_output_file = None
@@ -136,6 +145,19 @@ class VnaMeas:
         if self.verbose:
             print(file_extension.upper(), 'file written')
         self.last_output_file = output_filename
+        self.record_params()
+
+    def record_params(self):
+        if os.path.isfile(self.params_file):
+            write_mode = 'a'
+        else:
+            write_mode = 'w'
+        params_line = ""
+        for param in self.output_params:
+            params_line += param + "=" + str(self.__getattribute__(param)) + ","
+        params_line += 'utc=' + str(datetime.utcnow()) + "\n"
+        with open(self.params_file, write_mode) as f:
+            f.write(params_line)
 
     def plot_sweep(self):
         plot_freqs = []
