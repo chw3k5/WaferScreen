@@ -1,17 +1,9 @@
-from waferscreen.scripts import sweep_to_find_resonances, check_out
-from waferscreen.analyze.find_and_fit import ResFit
+from waferscreen.scripts import sweep_to_find_resonances, check_out, band_sweeps
 
 
-# sweep_file = sweep_to_find_resonances(project='so', wafer="7", trace_number=0,
-#                                       fcenter_GHz=4.10, fspan_MHz=200, num_freq_points=100001, sweeptype='lin',
-#                                       if_bw_Hz=1000,
-#                                       ifbw_track=False, port_power_dBm=-40, vna_avg=1,)
-# res_fit = ResFit(file=sweep_file,
-#                  group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)
-# sweep_file = sweep_to_find_resonances(project='so', wafer="6", trace_number=2,
-#                                       fcenter_GHz=4.350, fspan_MHz=200, num_freq_points=100001, sweeptype='lin',
-#                                       if_bw_Hz=1000,
-#                                       ifbw_track=False, port_power_dBm=-40, vna_avg=1,)
-# res_fit = ResFit(file=sweep_file, group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)
-for db in [-20]:
-    check_out(coax_path="Input2", temperature=0.15, port_power_dBm=db)
+# for db in [-30, -20, -15, -10, 0, -40, -50]:
+#     check_out(coax_path="Thru1_wZX60", temperature=300, port_power_dBm=db)
+
+
+band_sweeps(wafer=7, project="so", power_list=[-30, -25, -20, -15, -10], band_list=1,
+            lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.3)
