@@ -140,7 +140,7 @@ class TinySweeps:
         print("")
 
         # connect to SIM928
-        voltsource = srs_sim928.SRS_SIM928(address=volt_source_address, port=volt_source_port)
+        voltsource = srs_sim928.SRS_SIM928(com_num=2, address=volt_source_address, port=volt_source_port)
         voltsource.setvolt(self.volts[0])
         voltsource.output_on()
 
@@ -168,7 +168,7 @@ class TinySweeps:
                 # set frequency limits
                 if self.keep_away_collisions:
                     self.vna_meas.set_sweep_range_min_max(fmin_GHz=self.freq_bounds[j][0], fmax_GHz=self.freq_bounds[j][1])
-                    self.res_freqs = np.linspace(self.freq_bounds[j, 0], self.freq_bounds[j, 1], self.num_pts_per_sweep)
+                    self.res_freqs = np.linspace(self.freq_bounds[j][0], self.freq_bounds[j][1], self.num_pts_per_sweep)
                 else:
                     self.vna_meas.set_sweep_range_center_span(fcenter_GHz=self.res_freqs[j], fspan_MHz=self.meas_span * 1e-6)
                     self.res_freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j] +

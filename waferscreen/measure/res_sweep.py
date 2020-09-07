@@ -114,7 +114,7 @@ class VnaMeas:
             self.fmin = fmin_GHz
         if fmax_GHz is not None:
             self.fmax = fmax_GHz
-        self.vna.set_freq_limits(start=self.fmin_GHz, stop=self.fmax_GHz)
+        self.vna.set_freq_limits(start=self.fmin, stop=self.fmax)
         self.fcenter_GHz = (fmin_GHz + fmax_GHz) * 0.5
         self.fspan_MHz = (fmax_GHz - fmin_GHz) * 1000.0
         self.calulations(freq_only=True)

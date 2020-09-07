@@ -11,7 +11,6 @@ class SRS_SIM928():
             self.ResourceManager = visa.ResourceManager()
             self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
             self.ctrl.timeout = 1000
-            self.port = int(round(port))
             self.is_gpib = True
         else:
             self.ctrl = serial.Serial()
@@ -27,36 +26,43 @@ class SRS_SIM928():
         if self.is_gpib:
             self.ctrl.write(write_str)
         else:
-            self.ctrl.write(write_str.encode("utf-8"))
+            write_str += "\n"
+            b_str = write_str.encode("utf-8")
+            self.ctrl.write(b_str)
+
+    def query(self, query_str):
+        if self.is_gpib:
+            resp = self.ctrl.query(query_str)
+        else:
+            self.write(write_str=query_str)
+            b_resp = self.ctrl.read_all()
+            resp = b_resp.decode(encoding="utf-8")
+        return resp.strip()
 
     def say_hello(self):
         self.write("FLOQ")
         self.write('SNDT ' + self.port + ', "*IDN?"')
         time.sleep(0.1)
-        if self.is_gpib:
-            self.device_id = self.ctrl.query('GETN? ' + str(self.ctrl.port) + ',100')[5:].rstrip()
-        else:
-            self.write('GETN? ' + self.port + ',100')
-            self.device_id = str(self.ctrl.read_all())
-        print("Connected to : " + self.device_id)
+        self.device_id = self.query('GETN? ' + str(self.port) + ',100')  # [5:].rstrip()
+        print("Connected to :", self.device_id)
         
     def setvolt(self, volts = 0):
-        #print('SNDT ' + str(self.ctrl.port) + ', "VOLT ' + str(volts) + '"')
-        self.ctrl.write('SNDT ' + str(self.ctrl.port) + ', "VOLT ' + str(volts) + '"')
+        #print('SNDT ' + str(self.port) + ', "VOLT ' + str(volts) + '"')
+        self.write('SNDT ' + str(self.port) + ', "VOLT ' + str(volts) + '"')
         
     def getvolt(self, max_bytes = 80):
-        self.ctrl.write("FLOQ")
-        self.ctrl.write('SNDT ' + str(self.ctrl.port) + ', "VOLT?"')
+        self.write("FLOQ")
+        self.write('SNDT ' + str(self.port) + ', "VOLT?"')
         time.sleep(0.1)
-        resp = self.ctrl.query('GETN? ' + str(self.ctrl.port) + ',80')
-        self.volts = float(resp[5:].rstrip())
+        resp = self.query('GETN? ' + str(self.port) + ',80')
+        self.volts = float(resp)
         return self.volts
         
     def output_on(self):
-        self.ctrl.write('SNDT ' + str(self.ctrl.port) + ', "OPON"')
+        self.write('SNDT ' + str(self.port) + ', "OPON"')
         
     def output_off(self):
-        self.ctrl.write('SNDT ' + str(self.ctrl.port) + ', "OPOF"')
+        self.write('SNDT ' + str(self.port) + ', "OPOF"')
         
     def close(self):
         self.ctrl.close()
@@ -65,3 +71,4 @@ class SRS_SIM928():
 
 if __name__ == "__main__":
     vc = SRS_SIM928(com_num=2)
+    print(vc.query("*IDN?"))
