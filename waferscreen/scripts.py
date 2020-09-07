@@ -2,6 +2,7 @@ import os
 from ref import s21_dir, today_str, check_out_dir
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.find_and_fit import ResFit
+from waferscreen.analyze.tiny_sweeps import TinySweeps
 
 band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4147},
                "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
@@ -117,6 +118,8 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
     return res_fits
 
 
-def acquire_tiny_sweeps():
-    pass
+def acquire_tiny_sweeps(wafer, band_number=None):
+    if band_number is None:
+        band_number = "BandNone"
+    TinySweeps(wafer=wafer, band_number=band_number, run_number=1, auto_run=True, verbose=True)
     return
