@@ -118,9 +118,9 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
     return res_fits
 
 
-def acquire_tiny_sweeps(wafer, band_number=None, port_pwer_dBm=-40):
+def acquire_tiny_sweeps(wafer, band_number=None, run_number=1, port_pwer_dBm=-40, temperature_K=300):
     if band_number is None:
         band_number = "BandNone"
-    TinySweeps(wafer=wafer, band_number=band_number, run_number=1, port_power_dBm=port_pwer_dBm,
-               auto_run=True, verbose=True)
+    TinySweeps(wafer=wafer, band_number=band_number, run_number=run_number, port_power_dBm=port_pwer_dBm,
+               temperature_K=temperature_K, auto_run=True, verbose=True)
     return

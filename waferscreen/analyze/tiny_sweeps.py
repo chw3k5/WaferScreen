@@ -133,7 +133,8 @@ class TinySweeps:
         self.vna_meas = VnaMeas(fcenter_GHz=self.res_freqs[0], fspan_MHz=self.meas_span * 1e-6,
                                 num_freq_points=self.num_pts_per_sweep, sweeptype="lin", if_bw_Hz=self.if_bw,
                                 ifbw_track=self.ifbw_track, port_power_dBm=self.port_power, vna_avg=1, preset_vna=False,
-                                output_filename=None, auto_init=True, temperature_K=self.temperature_K, verbose=self.verbose)
+                                output_filename=os.path.join(output_dir, "file_name_place_holder.fake"),
+                                auto_init=True, temperature_K=self.temperature_K, verbose=self.verbose)
 
         print("")
 
@@ -163,17 +164,15 @@ class TinySweeps:
                 print("There is an error in this code....")
 
             if mask_res:
-
                 # set frequency limits
                 if self.keep_away_collisions:
                     self.vna_meas.set_sweep_range_min_max(fmin_GHz=self.freq_bounds[j][0], fmax_GHz=self.freq_bounds[j][1])
-                    freqs = np.linspace(self.freq_bounds[j, 0], self.freq_bounds[j, 1], self.num_pts_per_sweep)
+                    self.res_freqs = np.linspace(self.freq_bounds[j, 0], self.freq_bounds[j, 1], self.num_pts_per_sweep)
                 else:
                     self.vna_meas.set_sweep_range_center_span(fcenter_GHz=self.res_freqs[j], fspan_MHz=self.meas_span * 1e-6)
-                    freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j] +
+                    self.res_freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j] +
                                         self.meas_span * 1e-6 / 2.0, self.num_pts_per_sweep)
 
-                self.vna_meas.freqs = freqs
                 for single_voltage, single_current in zip(self.volts, self.currents):
                     # set voltage source
                     cur_volt = voltsource.getvolt()

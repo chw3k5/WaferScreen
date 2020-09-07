@@ -25,7 +25,7 @@ class VnaMeas:
             self.output_filename = "C:\\Users\\uvwave\\Desktop\\Jake_VNA\\Data\\12Aug2020\\test_s21_500mK"  # leave extension off, added according to file type
         else:
             self.output_filename = output_filename
-            self.basename = os.path.basename(self.output_filename)
+        self.basename = os.path.basename(self.output_filename)
         self.params_file = os.path.join(output_dir, "sweep_params.txt")
 
         # group delay removal settings
