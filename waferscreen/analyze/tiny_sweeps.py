@@ -26,15 +26,16 @@ class TinySweeps:
 
         self.temperature_K = temperature_K
 
-        self.data_output_folder = os.path.join(output_dir, '../s21', F"{self.wafer}", F'Band{self.band_number}',
+        band_str = F"Band{'%02i' % self.band_number}"
+        self.data_output_folder = os.path.join(output_dir, 's21', F"{self.wafer}", band_str,
                                                self.date_str, "flux_ramp")
         if not os.path.isdir(self.data_output_folder):
             os.mkdir(self.data_output_folder)
         self.file_delimiter = ","
 
         # resonator frequencies file
-        self.freqs_filename = os.path.join(output_dir, '../s21', F"{wafer}", F'Band{self.band_number}', self.date_str,
-                                           F"{self.wafer}_Trace{str(self.band_number)}_{self.date_str}" +
+        self.freqs_filename = os.path.join(output_dir, 's21', F"{wafer}", band_str, self.date_str,
+                                           F"{self.wafer}_{band_str}_{self.date_str}" +
                                            F"_run{self.run_number}_fit.csv")
         self.res_freq_units = "GHz"
         self.res_num_limits = [1, -1]  # set to -1 to ignore limits
