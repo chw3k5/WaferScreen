@@ -197,10 +197,6 @@ class ResFit:
             print("Fitting range is +/- " + str(self.fitting_range_kHz) + "kHz")
             print("Need to fit +/-" + str(n_samples) + " samples around each resonance center")
         prev_res_index = 0
-        # make file to write results out to
-        # Caleb changed how this file is outputted on July 14, 2020, see the write_results method
-        # f = open(self.fit_filename, "w")
-        # f.close()
         for i in range(0, len(self.res_freqs)):
             if self.verbose:
                 print("Fitting found resonance #" + str(i+1) + "/" + str(len(self.res_freqs)))
@@ -254,14 +250,6 @@ class ResFit:
                 print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_Zratio, error_Zratio))
                 print('')
 
-            # Caleb changed how this file is outputted on July 14, 2020, see the write_results method
-            # with open(self.fit_filename, "a") as f:
-            #     f.write(str(popt[0]) + "," + str(np.sqrt(pcov[0, 0])) + "," + str(popt[1]) + "," +
-            #             str(np.sqrt(pcov[1, 1])) + "," + str(popt[2]) + "," + str(np.sqrt(pcov[2, 2])) + "," +
-            #             str(popt[3]) + "," + str(np.sqrt(pcov[3, 3])) + "," + str(popt[4]) + "," +
-            #             str(np.sqrt(pcov[4, 4])) + "," + str(popt[5]) + "," + str(np.sqrt(pcov[5, 5])) + "," +
-            #             str(popt[6]) + "," + str(np.sqrt(pcov[6, 6])) + "," + str(popt[7]) + "," +
-            #             str(np.sqrt(pcov[7, 7])) + "\n")
             self.res_params.append(ResParams(Amag=fit_Amag, Amag_error=error_Amag,
                                              Aphase=fit_Aphase, Aphase_error=error_Aphase,
                                              Aslope=fit_Aslope, Aslope_error=error_Aslope,

@@ -61,18 +61,10 @@ class VnaMeas:
         """
         Calculations        
         """
-        # Figure out frequency points for recording
-        freq_radius_GHz = self.fspan_MHz / 2000.0
-        self.fmin = self.fcenter_GHz - freq_radius_GHz
-        self.fmax = self.fcenter_GHz + freq_radius_GHz
-        if self.sweeptype == "lin":
-            self.freqs = np.linspace(self.fmin, self.fmax, self.num_freq_points)
-        elif self.sweeptype == 'log':
-            logfmin = np.log10(self.fmin)
-            logfmax = np.log10(self.fmax)
-            logfreqs = np.linspace(logfmin, logfmax, self.num_freq_points)
-            self.freqs = 10.0 ** logfreqs
-
+        self.fmin = None
+        self.fmax = None
+        self.freqs = None
+        self.calulations()
         """ 
         Auto Initialization 
         """
@@ -81,6 +73,20 @@ class VnaMeas:
         else:
             self.vna = None
 
+    def calulations(self, freq_only=False):
+        if not freq_only:
+            # Figure out frequency points for recording
+            freq_radius_GHz = self.fspan_MHz / 2000.0
+            self.fmin = self.fcenter_GHz - freq_radius_GHz
+            self.fmax = self.fcenter_GHz + freq_radius_GHz
+        if self.sweeptype == "lin":
+            self.freqs = np.linspace(self.fmin, self.fmax, self.num_freq_points)
+        elif self.sweeptype == 'log':
+            logfmin = np.log10(self.fmin)
+            logfmax = np.log10(self.fmax)
+            logfreqs = np.linspace(logfmin, logfmax, self.num_freq_points)
+            self.freqs = 10.0 ** logfreqs
+
     def vna_init(self):
         # Set up Network Analyzer
         self.vna = Keysight_USB_VNA.USBVNA(address=self.vna_address)  # "PXI10::0-0.0::INSTR") #"PXI10::CHASSIS1::SLOT1::FUNC0::INSTR"
@@ -88,12 +94,30 @@ class VnaMeas:
             self.vna.preset()
         self.vna.setup_thru()
         self.vna.set_cal(calstate='OFF')  # get raw S21 data
-        self.vna.set_freq_center(center=self.fcenter_GHz, span=self.fspan_MHz / 1000.0)
+        self.set_sweep_range_center_span()
         self.vna.set_sweep(self.num_freq_points, type=self.sweeptype)
         self.vna.set_avg(count=self.vna_avg)
         self.vna.set_ifbw(self.if_bw_Hz, track=self.ifbw_track)
         self.vna.set_power(port=1, level=self.port_power_dBm, state="ON")
         time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
+
+    def set_sweep_range_center_span(self, fcenter_GHz=None, fspan_MHz=None):
+        if fcenter_GHz is not None:
+            self.fcenter_GHz = fcenter_GHz
+        if fspan_MHz is not None:
+            self.fspan_MHz = fspan_MHz
+        self.vna.set_freq_center(center=self.fcenter_GHz, span=self.fspan_MHz / 1000.0)
+        self.calulations()
+
+    def set_sweep_range_min_max(self, fmin_GHz=None, fmax_GHz=None):
+        if fmin_GHz is not None:
+            self.fmin = fmin_GHz
+        if fmax_GHz is not None:
+            self.fmax = fmax_GHz
+        self.vna.set_freq_limits(start=self.fmin_GHz, stop=self.fmax_GHz)
+        self.fcenter_GHz = (fmin_GHz + fmax_GHz) * 0.5
+        self.fspan_MHz = (fmax_GHz - fmin_GHz) * 1000.0
+        self.calulations(freq_only=True)
 
     def vna_sweep(self):
         # trigger a sweep to be done
@@ -121,6 +145,37 @@ class VnaMeas:
         # convert data from data_format to both LM for plotting
         self.s21LM = 10 * np.log10(self.s21R ** 2 + self.s21I ** 2)
         self.s21PH = 180.0 / np.pi * np.arctan2(self.s21I, self.s21R)
+
+    def vna_tiny_sweeps(self, single_current, res_number):
+        # trigger a sweep to be done
+        self.vna.reset_sweep()
+        self.vna.trig_sweep()
+
+        # collect data according to data_format LM or RI
+        (s21Au, s21Bu) = self.vna.get_S21(format='RI')
+        print("Trace Acquired")
+
+        # put uncalibrated data in complex format
+        s21 = []
+        for i in range(0, len(self.freqs)):
+            s21.append(s21Au[i] + 1j * s21Bu[i])
+        s21 = np.array(s21)
+
+        # remove group delay
+        if self.group_delay is not None:
+            phase_factors = np.exp(-1j * 2.0 * math.pi * self.freqs * self.group_delay)
+            s21 = s21 / phase_factors
+
+        if single_current >= 0:
+            ind_filename = F"sdata_res_{res_number}_cur_" + str(int(round(single_current))) + "uA.csv"
+        else:
+            ind_filename = F"sdata_res_{res_number}_cur_m" + str(int(round(-1 * single_current))) + "uA.csv"
+
+        # write out sdata
+        f = open(os.path.join(self.basename, ind_filename), 'w')
+        for i in range(0, len(self.freqs)):
+            f.write(str(self.freqs[i]) + "," + str(s21[i].real) + "," + str(s21[i].imag) + "\n")
+        f.close()
 
     def vna_close(self):
         self.vna.close()
