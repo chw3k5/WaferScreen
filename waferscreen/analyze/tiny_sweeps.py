@@ -1,11 +1,8 @@
 import numpy as np
-import math
-import time
 import os
 from ref import output_dir, today_str, vna_address, volt_source_address, volt_source_port
-from waferscreen.inst_control import Keysight_USB_VNA
 from waferscreen.inst_control import srs_sim928
-from waferscreen.analyze.find_and_fit import ResParams
+from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit
 from waferscreen.measure.res_sweep import VnaMeas
 
 ###
@@ -14,11 +11,14 @@ from waferscreen.measure.res_sweep import VnaMeas
 
 
 class TinySweeps:
-    def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None, auto_run=False, verbose=True):
+    def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None,
+                 fit_number=1, remove_baseline_ripple=False, auto_run=False, verbose=True):
         self.verbose = verbose
         self.wafer = wafer
         self.band_number = band_number
         self.run_number = run_number
+        self.fit_number = fit_number
+        self.remove_baseline_ripple = remove_baseline_ripple
         if date_str is None:
             self.date_str = today_str
         else:
@@ -59,7 +59,7 @@ class TinySweeps:
         self.rseries = 10000  # ohms
         self.current_min = -125  # uA
         self.current_max = 125  # uA
-        self.current_steps = 251
+        self.current_steps = 51
         self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
         self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps)  # volts
 
@@ -192,3 +192,35 @@ class TinySweeps:
         self.vna_meas.vna_close()
 
         print("Connection to Instruments Closed")
+
+    def analyze_sweep(self, file):
+        basename = os.path.basename(file)
+        res_num, current_mA_str = basename.rstrip('uA.csv').lstrip("sdata_res_").split('_cur_')
+        if "m" == current_mA_str[0]:
+            current_mA = -1.0 * float(current_mA_str[1:])
+        else:
+            current_mA = float(current_mA_str)
+        res_out_dir = os.path.join(self.data_output_folder, 'res_fits')
+        if not os.path.isdir(res_out_dir):
+            os.mkdir(res_out_dir)
+        output_filename = os.path.join(res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}.csv")
+        if not os.path.isfile(output_filename):
+            with open(output_filename, "w") as f:
+                f.write("ramp_current_mA,res_num," + res_params_header + "\n")
+        res_fit = ResFit(file=file, group_delay=0, verbose=self.verbose, freq_units=self.res_freq_units,
+                         remove_baseline_ripple=self.remove_baseline_ripple,
+                         auto_process=True)
+        with open(output_filename, 'a') as f:
+            for single_res_params in res_fit.res_params:
+                f.write(str(current_mA) + "," + res_num + "," + str(single_res_params) + "\n")
+
+    def analyze_all(self):
+        list_of_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
+                         if os.path.isfile(os.path.join(self.data_output_folder, f))]
+        for file_name in sorted(list_of_files):
+            self.analyze_sweep(file=file_name)
+
+
+if __name__ == "__main__":
+    ts = TinySweeps(wafer=7, band_number=1, run_number=-1, auto_run=False, verbose=True)
+    ts.analyze_all()

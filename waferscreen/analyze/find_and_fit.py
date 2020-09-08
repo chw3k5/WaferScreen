@@ -46,7 +46,7 @@ class ResParams(NamedTuple):
 
 
 class ResFit:
-    def __init__(self, file, group_delay=None, verbose=True, freq_units="MHz", auto_process=True):
+    def __init__(self, file, group_delay=None, remove_baseline_ripple=False, verbose=True, freq_units="MHz", auto_process=True):
         self.filename = file
         file_basename = os.path.basename(file)
         base_handle, _extension = file_basename.rsplit(".", 1)
@@ -67,7 +67,7 @@ class ResFit:
         self.smoothing_order = 5                     # smoothing order in savitsky-golay procedure
         self.cutoff_rate = 5000                      # cutoff in Qt^2/Qc to find resonances
         self.minimum_spacing_kHz = 100.0             # minimum spacing between resonances
-        self.remove_baseline_ripple_find_res = True  # uses a wider savitsky-golay procedure to remove baseline ripple during resonance finding
+        self.remove_baseline_ripple_find_res = remove_baseline_ripple  # uses a wider savitsky-golay procedure to remove baseline ripple during resonance finding
         self.baseline_scale_kHz_find_res = 3000      # smoothing scale for baseline ripple removal, should be ~30x smoothing_scale_kHz
         self.baseline_order_find_res = 3             # smoothing order for baseline ripple removal
         self.make_plots_find_res = True              # make plots during resonance finding

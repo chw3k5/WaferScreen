@@ -101,7 +101,7 @@ def find_resonances(freqs,
 
     # remove baseline ripple if desired
     if remove_baseline_ripple:
-        freq_spacing = (freqs[1] - freqs[0]) * 1e6  # GHz -> kHz
+        freq_spacing = (freqs[1] - freqs[0]) * 1.0e6  # GHz -> kHz
         baseline_scale = int(round(baseline_scale_kHz / freq_spacing))
         if baseline_scale % 2 == 0:  # if even
             baseline_scale = baseline_scale + 1  # make it odd
@@ -272,6 +272,7 @@ def find_resonances(freqs,
             plt.show()
         fig1.clf()
         fig4.clf()
-        fig5.clf()
+        if remove_baseline_ripple:
+            fig5.clf()
 
     return frs

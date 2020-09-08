@@ -108,7 +108,7 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
         sweep_file = sweep_to_find_resonances(project=project, wafer=wafer,
                                               fcenter_GHz=None, fspan_GHz=None, num_freq_points=100001, sweeptype='lin',
                                               if_bw_Hz=1000,
-                                              band=1, lower_extra_span_fraction=lower_extra_span_fraction,
+                                              band=band, lower_extra_span_fraction=lower_extra_span_fraction,
                                               upper_extra_span_fraction=upper_extra_span_fraction,
                                               ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,
                                               temperature_K=temperature_K)
@@ -124,4 +124,10 @@ def acquire_tiny_sweeps(wafer, band_number=None, run_number=1, port_pwer_dBm=-40
         band_number = "BandNone"
     TinySweeps(wafer=wafer, band_number=band_number, run_number=run_number, port_power_dBm=port_pwer_dBm,
                temperature_K=temperature_K, auto_run=True, verbose=True)
+    return
+
+
+def analyze_tiny_sweeps(wafer, band_number=None):
+    ts = TinySweeps(wafer=wafer, band_number=band_number, run_number=-1, auto_run=False, verbose=True)
+    ts.analyze_all()
     return

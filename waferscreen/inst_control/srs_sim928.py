@@ -24,6 +24,7 @@ class SRS_SIM928:
             self.is_open = self.ctrl.is_open
             self.is_gpib = False
             # self.write_to_port('BAUD' + baud_rate)
+        self.flush_queue()
         self.say_hello()
 
     def write(self, write_str):
@@ -44,10 +45,14 @@ class SRS_SIM928:
             resp = b_resp.decode(encoding="utf-8")
         return resp.strip()
 
-    def query(self, query_str):
+    def query(self, query_str, resp_type=None):
         raw_resp = "#3000"
-        while raw_resp == "#3000":
-            raw_resp = self.try_query(query_str=query_str)
+        if resp_type is None:
+            while raw_resp == "#3000":
+                raw_resp = self.try_query(query_str=query_str)
+        else:
+            while raw_resp[:5] != resp_type:
+                raw_resp = self.try_query(query_str=query_str)
         resp = raw_resp[5:]
         return resp
 
@@ -55,17 +60,17 @@ class SRS_SIM928:
         to_port_write_str = 'SNDT' + self.port + ',\"' + write_str + '\"'
         self.write(write_str=to_port_write_str)
 
-    def query_from_port(self, len_str):
+    def query_from_port(self, len_str, resp_type=None):
         question = 'GETN?'
         from_port_query_str = question + str(self.port) + ',' + str(len_str)
-        return self.query(query_str=from_port_query_str)
+        return self.query(query_str=from_port_query_str, resp_type=resp_type)
 
     def flush_queue(self):
         self.write("FLOQ")
 
     def say_hello(self):
         self.write_to_port('*IDN?')
-        self.device_id = self.query_from_port(len_str='100')  # [5:].rstrip()
+        self.device_id = self.query_from_port(len_str='100', resp_type="#3051")  # [5:].rstrip()
         print("Connected to :", self.device_id)
         
     def setvolt(self, voltage=0.0):
@@ -74,7 +79,7 @@ class SRS_SIM928:
     def getvolt(self, max_bytes=80):
         self.flush_queue()
         self.write_to_port('VOLT?')
-        resp = self.query_from_port(str(max_bytes))
+        resp = self.query_from_port(str(max_bytes), resp_type="#3008")
         self.volts = float(resp)
         return self.volts
         
