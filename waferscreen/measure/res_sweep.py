@@ -26,6 +26,7 @@ class VnaMeas:
         else:
             self.output_filename = output_filename
         self.basename = os.path.basename(self.output_filename)
+        self.dirname = os.path.dirname(self.output_filename)
         self.params_file = os.path.join(output_dir, "sweep_params.txt")
 
         # group delay removal settings
@@ -172,7 +173,7 @@ class VnaMeas:
             ind_filename = F"sdata_res_{res_number}_cur_m" + str(int(round(-1 * single_current))) + "uA.csv"
 
         # write out sdata
-        f = open(os.path.join(self.basename, ind_filename), 'w')
+        f = open(os.path.join(self.dirname, ind_filename), 'w')
         for i in range(0, len(self.freqs)):
             f.write(str(self.freqs[i]) + "," + str(s21[i].real) + "," + str(s21[i].imag) + "\n")
         f.close()

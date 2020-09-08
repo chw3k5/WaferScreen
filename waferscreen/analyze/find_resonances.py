@@ -227,45 +227,51 @@ def find_resonances(freqs,
         ax12.set_xlabel("Freq. (GHz)")
         ax12.set_ylabel(r"$\angle S_{21}$ (Deg)")
         ax12.legend(loc='upper right')
+        fig1.savefig(os.path.join(plot_dir, file_prefix + "fig1_results.pdf"))
 
         # plot 1st derivative in r-hat and theta-hat vs. freq
-        fig3 = plt.figure(3)
-        ax32 = fig3.add_subplot(111)
-        ax32.plot(first_deriv_freqs, first_deriv_rot_smooth[:, 1] * (first_deriv_freqs / 2.0), c='r')
-        ax32.set_xlabel("Freq. (GHz)")
-        ax32.set_ylabel(
+        fig4 = plt.figure(4)
+        ax42 = fig4.add_subplot(111)
+        ax42.plot(first_deriv_freqs, first_deriv_rot_smooth[:, 1] * (first_deriv_freqs / 2.0), c='r')
+        ax42.set_xlabel("Freq. (GHz)")
+        ax42.set_ylabel(
             r"$\frac{Q_t^2}{Q_c} = \frac{\omega_0}{2}\frac{\partial S_{21}}{\partial f} \cdot \hat{\theta}$")
         # mark found resonances
         for i in range(0, len(frs)):
-            ax32.plot([frs[i], frs[i]], [Qts[i], -7500], c='k', linestyle='--')
-            ax32.text(frs[i] - 0.001, -10000, str(i), fontsize=10)
-        ax32.set_ylim([-15000, 1.1 * np.amax(first_deriv_rot_smooth[:, 1] * (first_deriv_freqs / 2.0))])
-        ax32.scatter(frs, Qts, color='b', s=20.0)
-        ax32.plot([np.amin(freqs), np.amax(freqs)], [cutoff_rate, cutoff_rate], linestyle='--', color='k')
+            ax42.plot([frs[i], frs[i]], [Qts[i], -7500], c='k', linestyle='--')
+            ax42.text(frs[i] - 0.001, -10000, str(i), fontsize=10)
+        ax42.set_ylim([-15000, 1.1 * np.amax(first_deriv_rot_smooth[:, 1] * (first_deriv_freqs / 2.0))])
+        ax42.scatter(frs, Qts, color='b', s=20.0)
+        ax42.plot([np.amin(freqs), np.amax(freqs)], [cutoff_rate, cutoff_rate], linestyle='--', color='k')
+        fig4.savefig(os.path.join(plot_dir, file_prefix + "fig4_rhat_theata_hat.pdf"))
 
         if remove_baseline_ripple:
             # plot baseline removal data
-            fig4 = plt.figure(4)
-            ax41 = fig4.add_subplot(121)
-            ax41.plot(freqs, 20.0 * np.log10(np.absolute(pre_baseline_removal_sdata)), c='b', label='Raw')
-            ax41.plot(freqs, 20.0 * np.log10(np.absolute(sdata)), c='r', label='Baseline Removed')
-            ax41.plot(freqs, 20.0 * np.log10(np.absolute(baseline)), c='g', label='Baseline')
-            ax41.set_ylim([-15, 2.5])
-            ax41.set_xlabel("Freq. (GHz)")
-            ax41.set_ylabel(r"$\left| S_{21} \right|^2$ (dB)")
-            ax41.legend(loc='upper right')
+            fig5 = plt.figure(5)
+            ax51 = fig5.add_subplot(121)
+            ax51.plot(freqs, 20.0 * np.log10(np.absolute(pre_baseline_removal_sdata)), c='b', label='Raw')
+            ax51.plot(freqs, 20.0 * np.log10(np.absolute(sdata)), c='r', label='Baseline Removed')
+            ax51.plot(freqs, 20.0 * np.log10(np.absolute(baseline)), c='g', label='Baseline')
+            ax51.set_ylim([-15, 2.5])
+            ax51.set_xlabel("Freq. (GHz)")
+            ax51.set_ylabel(r"$\left| S_{21} \right|^2$ (dB)")
+            ax51.legend(loc='upper right')
 
-            ax42 = fig4.add_subplot(122)
-            ax42.plot(freqs, 180.0 / math.pi * np.arctan2(np.imag(pre_baseline_removal_sdata),
+            ax52 = fig5.add_subplot(122)
+            ax52.plot(freqs, 180.0 / math.pi * np.arctan2(np.imag(pre_baseline_removal_sdata),
                                                           np.real(pre_baseline_removal_sdata)), c='b', label='Raw')
-            ax42.plot(freqs, 180.0 / math.pi * np.arctan2(np.imag(sdata), np.real(sdata)), c='r',
+            ax52.plot(freqs, 180.0 / math.pi * np.arctan2(np.imag(sdata), np.real(sdata)), c='r',
                       label='Baseline Removed')
-            ax42.plot(freqs, 180.0 / math.pi * np.arctan2(np.imag(baseline), np.real(baseline)), c='g',
+            ax52.plot(freqs, 180.0 / math.pi * np.arctan2(np.imag(baseline), np.real(baseline)), c='g',
                       label='Baseline')
-            ax42.set_xlabel("Freq. (GHz)")
-            ax42.set_ylabel(r"$\angle S_{21}$ (Deg)")
-            ax42.legend(loc='upper right')
-
-        plt.show()
+            ax52.set_xlabel("Freq. (GHz)")
+            ax52.set_ylabel(r"$\angle S_{21}$ (Deg)")
+            ax52.legend(loc='upper right')
+            fig5.savefig(os.path.join(plot_dir, file_prefix + "fig5_baseline_ripple.pdf"))
+        if show_plot:
+            plt.show()
+        fig1.clf()
+        fig4.clf()
+        fig5.clf()
 
     return frs

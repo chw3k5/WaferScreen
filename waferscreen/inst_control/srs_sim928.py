@@ -9,6 +9,7 @@ class SRS_SIM928:
     def __init__(self, com_num=None, address="GPIB0::16::INSTR", port=1):
         self.port = str(port)
         self.voltage_precision = '3'
+        self.voltage_format_str = '%1.' + self.voltage_precision + 'e'
         if com_num is None:
             self.ResourceManager = visa.ResourceManager()
             self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
@@ -57,7 +58,7 @@ class SRS_SIM928:
     def query_from_port(self, len_str):
         question = 'GETN?'
         from_port_query_str = question + str(self.port) + ',' + str(len_str)
-        self.query(query_str=from_port_query_str)
+        return self.query(query_str=from_port_query_str)
 
     def flush_queue(self):
         self.write("FLOQ")
@@ -68,12 +69,11 @@ class SRS_SIM928:
         print("Connected to :", self.device_id)
         
     def setvolt(self, voltage=0.0):
-        self.write_to_port(F"VOLT{'%1.' + self.voltage_precision + 'e' % voltage}")
+        self.write_to_port(F"VOLT{self.voltage_format_str % voltage}")
 
     def getvolt(self, max_bytes=80):
         self.flush_queue()
         self.write_to_port('VOLT?')
-        time.sleep(0.1)
         resp = self.query_from_port(str(max_bytes))
         self.volts = float(resp)
         return self.volts

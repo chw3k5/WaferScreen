@@ -134,7 +134,7 @@ class TinySweeps:
         self.vna_meas = VnaMeas(fcenter_GHz=self.res_freqs[0], fspan_MHz=self.meas_span * 1e-6,
                                 num_freq_points=self.num_pts_per_sweep, sweeptype="lin", if_bw_Hz=self.if_bw,
                                 ifbw_track=self.ifbw_track, port_power_dBm=self.port_power, vna_avg=1, preset_vna=False,
-                                output_filename=os.path.join(output_dir, "file_name_place_holder.fake"),
+                                output_filename=os.path.join(self.data_output_folder, "file_name_place_holder.fake"),
                                 auto_init=True, temperature_K=self.temperature_K, verbose=self.verbose)
 
         print("")
@@ -167,21 +167,20 @@ class TinySweeps:
             if mask_res:
                 # set frequency limits
                 if self.keep_away_collisions:
-                    self.vna_meas.set_sweep_range_min_max(fmin_GHz=self.freq_bounds[j][0], fmax_GHz=self.freq_bounds[j][1])
-                    self.res_freqs = np.linspace(self.freq_bounds[j][0], self.freq_bounds[j][1], self.num_pts_per_sweep)
+                    self.vna_meas.set_sweep_range_min_max(fmin_GHz=self.freq_bounds[j][0],
+                                                          fmax_GHz=self.freq_bounds[j][1])
+                    # self.freqs = np.linspace(self.freq_bounds[j][0], self.freq_bounds[j][1], self.num_pts_per_sweep)
                 else:
                     self.vna_meas.set_sweep_range_center_span(fcenter_GHz=self.res_freqs[j], fspan_MHz=self.meas_span * 1e-6)
-                    self.res_freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j] +
-                                        self.meas_span * 1e-6 / 2.0, self.num_pts_per_sweep)
+                    # self.freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j] +
+                    #                          self.meas_span * 1e-6 / 2.0, self.num_pts_per_sweep)
 
                 for single_voltage, single_current in zip(self.volts, self.currents):
                     # set voltage source
                     cur_volt = voltsource.getvolt()
                     while abs(cur_volt - single_voltage) > 0.001:
                         voltsource.setvolt(single_voltage)
-                        time.sleep(0.1)
                         cur_volt = voltsource.getvolt()
-                    time.sleep(0.1)
 
                     print("Measuring resonator # " + str(j + 1) + "/" + str(len(self.res_freqs)) +
                           " at flux bias current " + str(single_current) + "uA")

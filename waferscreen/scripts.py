@@ -36,7 +36,7 @@ def calc_band_edges(min_GHz, max_GHz, center_GHz,
         return lower_edge, upper_edge
 
 
-def sweep_to_find_resonances(project, wafer,
+def sweep_to_find_resonances(project, wafer, temperature_K=300,
                              fcenter_GHz=None, fspan_GHz=None, num_freq_points=20001, sweeptype='lin', if_bw_Hz=100,
                              ifbw_track=False, port_power_dBm=-30, vna_avg=1, preset_vna=False,
                              band=None, lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1,
@@ -65,7 +65,7 @@ def sweep_to_find_resonances(project, wafer,
                        ifbw_track=ifbw_track, port_power_dBm=port_power_dBm, vna_avg=vna_avg, preset_vna=preset_vna,
                        output_filename=os.path.join(sweep_dir, sweep_base_name + str(run_number)),
                        auto_init=True,
-                       verbose=verbose)
+                       verbose=verbose, temperature_K=temperature_K)
     vna_meas.vna_sweep()
     vna_meas.write_sweep(file_extension='csv')
     if show_plot:
@@ -92,7 +92,7 @@ def check_out(coax_path, temperature=300, fcenter_GHz=10, fspan_MHz=20000, num_f
 
 
 def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
-                lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1):
+                lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1, temperature_K=300):
     if band_list is None:
         band_list = ["BandNone"]
     elif isinstance(band_list, (int, float, str)):
@@ -110,7 +110,8 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
                                               if_bw_Hz=1000,
                                               band=1, lower_extra_span_fraction=lower_extra_span_fraction,
                                               upper_extra_span_fraction=upper_extra_span_fraction,
-                                              ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,)
+                                              ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,
+                                              temperature_K=temperature_K)
 
         res_fit = ResFit(file=sweep_file,
                          group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)
