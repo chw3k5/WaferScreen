@@ -3,10 +3,10 @@ import time
 import serial
 
 
-
 class SRS_SIM928:
     """ Stanford Research Systems SIM928 Isolated Voltage Source """
     def __init__(self, com_num=None, address="GPIB0::16::INSTR", port=1):
+        self.device_id = None
         self.port = str(port)
         self.voltage_precision = '3'
         self.voltage_format_str = '%1.' + self.voltage_precision + 'e'
@@ -47,11 +47,13 @@ class SRS_SIM928:
 
     def query(self, query_str, resp_type=None):
         raw_resp = "#3000"
+        count = 0
         if resp_type is None:
-            while raw_resp == "#3000":
+            while raw_resp == "#3000" and count < 5:
+                count += 1
                 raw_resp = self.try_query(query_str=query_str)
         else:
-            while raw_resp[:5] != resp_type:
+            while raw_resp[:5] != resp_type and count < 5:
                 raw_resp = self.try_query(query_str=query_str)
         resp = raw_resp[5:]
         return resp
@@ -60,26 +62,27 @@ class SRS_SIM928:
         to_port_write_str = 'SNDT' + self.port + ',\"' + write_str + '\"'
         self.write(write_str=to_port_write_str)
 
-    def query_from_port(self, len_str, resp_type=None):
+    def query_from_port(self, write_to_port_str, len_str, resp_type=None):
         question = 'GETN?'
         from_port_query_str = question + str(self.port) + ',' + str(len_str)
-        return self.query(query_str=from_port_query_str, resp_type=resp_type)
+        resp = ""
+        while resp == "":
+            self.write_to_port(write_to_port_str)
+            resp = self.query(query_str=from_port_query_str, resp_type=resp_type)
+        return resp
 
     def flush_queue(self):
         self.write("FLOQ")
 
     def say_hello(self):
-        self.write_to_port('*IDN?')
-        self.device_id = self.query_from_port(len_str='100', resp_type="#3051")  # [5:].rstrip()
+        self.device_id = self.query_from_port(write_to_port_str='*IDN?', len_str='100', resp_type="#3051")
         print("Connected to :", self.device_id)
         
     def setvolt(self, voltage=0.0):
         self.write_to_port(F"VOLT{self.voltage_format_str % voltage}")
 
     def getvolt(self, max_bytes=80):
-        self.flush_queue()
-        self.write_to_port('VOLT?')
-        resp = self.query_from_port(str(max_bytes), resp_type="#3008")
+        resp = self.query_from_port(write_to_port_str='VOLT?', len_str=str(max_bytes), resp_type="#3008")
         self.volts = float(resp)
         return self.volts
         
