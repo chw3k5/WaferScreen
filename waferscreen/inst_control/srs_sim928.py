@@ -9,7 +9,7 @@ class SRS_SIM928:
         self.device_id = None
         self.port = str(port)
         self.voltage_precision = '3'
-        self.voltage_format_str = '%1.' + self.voltage_precision + 'e'
+        self.voltage_format_str = '%1.' + self.voltage_precision + 'f'
         if com_num is None:
             self.ResourceManager = visa.ResourceManager()
             self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
@@ -54,6 +54,7 @@ class SRS_SIM928:
                 raw_resp = self.try_query(query_str=query_str)
         else:
             while raw_resp[:5] != resp_type and count < 5:
+                count += 1
                 raw_resp = self.try_query(query_str=query_str)
         resp = raw_resp[5:]
         return resp
@@ -79,7 +80,10 @@ class SRS_SIM928:
         print("Connected to :", self.device_id)
         
     def setvolt(self, voltage=0.0):
-        self.write_to_port(F"VOLT{self.voltage_format_str % voltage}")
+        number_str = str(self.voltage_format_str % voltage) + "e+0"
+        if number_str[0] != "-":
+            number_str = " " + number_str
+        self.write_to_port(F"VOLT{number_str}")
 
     def getvolt(self, max_bytes=80):
         resp = self.query_from_port(write_to_port_str='VOLT?', len_str=str(max_bytes), resp_type="#3008")
