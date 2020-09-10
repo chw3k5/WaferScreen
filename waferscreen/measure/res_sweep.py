@@ -34,7 +34,7 @@ class VnaMeas:
     """
     def __init__(self, fcenter_GHz=4.15, fspan_MHz=300, num_freq_points=20001, sweeptype='lin', if_bw_Hz=100,
                  ifbw_track=False, port_power_dBm=-20, vna_avg=1, preset_vna=False,
-                 output_filename=None, auto_init=True, temperature_K=None, verbose=True):
+                 output_filename=None, auto_init=True, temperature_K=None, use_exact_num_of_points=False, verbose=True):
         """
         Configuration and Option Settings
         """
@@ -60,6 +60,7 @@ class VnaMeas:
         self.fcenter_GHz = fcenter_GHz
         self.fspan_MHz = fspan_MHz
         self.num_freq_points = num_freq_points  # number of frequency points measured
+        self.use_exact_num_of_points = use_exact_num_of_points
         self.sweeptype = sweeptype  # lin or log in freq space
         self.if_bw_Hz = if_bw_Hz
         self.ifbw_track = ifbw_track  # ifbw tracking, reduces IFBW at low freq to overcome 1/f noise
@@ -113,7 +114,7 @@ class VnaMeas:
             self.vna_address = usbvna_address
             self.max_frequency_points = 100001
             # Set up Network Analyzer
-            self.vna = Keysight_USB_VNA.USBVNA(address=self.vna_address)  # "PXI10::0-0.0::INSTR") #"PXI10::CHASSIS1::SLOT1::FUNC0::INSTR"
+            self.vna = Keysight_USB_VNA.USBVNA(address=self.vna_address)
             if self.preset_vna:
                 self.vna.preset()
             self.vna.setup_thru()
@@ -122,11 +123,12 @@ class VnaMeas:
             self.vna_address = agilent8722es_address
             self.max_frequency_points = 1601
             multiple_of_max_points = 0
-            # only a few values of points are allowed for this VNA,
-            # change the requested number of points to be a multiple of an allowed value, the max points
-            while self.num_freq_points > multiple_of_max_points:
-                multiple_of_max_points += self.max_frequency_points
-            self.num_freq_points = multiple_of_max_points
+            if not self.use_exact_num_of_points:
+                # only a few values of points are allowed for this VNA,
+                # change the requested number of points to be a multiple of an allowed value, the max points
+                while self.num_freq_points > multiple_of_max_points:
+                    multiple_of_max_points += self.max_frequency_points
+                self.num_freq_points = multiple_of_max_points
             self.calulations()
             self.vna = aly8722ES(address=self.vna_address)
         else:

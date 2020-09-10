@@ -3,7 +3,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 
-file = os.path.join(s21_dir, "so", "7_Band01_2020-09-10_run8.csv")
+file = os.path.join(s21_dir, "so", "7_Band02_2020-09-10_run2.csv")
 
 with open(file, 'r') as f:
     raw_lines = f.readlines()

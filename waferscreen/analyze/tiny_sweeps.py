@@ -55,7 +55,7 @@ class TinySweeps:
 
         # frequency sweep options
         self.meas_span = 1000  # kHz
-        self.num_pts_per_sweep = 501  # 1601 for Aly8722ES, 100001 for P5002A
+        self.num_pts_per_sweep = 401  # 1601 for Aly8722ES, 100001 for P5002A
         self.port_power = port_power_dBm  # dBm
         self.if_bw = 300  # Hz
         self.ifbw_track = False  # ifbw tracking, reduces IFBW at low freq to overcome 1/f noise
@@ -67,7 +67,7 @@ class TinySweeps:
         self.rseries = 10000  # ohms
         self.current_min = -125  # uA
         self.current_max = 125  # uA
-        self.current_steps = 2
+        self.current_steps = 251
         self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
         self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps) # volts
 
@@ -144,19 +144,13 @@ class TinySweeps:
                                 num_freq_points=self.num_pts_per_sweep, sweeptype="lin", if_bw_Hz=self.if_bw,
                                 ifbw_track=self.ifbw_track, port_power_dBm=self.port_power, vna_avg=1, preset_vna=False,
                                 output_filename=os.path.join(self.data_output_folder, "file_name_place_holder.fake"),
-                                auto_init=True, temperature_K=self.temperature_K, verbose=self.verbose)
-
-        print("")
-
+                                auto_init=True, temperature_K=self.temperature_K, use_exact_num_of_points=True,
+                                verbose=self.verbose)
         # connect to SIM928
         voltsource = srs_sim928.SRS_SIM928(com_num=2, address=volt_source_address, port=volt_source_port)
         voltsource.setvolt(self.volts[0])
         voltsource.output_on()
-
-        print("")
-
         for j in range(len(self.res_freqs)):
-
             # only fit resonators we want to fit...
             mask_res = False
             if self.res_num_limits[0] != -1 and self.res_num_limits[1] != -1:
@@ -171,18 +165,20 @@ class TinySweeps:
             elif self.res_num_limits[0] == -1 and self.res_num_limits[1] == -1:
                 mask_res = True
             else:
-                print("There is an error in this code....")
+                raise KeyError("There is an error in this code....")
 
             if mask_res:
                 # set frequency limits
                 if self.keep_away_collisions:
                     self.vna_meas.set_sweep_range_min_max(fmin_GHz=self.freq_bounds[j][0],
                                                           fmax_GHz=self.freq_bounds[j][1])
-                    # self.freqs = np.linspace(self.freq_bounds[j][0], self.freq_bounds[j][1], self.num_pts_per_sweep)
+                    self.vna_meas.freqs = np.linspace(self.freq_bounds[j][0], self.freq_bounds[j][1],
+                                                      self.num_pts_per_sweep)
                 else:
-                    self.vna_meas.set_sweep_range_center_span(fcenter_GHz=self.res_freqs[j], fspan_MHz=self.meas_span * 1e-6)
-                    # self.freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j] +
-                    #                          self.meas_span * 1e-6 / 2.0, self.num_pts_per_sweep)
+                    self.vna_meas.set_sweep_range_center_span(fcenter_GHz=self.res_freqs[j],
+                                                              fspan_MHz=self.meas_span * 1e-6)
+                    self.vna_meas.freqs = np.linspace(self.res_freqs[j] - self.meas_span * 1e-6 / 2.0, self.res_freqs[j]
+                                                      + self.meas_span * 1e-6 / 2.0, self.num_pts_per_sweep)
 
                 for single_voltage, single_current in zip(self.volts, self.currents):
                     # set voltage source
@@ -190,17 +186,17 @@ class TinySweeps:
                     cur_volt = voltsource.getvolt()
                     if abs(cur_volt - single_voltage) > 0.001:
                         raise IOError("Voltage failed to set for SIM928")
-
-                    print("Measuring resonator # " + str(j + 1) + "/" + str(len(self.res_freqs)) +
-                          " at flux bias current " + str(single_current) + "uA")
+                    if self.verbose:
+                        print("Measuring resonator # " + str(j + 1) + "/" + str(len(self.res_freqs)) +
+                              " at flux bias current " + str(single_current) + "uA")
 
                     # trigger a sweep to be done
                     self.vna_meas.vna_tiny_sweeps(single_current, res_number=j)
 
         # close connection to instruments
         self.vna_meas.vna_close()
-
-        print("Connection to Instruments Closed")
+        if self.verbose:
+            print("Connection to Instruments Closed")
 
     def make_res_fit_file(self, res_num):
         return os.path.join(self.res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}.csv")
