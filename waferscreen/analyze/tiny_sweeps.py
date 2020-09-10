@@ -65,9 +65,9 @@ class TinySweeps:
 
         # flux ramp options
         self.rseries = 10000  # ohms
-        self.current_min = -124  # uA
-        self.current_max = -4  # uA
-        self.current_steps = 31
+        self.current_min = -125  # uA
+        self.current_max = 125  # uA
+        self.current_steps = 2
         self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
         self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps) # volts
 

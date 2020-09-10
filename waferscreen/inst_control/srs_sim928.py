@@ -53,7 +53,7 @@ class SRS_SIM928:
                 count += 1
                 raw_resp = self.try_query(query_str=query_str)
         else:
-            while raw_resp[:5] != resp_type and count < 5:
+            while raw_resp[:5] not in resp_type and count < 5:
                 count += 1
                 raw_resp = self.try_query(query_str=query_str)
         resp = raw_resp[5:]
@@ -76,17 +76,17 @@ class SRS_SIM928:
         self.write("FLOQ")
 
     def say_hello(self):
-        self.device_id = self.query_from_port(write_to_port_str='*IDN?', len_str='100', resp_type="#3051")
+        self.device_id = self.query_from_port(write_to_port_str='*IDN?', len_str='100', resp_type={"#3051"})
         print("Connected to :", self.device_id)
         
     def setvolt(self, voltage=0.0):
-        number_str = str(self.voltage_format_str % voltage) + "e+0"
+        number_str = str(self.voltage_format_str % voltage)
         if number_str[0] != "-":
             number_str = " " + number_str
         self.write_to_port(F"VOLT{number_str}")
 
-    def getvolt(self, max_bytes=80):
-        resp = self.query_from_port(write_to_port_str='VOLT?', len_str=str(max_bytes), resp_type="#3008")
+    def getvolt(self, max_bytes=100):
+        resp = self.query_from_port(write_to_port_str='VOLT?', len_str=str(max_bytes), resp_type={"#3007", "#3008"})
         self.volts = float(resp)
         return self.volts
         
@@ -103,8 +103,9 @@ class SRS_SIM928:
 
 if __name__ == "__main__":
     vc = SRS_SIM928(com_num=2, address="GPIB0::16::INSTR", port=1)
-    vc.write_to_port("VOLT?")
-    vc.query_from_port('100')
-    vc.write_to_port("VOLT?")
-    vc.query_from_port('100')
+    vc.setvolt(voltage=-0.777)
+    print(vc.getvolt())
+    vc.setvolt(voltage=0.777)
+    print(vc.getvolt())
+
 

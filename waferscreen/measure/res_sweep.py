@@ -253,8 +253,13 @@ class VnaMeas:
             self.set_sweep_range_min_max(fmin_GHz=fmin, fmax_GHz=fmax)
             # process the data into other formats and add the option phase delay
             if self.verbose:
+                fmax_str = '%1.4f' % fmax
+                fmin_str = '%1.4f' % fmin
+                if fmax_str == fmin_str:
+                    fmax_str = '%1.6f' % fmax
+                    fmin_str = '%1.6f' % fmin
                 print(F"Loop {'%02i' % (loop_index + 1)} of {'%02i' % loops_required}  " +
-                      F"{'%1.4f' % fmin} GHz to {'%1.4f' % fmax} GHz")
+                      F"{fmin_str} GHz to {fmax_str}")
             s21Au, s21Bu = self.get_sweep()
             s21R, s21I, s21LM, s21PH = data_format_and_phase_delay(s21Au=s21Au, s21Bu=s21Bu, freqs=freqs_this_loop,
                                                                    group_delay=self.group_delay)
@@ -269,35 +274,17 @@ class VnaMeas:
             end_index += self.max_frequency_points
 
     def vna_tiny_sweeps(self, single_current, res_number):
-        # trigger a sweep to be done
-        self.vna.reset_sweep()
-        self.vna.trig_sweep()
 
-        # collect data according to data_format LM or RI
-        (s21Au, s21Bu) = self.vna.get_S21(format='RI')
-        print("Trace Acquired")
-
-        # put uncalibrated data in complex format
-        s21 = []
-        for i in range(0, len(self.freqs)):
-            s21.append(s21Au[i] + 1j * s21Bu[i])
-        s21 = np.array(s21)
-
-        # remove group delay
-        if self.group_delay is not None:
-            phase_factors = np.exp(-1j * 2.0 * math.pi * self.freqs * self.group_delay)
-            s21 = s21 / phase_factors
-
+        self.vna_sweep()
         if single_current >= 0:
             ind_filename = F"sdata_res_{res_number}_cur_" + str(int(round(single_current))) + "uA.csv"
         else:
             ind_filename = F"sdata_res_{res_number}_cur_m" + str(int(round(-1 * single_current))) + "uA.csv"
-
         # write out sdata
-        f = open(os.path.join(self.dirname, ind_filename), 'w')
-        for i in range(0, len(self.freqs)):
-            f.write(str(self.freqs[i]) + "," + str(s21[i].real) + "," + str(s21[i].imag) + "\n")
-        f.close()
+        with open(os.path.join(self.dirname, ind_filename), 'w') as f:
+            for i in range(len(self.freqs)):
+                f.write(str(self.freqs[i]) + "," + str(self.s21R[i]) + "," + str(self.s21I[i]) + "\n")
+        self.record_params()
 
     def vna_close(self):
         self.vna.close()
