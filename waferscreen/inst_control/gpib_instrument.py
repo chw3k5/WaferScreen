@@ -5,16 +5,15 @@ Created on Mar 3, 2009
 @version: 1.0.0
 '''
 
-#import time
-
-import instrument
-from gpibinter import ibdev, ibfind, ibonl, ibcmd, ibcmda, ibclr, ibwrt, ibwrta, ibrd, ibln, ibwait, ibsta
+from waferscreen.inst_control import instrument
+from waferscreen.inst_control.gpibinter import ibdev, ibfind, ibonl, ibcmd, ibcmda, ibclr, ibwrt, ibwrta, ibrd, ibln, ibwait, ibsta
 import numpy
 
 # Constants
 RQS = (1<<11)
 SRQ = (1<<12)
 TIMO = (1<<14)
+
 
 class Gpib_Instrument(instrument.Instrument):
     '''
@@ -134,4 +133,4 @@ class Gpib_Instrument(instrument.Instrument):
         else:
             length = maxlen
         if string[:length] != self.id_string[:length]:
-            print "This is not a %s %s" % (self.manufacturer, self.model_number)
+            print("This is not a %s %s" % (self.manufacturer, self.model_number))

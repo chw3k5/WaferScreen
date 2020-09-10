@@ -259,12 +259,13 @@ class TinySweeps:
             res_calc['average_res_qc'] = np.mean([param.Qc for param in res_params])
             res_calc['average_res_qi'] = np.mean([param.Qi for param in res_params])
             res_calc['average_res_zratio'] = np.mean([param.Zratio for param in res_params])
-            #This is not how the p2p frequency shift is extracted since it's subject to noise at high lambda -- res_calc['flux_ramp_shift_kHz'] = np.ptp([param.f0 for param in res_params]) * 1.0e6
+
 
             I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA) * 1.0e-6,
                                                           f0=np.array([res_param.f0 for res_param in res_params]))
             lambda_params = LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit)
             res_calc['lambfit'] = lambda_params.lambfit
+            res_calc['flux_ramp_shift_kHz'] = lambda_params.Pfit * 1.0e6
             res_calc['fr_squid_mi_pH'] = (lambda_params.mfit * Phi0 / (2.0 * np.pi)) * 1.0e12  # converting to pico Henries
             plot_dict[average_res_freq] = res_calc
 

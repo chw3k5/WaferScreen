@@ -48,21 +48,21 @@ if platform.system() == 'Linux':
         libname =  find_library('gpibapi') # NI gpib driver
         ni_style = 1
     if not libname:
-        raise ValueError, 'gpib library not found'
+        raise ValueError('gpib library not found')
     gpiblib = CDLL(libname)
 
 elif platform.system() == 'Windows':
     # docs say hardcorded name may be better on windows
     libname = find_library('ni4882')## or gpi32 ???
     if not libname:
-        raise ValueError, 'NI488 library not found'
+        raise ValueError('NI488 library not found')
     ni_style = 1
     gpiblib = WinDLL(libname)
 
 elif platform.system() == 'Darwin':##???
     libname = find_library('NI488')
     if not libname:
-        raise ValueError, 'NI488 library not found'
+        raise ValueError('NI488 library not found')
     ni_style = 1
     gpiblib = CDLL(libname)
 
@@ -72,34 +72,35 @@ def ib_status(code):
     '''Given a ibsta code, return the text status [not working yet]'''
     result = ''
     
-    status_strings = [ \
-                      "Device Clear State. ", \
-                      "Device Trigger State. ", \
-                      "Listener. ", \
-                      "Talker. ", \
-                      "ATN line is asserted. ", \
-                      "Controller-In-Charge. ", \
-                      "Remote State. ", \
-                      "Lockout State. ", \
-                      "I/O completed. ", \
-                      "", \
-                      "", \
-                      "Device requesting service. ", \
-                      "SRQ line is asserted. ", \
-                      "END or EOS detected. ", \
-                      "Time limit exceeded. ", \
-                      "GPIB error. " \
+    status_strings = [
+                      "Device Clear State. ",
+                      "Device Trigger State. ",
+                      "Listener. ",
+                      "Talker. ",
+                      "ATN line is asserted. ",
+                      "Controller-In-Charge. ",
+                      "Remote State. ",
+                      "Lockout State. ",
+                      "I/O completed. ",
+                      "",
+                      "",
+                      "Device requesting service. ",
+                      "SRQ line is asserted. ",
+                      "END or EOS detected. ",
+                      "Time limit exceeded. ",
+                      "GPIB error. "
                       ]
     
     for i in range(16):
-        print i, 2**i
+        print(i, 2**i)
         if (2**i) & code:
             result += status_strings[i]
     
     return result
 
+
 def ib_error(code):
-    '''Given an error code, return the error text. '''
+    """Given an error code, return the error text. """
 
     error_strings = [ \
                      "System error", \
@@ -134,6 +135,7 @@ def ib_error(code):
                      ]
     
     return error_strings[code]
+
 
 def iberr():
     '''Returns the current error code'''

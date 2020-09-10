@@ -3,7 +3,8 @@ from datetime import datetime
 
 # Instrument addresses
 # go into Keysight GUI, enable HiSlip Interface, find address in SCPI Parser I/O
-vna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
+usbvna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
+agilent8722es_address = "GPIB1::19::INSTR"
 volt_source_address = "GPIB0::16::INSTR"
 volt_source_port = 1
 

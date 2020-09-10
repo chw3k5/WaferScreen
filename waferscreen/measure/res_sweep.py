@@ -5,8 +5,9 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.inst_control import Keysight_USB_VNA
+from waferscreen.inst_control.aly8722ES import aly8722ES
 from waferscreen.plot import pySmith
-from ref import file_extension_to_delimiter, vna_address, output_dir
+from ref import file_extension_to_delimiter, usbvna_address, agilent8722es_address, output_dir
 
 
 class VnaMeas:
@@ -37,7 +38,7 @@ class VnaMeas:
         self.plot_phase = True
 
         # User VNA settings
-        self.vna_address = vna_address
+        self.vna_address = None
         self.fcenter_GHz = fcenter_GHz
         self.fspan_MHz = fspan_MHz
         self.num_freq_points = num_freq_points  # number of frequency points measured
@@ -88,26 +89,58 @@ class VnaMeas:
             logfreqs = np.linspace(logfmin, logfmax, self.num_freq_points)
             self.freqs = 10.0 ** logfreqs
 
-    def vna_init(self):
-        # Set up Network Analyzer
-        self.vna = Keysight_USB_VNA.USBVNA(address=self.vna_address)  # "PXI10::0-0.0::INSTR") #"PXI10::CHASSIS1::SLOT1::FUNC0::INSTR"
-        if self.preset_vna:
-            self.vna.preset()
-        self.vna.setup_thru()
-        self.vna.set_cal(calstate='OFF')  # get raw S21 data
+    def vna_init(self, vna='8822es'):
+        vna = vna.lower()
+        if vna == 'usbvna':
+            self.vna_address = usbvna_address
+            # Set up Network Analyzer
+            self.vna = Keysight_USB_VNA.USBVNA(address=self.vna_address)  # "PXI10::0-0.0::INSTR") #"PXI10::CHASSIS1::SLOT1::FUNC0::INSTR"
+            if self.preset_vna:
+                self.vna.preset()
+            self.vna.setup_thru()
+            self.vna.set_cal(calstate='OFF')  # get raw S21 data
+
+            self.vna.set_avg(count=self.vna_avg)
+            self.vna.set_ifbw(self.if_bw_Hz, track=self.ifbw_track)
+            self.vna.set_power(port=1, level=self.port_power_dBm, state="ON")
+            time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
+        elif vna == '8822es':
+            self.vna_address = usbvna_address
+            self.vna = aly8722ES(address=self.vna_address)
+        else:
+            raise KeyError("VNA: " + str(vna) + " if not a recognized")
         self.set_sweep_range_center_span()
-        self.vna.set_sweep(self.num_freq_points, type=self.sweeptype)
-        self.vna.set_avg(count=self.vna_avg)
-        self.vna.set_ifbw(self.if_bw_Hz, track=self.ifbw_track)
-        self.vna.set_power(port=1, level=self.port_power_dBm, state="ON")
-        time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
+        self.set_freq_points()
+
+    def set_freq_points(self):
+        if self.vna_address == usbvna_address:
+            self.vna.set_sweep(self.num_freq_points, type=self.sweeptype)
+        elif self.vna_address == agilent8722es_address:
+            self.vna.setPoints(N=self.num_freq_points)
+            if self.sweeptype == 'log':
+                self.vna.setLogFrequencySweep()
+            else:
+                self.vna.setLinearFrequencySweep()
+
+    def set_avg(self):
+        if self.vna_address == usbvna_address:
+            self.vna.set_avg(count=self.vna_avg)
+        else:
+
+
+    def set_freq_center(self):
+        if self.vna_address == usbvna_address:
+            self.vna.set_freq_center(center=self.fcenter_GHz, span=self.fspan_MHz / 1000.0)
+        elif self.vna_address == agilent8722es_address:
+            self.vna.set_center_freq(center_freq_Hz=self.fcenter_GHz * 1.0e9)
+            self.vna.setSpan(N=self.fspan_MHz * 1.0e6)
 
     def set_sweep_range_center_span(self, fcenter_GHz=None, fspan_MHz=None):
         if fcenter_GHz is not None:
             self.fcenter_GHz = fcenter_GHz
         if fspan_MHz is not None:
             self.fspan_MHz = fspan_MHz
-        self.vna.set_freq_center(center=self.fcenter_GHz, span=self.fspan_MHz / 1000.0)
+        self.set_freq_center()
         self.calulations()
 
     def set_sweep_range_min_max(self, fmin_GHz=None, fmax_GHz=None):
