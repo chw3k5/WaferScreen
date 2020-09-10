@@ -38,7 +38,8 @@ class VnaMeas:
         self.plot_phase = True
 
         # User VNA settings
-        self.vna_address = None
+        self.vna_address = None  # set later
+        self.max_frequency_points = None  # set later
         self.fcenter_GHz = fcenter_GHz
         self.fspan_MHz = fspan_MHz
         self.num_freq_points = num_freq_points  # number of frequency points measured
@@ -93,24 +94,48 @@ class VnaMeas:
         vna = vna.lower()
         if vna == 'usbvna':
             self.vna_address = usbvna_address
+            self.max_frequency_points = 100001
             # Set up Network Analyzer
             self.vna = Keysight_USB_VNA.USBVNA(address=self.vna_address)  # "PXI10::0-0.0::INSTR") #"PXI10::CHASSIS1::SLOT1::FUNC0::INSTR"
             if self.preset_vna:
                 self.vna.preset()
             self.vna.setup_thru()
             self.vna.set_cal(calstate='OFF')  # get raw S21 data
-
-            self.vna.set_avg(count=self.vna_avg)
-            self.vna.set_ifbw(self.if_bw_Hz, track=self.ifbw_track)
-            self.vna.set_power(port=1, level=self.port_power_dBm, state="ON")
-            time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
         elif vna == '8822es':
             self.vna_address = usbvna_address
+            self.max_frequency_points = 1601
             self.vna = aly8722ES(address=self.vna_address)
         else:
             raise KeyError("VNA: " + str(vna) + " if not a recognized")
         self.set_sweep_range_center_span()
         self.set_freq_points()
+        self.set_avg()
+        self.set_ifbw()
+        self.set_power()
+
+    def set_power(self, power=None):
+        if power is None:
+            power = self.port_power_dBm
+        else:
+            self.port_power_dBm = power
+        if self.vna_address == usbvna_address:
+            self.vna.set_power(port=1, level=power, state="ON")
+        elif self.vna_address == agilent8722es_address:
+            self.vna.setPower(P=(power - 30.0))
+            self.vna.self.setPowerSwitch(P='ON')
+        time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
+
+    def power_off(self):
+        if self.vna_address == usbvna_address:
+            self.vna.set_power(port=1, level=self.port_power_dBm, state="OFF")
+        elif self.vna_address == agilent8722es_address:
+            self.vna.self.setPowerSwitch(P='OFF')
+
+    def set_ifbw(self):
+        if self.vna_address == usbvna_address:
+            self.vna.set_ifbw(self.if_bw_Hz, track=self.ifbw_track)
+        elif self.vna_address == agilent8722es_address:
+            self.vna.setIFbandwidth(ifbw=self.if_bw_Hz)
 
     def set_freq_points(self):
         if self.vna_address == usbvna_address:
@@ -126,7 +151,11 @@ class VnaMeas:
         if self.vna_address == usbvna_address:
             self.vna.set_avg(count=self.vna_avg)
         else:
-
+            if self.vna_avg < 2:
+                self.vna.turn_ave_off()
+            else:
+                self.vna.turn_ave_on()
+                self.vna.set_ave_factor(self.vna_avg)
 
     def set_freq_center(self):
         if self.vna_address == usbvna_address:
@@ -153,16 +182,20 @@ class VnaMeas:
         self.fspan_MHz = (fmax_GHz - fmin_GHz) * 1000.0
         self.calulations(freq_only=True)
 
-    def vna_sweep(self):
-        # trigger a sweep to be done
-        self.vna.reset_sweep()
-        self.vna.trig_sweep()
-
-        # collect data according to data_format LM or RI
-        (s21Au, s21Bu) = self.vna.get_S21(format='RI')
+    def get_sweep(self):
+        if self.vna_address == usbvna_address:
+            self.vna.reset_sweep()
+            self.vna.trig_sweep()
+            # collect data according to data_format LM or RI
+            s21Au, s21Bu = self.vna.get_S21(format='RI')
+        elif self.vna_address == agilent8722es_address:
+            freqs, s21Au, s21Bu = self.vna.get_sweep()
         if self.verbose:
             print("Trace Acquired")
+        return s21Au, s21Bu
 
+    def vna_sweep(self):
+        s21Au, s21Bu = self.get_sweep()
         # put uncalibrated data in complex format
         s21data = np.array(s21Au) + 1j * np.array(s21Bu)
 

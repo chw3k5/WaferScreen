@@ -95,31 +95,31 @@ class aly8722ES():
         return float(self.ctrl.query('IFBW?'))
 
     def getFrequencyArray(self):
-        ''' returns the current frequency array (in MHz) by asking the VNA for the sweep parameters '''
+        """ returns the current frequency array (in MHz) by asking the VNA for the sweep parameters """
         return self.makeFrequencyArray(fi=self.getStartFrequency(), numpts=self.getPoints(), span=self.getSpan()) / 1.e6
 
     def getPower(self):
         return float(self.ctrl.query('POWE?'))
 
     def getSpan(self):
-        'gets the frequency span in Hz'
+        """gets the frequency span in Hz"""
         F = float(self.ctrl.query('SPAN?'))
         return F
 
     def getMarkerVal(self):
-        'returns freq (Hz) and Power (dB) of marker'
+        """returns freq (Hz) and Power (dB) of marker"""
         str = self.ctrl.query('OUTPMARK')
         str.split(',')
         [dB, f] = [float(str.split(',')[0]), float(str.split(',')[2])]
         return [dB, f]
 
     def getCWfreq(self):
-        'gets the center frequency (in MHz) in continuous wave mode'
+        """gets the center frequency (in MHz) in continuous wave mode"""
         F = float(self.ctrl.query('CWFREQ?')) / 1.e6
         return F
 
     def getPoints(self):
-        'get the number of points in the trace'
+        """get the number of points in the trace"""
         N = float(self.ctrl.query('POIN?'))
         return int(N)
 
@@ -143,9 +143,9 @@ class aly8722ES():
         return self.getComplexTrace(D)
 
     def getTrace(self):
-        ''' transfer the current trace to the computer using the ascii protocol
+        """ transfer the current trace to the computer using the ascii protocol
             output: N x 2 numpy array, 0th column is real, 1st column is imaginary
-        '''
+        """
         Npts = self.getPoints()
         self.ctrl.write('FORM4')
         self.ctrl.write('OUTPDATA')
@@ -235,17 +235,27 @@ class aly8722ES():
 
     def setIFbandwidth(self, ifbw):
         ''' set the intermediate frequency bandwidth (in Hz) '''
-        allowedvals = [10, 30, 100, 300, 1000, 3000, 3700, 6000]
+        allowedvals = {10, 30, 100, 300, 1000, 3000, 3700, 6000}
         if ifbw in allowedvals:
             self.ctrl.write('IFBW%d' % ifbw)
         else:
-            print('The IF bandwidth can only take the following discrete values:' + str(allowedvals))
+            raise KeyError('The IF bandwidth can only take the following discrete values:' + str(allowedvals))
 
     def set_center_freq(self, center_freq_Hz):
         self.ctrl.write(F"CENT {center_freq_Hz}")
 
+    def set_ave_factor(self, ave_factor):
+        if isinstance(ave_factor, int):
+            self.ctrl.write(F"AVERFACT {ave_factor}")
+
+    def turn_ave_on(self):
+        self.ctrl.write(F"AVERO ON")
+
+    def turn_ave_off(self):
+        self.ctrl.write(F"AVERO OFF")
+
     def setupFrequencySweep(self, fi=100, ff=200, power=-45, mtype='S21', displaytype='LOGM', numpts=1601, ifbw=1000):
-        ''' set instrument for a frequency sweep '''
+        """ set instrument for a frequency sweep """
         self.setIFbandwidth(ifbw)
         self.setLinearFrequencySweep()
         self.ctrl.write('CHAN1;AUTO;AUXCOFF;')
@@ -295,12 +305,34 @@ class aly8722ES():
         'sets the center frequency to the marker'
         self.ctrl.write('MARKCENT')
 
-    # higher level data acquisition functions --------------------------------------------------------------
+    def get_sweep(self, show_plot=False):
+        self.ctrl.write('OPC?;SING')  # take single frequency sweep
+        print('taking snapshot')
+        complete = self.ctrl.read().rstrip()
+        print(complete)
+        print('Done.')
+        self.ctrl.write('AUTO')
+        if complete == '1':
+            pass
+        else:
+            raise TimeoutError('The frequency sweep did not complete before pulling the data.')
+        d = self.getTrace()
+        N, M = np.shape(d)
+        f = self.getFrequencyArray()
+        freqs = f
+        real = d[:, 0]
+        imag = d[:, 1]
+        if show_plot:
+            print('plotting the data')
+            pylab.plot(freqs, real, imag, 'b-')
+            pylab.xlabel('Frequency (MHz)')
+            pylab.ylabel('Response (dB)')
+        return freqs, real, imag
 
+    # higher level data acquisition functions --------------------------------------------------------------
     def alySnapShot(self, fi=100, ff=200, power=-45, ifbw=1000, mtype='S21', displaytype='LOGM', numpts=1601,
-                    showplot=False, \
-                    savedata=False, filename='foo', dataformat=0):
-        ''' measure a frequency sweep in one frame of the network analyzer (1601 pts max) 
+                    show_plot=False, savedata=False, filename='foo', dataformat=0):
+        """ measure a frequency sweep in one frame of the network analyzer (1601 pts max)
 
             input:
             fi = start frequency (MHz)
@@ -312,9 +344,9 @@ class aly8722ES():
             dataformat: how the data is returned as described below
 
 
-            output: 
+            output:
 
-            DEFAULT: 
+            DEFAULT:
             numpts x 3 array
             1st column: frequency (MHz)
             2nd column: real part of response
@@ -322,7 +354,7 @@ class aly8722ES():
 
             if dataformat = 1
             return farray and separately the complex array Z_real +1jZ_imag
-        '''
+        """
         self.setupFrequencySweep(fi, ff, power, mtype, displaytype, numpts)
         self.setIFbandwidth(ifbw)
         self.ctrl.write('OPC?;SING')  # take single frequency sweep
@@ -342,7 +374,7 @@ class aly8722ES():
         dd[:, 0] = f
         dd[:, 1] = d[:, 0]
         dd[:, 2] = d[:, 1]
-        if showplot:
+        if show_plot:
             print('plotting the data')
             pylab.plot(dd[:, 0], self.s21mag(dd[:, 1], dd[:, 2]), 'b-')
             pylab.xlabel('Frequency (MHz)')

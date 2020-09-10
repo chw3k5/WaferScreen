@@ -342,7 +342,7 @@ class USBVNA():
                     traceI.append(float(tracesplit[i]))
             traceR = np.array(traceR)
             traceI = np.array(traceI)
-            return (traceR, traceI)
+            return traceR, traceI
         else:
             print('Format not recognized!')
             return 0

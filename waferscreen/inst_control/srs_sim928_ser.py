@@ -11,9 +11,9 @@ import serial_instrument
 import serial
 
 class SRS_SIM928(serial_instrument.SerialInstrument):
-    '''
+    """
     The SRS SIM928 Isolated Voltage Source *serial* communication class (Incomplete)
-    '''
+    """
 
 
     def __init__(self, port='srs', sim_port = 1):
