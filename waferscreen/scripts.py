@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from ref import s21_dir, today_str, check_out_dir
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.find_and_fit import ResFit
@@ -49,6 +50,9 @@ def sweep_to_find_resonances(project, wafer, temperature_K=300,
                                                  lower_extra_span_fraction=lower_extra_span_fraction,
                                                  upper_extra_span_fraction=upper_extra_span_fraction,
                                                  return_span_center=True)
+        # keep the number of frequency points in-band constant, no matter how much the extra_span_fraction
+        num_freq_points = int(np.round(num_freq_points * (
+                    1.0 + (lower_extra_span_fraction + upper_extra_span_fraction) * 0.5)))
     else:
         band = "BandNone"
 
@@ -91,8 +95,9 @@ def check_out(coax_path, temperature=300, fcenter_GHz=10, fspan_MHz=20000, num_f
     return vna_meas.last_output_file
 
 
-def band_sweeps(wafer, project="so", power_list=-30, band_list=None, if_bw_Hz=100,
-                lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1, temperature_K=300):
+def band_sweeps(wafer, project="so", power_list=-30, band_list=None, num_freq_points=100001, if_bw_Hz=100,
+                lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1, temperature_K=300,
+                show_sweep_plot=False):
     if band_list is None:
         band_list = ["BandNone"]
     elif isinstance(band_list, (int, float, str)):
@@ -106,12 +111,12 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None, if_bw_Hz=10
     res_fits = []
     for port_power_dBm, band in sweeps_params:
         sweep_file = sweep_to_find_resonances(project=project, wafer=wafer,
-                                              fcenter_GHz=None, fspan_GHz=None, num_freq_points=100001, sweeptype='lin',
+                                              fcenter_GHz=None, fspan_GHz=None, num_freq_points=num_freq_points, sweeptype='lin',
                                               if_bw_Hz=if_bw_Hz,
                                               band=band, lower_extra_span_fraction=lower_extra_span_fraction,
                                               upper_extra_span_fraction=upper_extra_span_fraction,
                                               ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,
-                                              temperature_K=temperature_K)
+                                              temperature_K=temperature_K, show_plot=show_sweep_plot)
 
         res_fit = ResFit(file=sweep_file,
                          group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)

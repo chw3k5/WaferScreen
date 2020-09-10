@@ -144,7 +144,7 @@ class VnaMeas:
         if self.vna_address == usbvna_address:
             self.vna.set_power(port=1, level=power, state="ON")
         elif self.vna_address == agilent8722es_address:
-            self.vna.setPower(P=(power - 30.0))
+            self.vna.setPower(P=(power))
             self.vna.setPowerSwitch(P='ON')
         time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
 

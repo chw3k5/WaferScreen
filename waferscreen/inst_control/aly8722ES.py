@@ -19,7 +19,7 @@ class aly8722ES():
     def __init__(self, address="GPIB1::19::INSTR"):
         self.ResourceManager = visa.ResourceManager()
         self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
-        self.ctrl.timeout = 100000
+        self.ctrl.timeout = 300000
         self.ctrl.device_id = self.ctrl.query("*IDN?")
         print("Connected to : " + self.ctrl.device_id)
 

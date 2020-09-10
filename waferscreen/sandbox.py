@@ -14,8 +14,10 @@ do_tiny_sweeps = False
 
 
 if do_band_sweeps:
-    band_sweeps(wafer=wafer, project=project, power_list=[-30], band_list=band_list, if_bw_Hz=100,
-                lower_extra_span_fraction=0.0, upper_extra_span_fraction=0.3, temperature_K=temperture_K)
+    band_sweeps(wafer=wafer, project=project, power_list=[-30], band_list=band_list,
+                if_bw_Hz=300, num_freq_points=10001,
+                lower_extra_span_fraction=0.0, upper_extra_span_fraction=0.3, temperature_K=temperture_K,
+                show_sweep_plot=True)
 
 if do_tiny_sweeps:
     for band in band_list:
