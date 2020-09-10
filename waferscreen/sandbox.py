@@ -5,16 +5,16 @@ from waferscreen.scripts import acquire_tiny_sweeps, analyze_tiny_sweeps
 # for db in [-30, -20, -15, -10, 0, -40, -50]:
 #     check_out(coax_path="Thru1_wZX60", temperature=300, port_power_dBm=db)
 
-temperture_K = 0.13
+temperture_K = 1.5
 wafer = 7
 project = 'so'
-band_list = [2]
-do_band_sweeps = False
-do_tiny_sweeps = True
+band_list = [1]
+do_band_sweeps = True
+do_tiny_sweeps = False
 
 
 if do_band_sweeps:
-    band_sweeps(wafer=wafer, project=project, power_list=[-30], band_list=band_list,
+    band_sweeps(wafer=wafer, project=project, power_list=[-30], band_list=band_list, if_bw_Hz=100,
                 lower_extra_span_fraction=0.0, upper_extra_span_fraction=0.3, temperature_K=temperture_K)
 
 if do_tiny_sweeps:

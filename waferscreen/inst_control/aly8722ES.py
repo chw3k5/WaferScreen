@@ -19,7 +19,7 @@ class aly8722ES():
     def __init__(self, address="GPIB1::19::INSTR"):
         self.ResourceManager = visa.ResourceManager()
         self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
-        self.ctrl.timeout = 10000
+        self.ctrl.timeout = 100000
         self.ctrl.device_id = self.ctrl.query("*IDN?")
         print("Connected to : " + self.ctrl.device_id)
 
@@ -305,12 +305,14 @@ class aly8722ES():
         'sets the center frequency to the marker'
         self.ctrl.write('MARKCENT')
 
-    def get_sweep(self, show_plot=False):
+    def get_sweep(self, show_plot=False, verbose=False):
         self.ctrl.write('OPC?;SING')  # take single frequency sweep
-        print('taking snapshot')
+        if verbose:
+            print('taking snapshot')
         complete = self.ctrl.read().rstrip()
-        print(complete)
-        print('Done.')
+        if verbose:
+            print(complete)
+            print('Done.')
         self.ctrl.write('AUTO')
         if complete == '1':
             pass

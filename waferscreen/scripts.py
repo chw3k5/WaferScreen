@@ -40,7 +40,7 @@ def sweep_to_find_resonances(project, wafer, temperature_K=300,
                              fcenter_GHz=None, fspan_GHz=None, num_freq_points=20001, sweeptype='lin', if_bw_Hz=100,
                              ifbw_track=False, port_power_dBm=-30, vna_avg=1, preset_vna=False,
                              band=None, lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1,
-                             show_plot=False, verbose=False):
+                             show_plot=False, verbose=True):
     if band is not None:
         if isinstance(band, int):
             band = F"Band{'%02i' % band}"
@@ -91,7 +91,7 @@ def check_out(coax_path, temperature=300, fcenter_GHz=10, fspan_MHz=20000, num_f
     return vna_meas.last_output_file
 
 
-def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
+def band_sweeps(wafer, project="so", power_list=-30, band_list=None, if_bw_Hz=100,
                 lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1, temperature_K=300):
     if band_list is None:
         band_list = ["BandNone"]
@@ -107,7 +107,7 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None,
     for port_power_dBm, band in sweeps_params:
         sweep_file = sweep_to_find_resonances(project=project, wafer=wafer,
                                               fcenter_GHz=None, fspan_GHz=None, num_freq_points=100001, sweeptype='lin',
-                                              if_bw_Hz=1000,
+                                              if_bw_Hz=if_bw_Hz,
                                               band=band, lower_extra_span_fraction=lower_extra_span_fraction,
                                               upper_extra_span_fraction=upper_extra_span_fraction,
                                               ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,

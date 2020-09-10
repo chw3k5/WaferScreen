@@ -10,6 +10,23 @@ from waferscreen.plot import pySmith
 from ref import file_extension_to_delimiter, usbvna_address, agilent8722es_address, output_dir
 
 
+def data_format_and_phase_delay(s21Au, s21Bu, freqs, group_delay=None):
+    # put uncalibrated data in complex format
+    s21data = np.array(s21Au) + 1j * np.array(s21Bu)
+    # remove group delay if desired
+    if group_delay is None:
+        group_delay = 0.0
+    phase_delays = np.exp(-1j * freqs * 2.0 * math.pi * group_delay)
+    # calculate the 'calibrated' S21 data by dividing by phase delay
+    cal_s21data = s21data / phase_delays
+    s21R = np.real(cal_s21data)
+    s21I = np.imag(cal_s21data)
+    # convert data from data_format to both LM for plotting
+    s21LM = 10 * np.log10(s21R ** 2 + s21I ** 2)
+    s21PH = 180.0 / np.pi * np.arctan2(s21I, s21R)
+    return s21R, s21I, s21LM, s21PH
+
+
 class VnaMeas:
     """
     Code which will take an S21 measurement with a Keysight USB VNA (P937XA) and plot it LM and in a Smith Chart
@@ -102,13 +119,19 @@ class VnaMeas:
             self.vna.setup_thru()
             self.vna.set_cal(calstate='OFF')  # get raw S21 data
         elif vna == '8822es':
-            self.vna_address = usbvna_address
+            self.vna_address = agilent8722es_address
             self.max_frequency_points = 1601
+            multiple_of_max_points = 0
+            # only a few values of points are allowed for this VNA,
+            # change the requested number of points to be a multiple of an allowed value, the max points
+            while self.num_freq_points > multiple_of_max_points:
+                multiple_of_max_points += self.max_frequency_points
+            self.num_freq_points = multiple_of_max_points
+            self.calulations()
             self.vna = aly8722ES(address=self.vna_address)
         else:
             raise KeyError("VNA: " + str(vna) + " if not a recognized")
         self.set_sweep_range_center_span()
-        self.set_freq_points()
         self.set_avg()
         self.set_ifbw()
         self.set_power()
@@ -122,7 +145,7 @@ class VnaMeas:
             self.vna.set_power(port=1, level=power, state="ON")
         elif self.vna_address == agilent8722es_address:
             self.vna.setPower(P=(power - 30.0))
-            self.vna.self.setPowerSwitch(P='ON')
+            self.vna.setPowerSwitch(P='ON')
         time.sleep(1.0)  # sleep for a second in case we've just over-powered the resonators
 
     def power_off(self):
@@ -137,11 +160,13 @@ class VnaMeas:
         elif self.vna_address == agilent8722es_address:
             self.vna.setIFbandwidth(ifbw=self.if_bw_Hz)
 
-    def set_freq_points(self):
+    def set_freq_points(self, num_freq_points=None):
+        if num_freq_points is None:
+            num_freq_points = self.num_freq_points
         if self.vna_address == usbvna_address:
-            self.vna.set_sweep(self.num_freq_points, type=self.sweeptype)
+            self.vna.set_sweep(num_freq_points, type=self.sweeptype)
         elif self.vna_address == agilent8722es_address:
-            self.vna.setPoints(N=self.num_freq_points)
+            self.vna.setPoints(N=num_freq_points)
             if self.sweeptype == 'log':
                 self.vna.setLogFrequencySweep()
             else:
@@ -170,17 +195,15 @@ class VnaMeas:
         if fspan_MHz is not None:
             self.fspan_MHz = fspan_MHz
         self.set_freq_center()
-        self.calulations()
 
     def set_sweep_range_min_max(self, fmin_GHz=None, fmax_GHz=None):
         if fmin_GHz is not None:
             self.fmin = fmin_GHz
         if fmax_GHz is not None:
             self.fmax = fmax_GHz
-        self.vna.set_freq_limits(start=self.fmin, stop=self.fmax)
         self.fcenter_GHz = (fmin_GHz + fmax_GHz) * 0.5
         self.fspan_MHz = (fmax_GHz - fmin_GHz) * 1000.0
-        self.calulations(freq_only=True)
+        self.set_freq_center()
 
     def get_sweep(self):
         if self.vna_address == usbvna_address:
@@ -195,23 +218,55 @@ class VnaMeas:
         return s21Au, s21Bu
 
     def vna_sweep(self):
-        s21Au, s21Bu = self.get_sweep()
-        # put uncalibrated data in complex format
-        s21data = np.array(s21Au) + 1j * np.array(s21Bu)
-
-        # remove group delay if desired
-        if self.group_delay is None:
-            self.group_delay = 0.0
-        phase_delays = np.exp(-1j * self.freqs * 2.0 * math.pi * self.group_delay)
-
-        # calculate the 'calibrated' S21 data by dividing by phase delay
-        cal_s21data = s21data / phase_delays
-        self.s21R = np.real(cal_s21data)
-        self.s21I = np.imag(cal_s21data)
-
-        # convert data from data_format to both LM for plotting
-        self.s21LM = 10 * np.log10(self.s21R ** 2 + self.s21I ** 2)
-        self.s21PH = 180.0 / np.pi * np.arctan2(self.s21I, self.s21R)
+        # count how many loops we need to get all the data for this sweep.
+        loops_required = 0
+        points_acquired_after_n_loops = 0
+        while points_acquired_after_n_loops < self.num_freq_points:
+            loops_required += 1
+            points_acquired_after_n_loops += self.max_frequency_points
+        points_needed_last_loop = self.max_frequency_points - (points_acquired_after_n_loops - self.num_freq_points)
+        # initialized the data variables
+        self.s21R = np.zeros(self.num_freq_points)
+        self.s21I = np.zeros(self.num_freq_points)
+        self.s21LM = np.zeros(self.num_freq_points)
+        self.s21PH = np.zeros(self.num_freq_points)
+        # do the loops to get the VNA data
+        points_last_loop = -1
+        start_index = 0
+        end_index = self.max_frequency_points
+        for loop_index in range(loops_required):
+            # determine if this is the last loop
+            if loop_index + 1 == loops_required:
+                # thing to do on the last loop
+                points_this_loop = points_needed_last_loop
+                freqs_this_loop = self.freqs[start_index:]
+                end_index = self.num_freq_points
+            else:
+                points_this_loop = self.max_frequency_points
+                freqs_this_loop = self.freqs[start_index:end_index]
+            fmin = freqs_this_loop[0]
+            fmax = freqs_this_loop[-1]
+            # change the number of frequency points if needed
+            if points_last_loop != points_this_loop:
+                self.set_freq_points(num_freq_points=points_this_loop)
+            # change the frequency
+            self.set_sweep_range_min_max(fmin_GHz=fmin, fmax_GHz=fmax)
+            # process the data into other formats and add the option phase delay
+            if self.verbose:
+                print(F"Loop {'%02i' % (loop_index + 1)} of {'%02i' % loops_required}  " +
+                      F"{'%1.4f' % fmin} GHz to {'%1.4f' % fmax} GHz")
+            s21Au, s21Bu = self.get_sweep()
+            s21R, s21I, s21LM, s21PH = data_format_and_phase_delay(s21Au=s21Au, s21Bu=s21Bu, freqs=freqs_this_loop,
+                                                                   group_delay=self.group_delay)
+            # Store the data in the varables for this class
+            self.s21R[start_index: end_index] = s21R
+            self.s21I[start_index: end_index] = s21I
+            self.s21LM[start_index: end_index] = s21LM
+            self.s21PH[start_index: end_index] = s21PH
+            # things to reset for the next loop
+            points_last_loop = points_this_loop
+            start_index = int(end_index)
+            end_index += self.max_frequency_points
 
     def vna_tiny_sweeps(self, single_current, res_number):
         # trigger a sweep to be done

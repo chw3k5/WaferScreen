@@ -2,7 +2,7 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 from typing import NamedTuple
-from ref import output_dir, today_str, vna_address, volt_source_address, volt_source_port
+from ref import output_dir, today_str, usbvna_address, volt_source_address, volt_source_port, agilent8722es_address
 from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit
 from waferscreen.measure.res_sweep import VnaMeas
@@ -15,7 +15,8 @@ from waferscreen.analyze.lamb_fit import lambdafit, Phi0
 
 class TinySweeps:
     def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None,
-                 fit_number=1, remove_baseline_ripple=False, auto_run=False, verbose=True):
+                 fit_number=1, remove_baseline_ripple=False, vna_address=agilent8722es_address,
+                 auto_run=False, verbose=True):
         self.verbose = verbose
         self.wafer = wafer
         self.band_number = band_number
