@@ -219,6 +219,25 @@ class TinySweeps:
             for single_res_params in res_fit.res_params:
                 f.write(str(current_mA) + "," + res_num + "," + str(single_res_params) + "\n")
 
+    def eager_analyze(self):
+        # get all the resonators sweeps that are available
+        list_of_available_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
+                                   if os.path.isfile(os.path.join(self.data_output_folder, f))]
+        # find the resonators that have been processed
+        res_fit_dir = os.path.join(self.data_output_folder, "res_fit")
+        found_resonator_currents = set()
+        if os.path.isdir(res_fit_dir):
+            processed_resonator_files = [os.path.join(res_fit_dir, f) for f in os.listdir(res_fit_dir)
+                                         if os.path.isfile(os.path.join(self.data_output_folder, f))]
+            for resonator_file in processed_resonator_files:
+                with open(resonator_file, 'r') as f:
+                    raw_res_data = f.readlines()
+                header = split
+
+
+
+        # these are the resonators that are a available but have not been processed, process them now
+
     def analyze_all(self):
         list_of_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
                          if os.path.isfile(os.path.join(self.data_output_folder, f))]
