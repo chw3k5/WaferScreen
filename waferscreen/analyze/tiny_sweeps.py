@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import time
 from matplotlib import pyplot as plt
 from typing import NamedTuple
 from ref import output_dir, today_str, usbvna_address, volt_source_address, volt_source_port, agilent8722es_address
@@ -7,11 +8,12 @@ from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.lamb_fit import lambdafit, Phi0
+from waferscreen.read.table_read import ClassyReader
 
-###
-#  This code takes a single flux ramp sweep at one RF read power over a number of resonators
-###
 
+def ramp_name_parse(basename):
+    res_num, current_uA_str = basename.rstrip('uA.csv').lstrip("sdata_res_").split('_cur_')
+    return current_uA_str, res_num
 
 class TinySweeps:
     def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None,
@@ -203,40 +205,65 @@ class TinySweeps:
 
     def analyze_sweep(self, file):
         basename = os.path.basename(file)
-        res_num, current_mA_str = basename.rstrip('uA.csv').lstrip("sdata_res_").split('_cur_')
-        if "m" == current_mA_str[0]:
-            current_mA = -1.0 * float(current_mA_str[1:])
+        current_uA_str, res_num = ramp_name_parse(basename)
+        if "m" == current_uA_str[0]:
+            current_uA = -1.0 * float(current_uA_str[1:])
         else:
-            current_mA = float(current_mA_str)
+            current_uA = float(current_uA_str)
         output_filename = self.make_res_fit_file(res_num=res_num)
         if not os.path.isfile(output_filename):
             with open(output_filename, "w") as f:
-                f.write("ramp_current_mA,res_num," + res_params_header + "\n")
+                f.write("ramp_current_uA,res_num," + res_params_header + "\n")
         res_fit = ResFit(file=file, group_delay=0, verbose=self.verbose, freq_units=self.res_freq_units,
                          remove_baseline_ripple=self.remove_baseline_ripple,
                          auto_process=True)
         with open(output_filename, 'a') as f:
             for single_res_params in res_fit.res_params:
-                f.write(str(current_mA) + "," + res_num + "," + str(single_res_params) + "\n")
+                f.write(str(current_uA) + "," + res_num + "," + str(single_res_params) + "\n")
 
-    def eager_analyze(self):
+    def analyze_unprocessed(self):
         # get all the resonators sweeps that are available
+        available_resonator_currents = set()
+        current_tuple_to_filename = {}
         list_of_available_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
                                    if os.path.isfile(os.path.join(self.data_output_folder, f))]
+        for available_filename in list_of_available_files:
+            current_uA_str, res_num = ramp_name_parse(os.path.basename(available_filename))
+            current_tuple = (current_uA_str, res_num)
+            available_resonator_currents.add(current_tuple)
+            current_tuple_to_filename[current_tuple] = available_filename
         # find the resonators that have been processed
         res_fit_dir = os.path.join(self.data_output_folder, "res_fit")
-        found_resonator_currents = set()
+        processed_resonator_currents = set()
         if os.path.isdir(res_fit_dir):
             processed_resonator_files = [os.path.join(res_fit_dir, f) for f in os.listdir(res_fit_dir)
                                          if os.path.isfile(os.path.join(self.data_output_folder, f))]
             for resonator_file in processed_resonator_files:
-                with open(resonator_file, 'r') as f:
-                    raw_res_data = f.readlines()
-                header = split
-
-
-
+                res_data = ClassyReader(filename=resonator_file, delimiter=',')
+                processed_resonator_currents.update({(ramp_current_uA, res_num)
+                                                     for ramp_current_uA, res_num
+                                                     in zip(res_data.ramp_current_uA, res_data.res_num)})
         # these are the resonators that are a available but have not been processed, process them now
+        unprocessed_currents = available_resonator_currents - processed_resonator_currents
+        for current_tuple in available_resonator_currents - processed_resonator_currents:
+            self.analyze_sweep(file=current_tuple_to_filename[current_tuple])
+        if unprocessed_currents == set():
+            return False
+        else:
+            return True
+
+    def eager_analyze(self):
+        """
+        Keep analysing unprocessed data until it was found that there was no additional data to process
+        that was found after 2 tries.
+        """
+        complete_status1 = False
+        complete_status2 = False
+        while complete_status1 and complete_status2:
+            complete_status2 = complete_status1
+            complete_status1 = self.analyze_unprocessed()
+            if not (complete_status2 and complete_status1):
+                time.sleep(20)
 
     def analyze_all(self):
         list_of_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
@@ -257,7 +284,7 @@ class TinySweeps:
             for res_data in res_file_lines[1:]:
                 res_dict = {header_name: float(row_value)
                             for header_name, row_value in zip(header, res_data.strip().split(','))}
-                current_dict[res_dict['ramp_current_mA']] = ResParams(**{column_name: res_dict[column_name]
+                current_dict[res_dict['ramp_current_uA']] = ResParams(**{column_name: res_dict[column_name]
                                                                          for column_name
                                                                          in res_params_header.split(',')})
             self.res_num_dict[res_num] = current_dict

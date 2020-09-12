@@ -1,3 +1,5 @@
+import numpy as np
+
 """
 This file read-in file for data is tailored to replace the the "atpy" packages read-in functionally.
 
@@ -137,6 +139,20 @@ def row_dict(filename, key=None, delimiter=",", null_value=None, inner_key_remov
     return data
 
 
+def floats_table(file, delimiter=",", return_header=False):
+    with open(file, 'r') as f:
+        raw_lines = f.readlines()
+    header = raw_lines[0].rstrip().split(delimiter)
+    data = [tuple(single_line.rstrip().split(delimiter)) for single_line in raw_lines[1:]]
+    by_column_data = list(zip(*data))
+    data_dict = {header_value: np.array(column_values, dtype=float)
+                 for header_value, column_values in zip(header, by_column_data)}
+    if return_header:
+        return data_dict, header
+    else:
+        return data_dict
+
+
 class ClassyReader:
     """
     Use this class if you want to access your data as an attribute to a class obj and not a dictionary.
@@ -144,9 +160,12 @@ class ClassyReader:
     One added functionally over the table dictionary definition above is the that the filename from which the data
     is read, is also saved under the filename attribute.
     """
-    def __init__(self, filename, delimiter=","):
+    def __init__(self, filename, delimiter=",", do_floats_table=False):
         self.filename = filename
-        table_dict = get_table_data(filename=filename, delimiter=delimiter)
+        if do_floats_table:
+            table_dict = floats_table(file=filename, delimiter=delimiter)
+        else:
+            table_dict = get_table_data(filename=filename, delimiter=delimiter)
         self.keys = list(table_dict.keys())
         for key in self.keys:
             setattr(self, key, table_dict[key])
