@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.read.table_read import floats_table
 
-file = os.path.join(s21_dir, "so", "7_Band02_2020-09-10_run3.csv")
+file = os.path.join(s21_dir, "so", "7_Band01_2020-09-08_run9.csv")
 
 data_dict = floats_table(file, delimiter=",")
 

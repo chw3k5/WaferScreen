@@ -62,29 +62,9 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
             elif data_format == 'COM':  # complex
                 fit_params.append(np.array([s21data[i].real, s21data[i].imag]))
             else:
-                print('Data Format not recognized!!!')
-                return 0
+                raise KeyError('Data Format not recognized.')
     fit_freqs = np.array(fit_freqs)
     fit_params = np.array(fit_params)
-
-    # estimate errors according to method est_errors
-    error_params = []
-    if error_est == 'prop':  # estimate errors are proportional to |S| or |Y|
-        print('Using Proportional Errors')
-        e11_min = 0.0
-        for i in range(0, len(fit_freqs)):
-            fit_vec = fit_params[i]
-            e1 = np.sqrt(fit_vec[0] ** 2 + fit_vec[1] ** 2) + e11_min
-            error_vec = np.array([e1, e1])
-            error_params.append(error_vec)
-    elif error_est == 'flat':  # estimate errors are constant
-        print('Using Flat Errors')
-        for i in range(0, len(fit_freqs)):
-            error_vec = np.array([1.0, 1.0])
-            error_params.append(error_vec)
-    else:
-        print('Error estimation method not recognized!')
-        return 0
 
     # guess Amag and Aphase by looking at ends of data
     est_A_range = 10  # number of data points on each end used to estimate A
@@ -143,12 +123,12 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
     # now find first point to have |S21|^2 < s21_search
     i = 0
     while guess_s21_filt[i] > s21_search and i < len(fit_freqs) - 1:
-        i = i + 1
+        i += 1
     f_lower = fit_freqs[i]
     # now find first point to have |S21|^2 < 0.5 * |A|^2 from above
     i = len(fit_freqs) - 1
     while guess_s21_filt[i] > s21_search and i >= 0:
-        i = i - 1
+        i -= 1
     f_upper = fit_freqs[i]
     if f_lower < f0_guess and f_upper > f0_guess:
         Qt_lower = 1.0 / (1 - (f_lower / f0_guess) ** 2)
@@ -190,70 +170,102 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
             plt.show()
         fig0.savefig(os.path.join(plot_dir, file_prefix + str("%1.5f" % f0_guess) + "_GHz_resonator_fit.pdf"))
         fig0.clf()
+
+    # use curve fit to for these params
+    popt, pcov = single_res_fit(model=model, fit_freqs=fit_freqs,
+                                fit_params=fit_params, error_est=error_est,
+                                Amag_guess=Amag_guess, Aphase_guess=Aphase_guess,
+                                f0_guess=f0_guess, Qi_guess=Qi_guess, Qc_guess=Qc_guess,
+                                Aslope_guess=Aslope_guess, tau_guess=tau_guess)
+    return popt, pcov
+
+
+def est_error(fit_freqs, fit_params, error_est='prop'):
+    # estimate errors according to method est_errors
+    error_params = []
+    if error_est == 'prop':  # estimate errors are proportional to |S| or |Y|
+        print('Using Proportional Errors')
+        e11_min = 0.0
+        for i in range(0, len(fit_freqs)):
+            fit_vec = fit_params[i]
+            e1 = np.sqrt(fit_vec[0] ** 2 + fit_vec[1] ** 2) + e11_min
+            error_vec = np.array([e1, e1])
+            error_params.append(error_vec)
+    elif error_est == 'flat':  # estimate errors are constant
+        print('Using Flat Errors')
+        for i in range(0, len(fit_freqs)):
+            error_vec = np.array([1.0, 1.0])
+            error_params.append(error_vec)
+    else:
+        raise KeyError('Error estimation method not recognized')
+    return np.array(error_params)
+
+
+def single_res_fit(model, fit_freqs, fit_params, error_est,
+                   Amag_guess, Aphase_guess, f0_guess, Qi_guess, Qc_guess,
+                   Aslope_guess=None, tau_guess=None):
+    # use curve fit to for these params
+    error_params = est_error(fit_freqs, fit_params, error_est=error_est)
     # unravel fit parameters and errors to 1D vector
     error_params = np.array(error_params)
     fit_params = fit_params.ravel()
     error_params = error_params.ravel()
-
     # perform fit using optimize.curve_fit
     if model == 'simple_res':  # (Amag, Aphase, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -10, freqs[0], 0, 0), (np.inf, 360.0, 10, freqs[len(freqs) - 1], np.inf, np.inf))
+        bounds = ((0, -360.0, -10, fit_freqs[0], 0, 0), (np.inf, 360.0, 10, fit_freqs[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_simple_res, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_gain_slope':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -10, -10, freqs[0], 0, 0), (np.inf, 360.0, 10, 10, freqs[len(freqs) - 1], np.inf, np.inf))
+        bounds = ((0, -360.0, -10, -10, fit_freqs[0], 0, 0), (np.inf, 360.0, 10, 10, fit_freqs[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_simple_res_gain_slope, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_nonlinear_phase':  # (Amag, Aphase, Pphase, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -10, -10, freqs[0], 0, 0), (np.inf, 360.0, 10, 10, freqs[len(freqs) - 1], np.inf, np.inf))
+        bounds = ((0, -360.0, -10, -10, fit_freqs[0], 0, 0), (np.inf, 360.0, 10, 10, fit_freqs[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_simple_res_nonlinear_phase, fit_freqs, fit_params, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_nonlinear_phase_gain_slope':  # (Amag, Aphase, Aslope, Pphase, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -100, -10, -10, freqs[0], 0, 0),
-                  (np.inf, 360.0, 100, 10, 10, freqs[len(freqs) - 1], np.inf, np.inf))
+        bounds = ((0, -360.0, -100, -10, -10, fit_freqs[0], 0, 0),
+                  (np.inf, 360.0, 100, 10, 10, fit_freqs[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_simple_res_nonlinear_phase_gain_slope, fit_freqs, fit_params, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     elif model == 'tline_res':  # (Amag, Aphase, tau, f0, Qi, Qc, Z0ratio)
         starting_vals = [Amag_guess, Aphase_guess, 0, f0_guess, Qi_guess, Qc_guess, 1]
         bounds = (
-        (0, -360.0, -10, freqs[0], 0, 0, 0.99), (np.inf, 360.0, 10, freqs[len(freqs) - 1], np.inf, np.inf, 1.01))
+        (0, -360.0, -10, fit_freqs[0], 0, 0, 0.99), (np.inf, 360.0, 10, fit_freqs[-1], np.inf, np.inf, 1.01))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_tline_res, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'tline_res_gain_slope':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc, Z0ratio)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, f0_guess, Qi_guess, Qc_guess, 1]
-        bounds = ((0, -360.0, -10, -10, freqs[0], 0, 0, 0.99),
-                  (np.inf, 360.0, 10, 10, freqs[len(freqs) - 1], np.inf, np.inf, 1.01))
+        bounds = ((0, -360.0, -10, -10, fit_freqs[0], 0, 0, 0.99),
+                  (np.inf, 360.0, 10, 10, fit_freqs[-1], np.inf, np.inf, 1.01))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_tline_res_gain_slope, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_gain_slope_renorm':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc, Z0new_real, Z0new_imag)
         starting_vals = [Amag_guess, Aphase_guess, Aslope_guess, tau_guess, f0_guess, Qi_guess, Qc_guess, 50, 0]
-        bounds = ((0, -360.0, -100, -100, freqs[0], 0, 0, 0, -np.inf),
-                  (np.inf, 360.0, 100, 100, freqs[len(freqs) - 1], np.inf, np.inf, np.inf, np.inf))
+        bounds = ((0, -360.0, -100, -100, fit_freqs[0], 0, 0, 0, -np.inf),
+                  (np.inf, 360.0, 100, 100, fit_freqs[-1], np.inf, np.inf, np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_simple_res_gain_slope_renorm, fit_freqs, fit_params, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_gain_slope_complex':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc, Zratio)
         starting_vals = [Amag_guess, Aphase_guess, Aslope_guess, tau_guess, f0_guess, Qi_guess, Qc_guess, 0]
         bounds = (
-        (0, -360.0, -1000, -100, freqs.min(), 0, 0, -5.0), (np.inf, 360.0, 1000, 100, freqs.max(), np.inf, np.inf, 5.0))
+        (0, -360.0, -1000, -100, fit_freqs.min(), 0, 0, -5.0), (np.inf, 360.0, 1000, 100, fit_freqs.max(), np.inf, np.inf, 5.0))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
         popt, pcov = curve_fit(fit_simple_res_gain_slope_complex, fit_freqs, fit_params, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     else:
-        print('Fit model : ' + str(model) + ' not recognized!')
-        return 0
-
-    # return fit results
+        raise KeyError('Fit model : ' + str(model) + ' not recognized')
     return popt, pcov
 
 

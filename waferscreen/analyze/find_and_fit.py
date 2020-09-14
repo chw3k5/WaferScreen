@@ -45,6 +45,48 @@ class ResParams(NamedTuple):
         return output_string[:-1]
 
 
+def package_res_results(popt, pcov, verbose=False):
+    fit_Amag = popt[0]
+    fit_Aphase = popt[1]
+    fit_Aslope = popt[2]
+    fit_tau = popt[3]
+    fit_f0 = popt[4]
+    fit_Qi = popt[5]
+    fit_Qc = popt[6]
+    fit_Zratio = popt[7]
+
+    error_Amag = np.sqrt(pcov[0, 0])
+    error_Aphase = np.sqrt(pcov[1, 1])
+    error_Aslope = np.sqrt(pcov[2, 2])
+    error_tau = np.sqrt(pcov[3, 3])
+    error_f0 = np.sqrt(pcov[4, 4])
+    error_Qi = np.sqrt(pcov[5, 5])
+    error_Qc = np.sqrt(pcov[6, 6])
+    error_Zratio = np.sqrt(pcov[7, 7])
+
+    if verbose:
+        print('Fit Result')
+        print('Amag          : %.4f +/- %.6f' % (fit_Amag, error_Amag))
+        print('Aphase        : %.2f +/- %.4f Deg' % (fit_Aphase, error_Aphase))
+        print('Aslope        : %.3f +/- %.3f /GHz' % (fit_Aslope, error_Aslope))
+        print('Tau           : %.3f +/- %.3f ns' % (fit_tau, error_tau))
+        print('f0            : %.6f +/- %.8f GHz' % (fit_f0, error_f0))
+        print('Qi            : %.0f +/- %.0f' % (fit_Qi, error_Qi))
+        print('Qc            : %.0f +/- %.0f' % (fit_Qc, error_Qc))
+        print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_Zratio, error_Zratio))
+        print('')
+
+    single_res_params = ResParams(Amag=fit_Amag, Amag_error=error_Amag,
+                                  Aphase=fit_Aphase, Aphase_error=error_Aphase,
+                                  Aslope=fit_Aslope, Aslope_error=error_Aslope,
+                                  tau=fit_tau, tau_error=error_tau,
+                                  f0=fit_f0, f0_error=error_f0,
+                                  Qi=fit_Qi, Qi_error=error_Qi,
+                                  Qc=fit_Qc, Qc_error=error_Qc,
+                                  Zratio=fit_Zratio, Zratio_error=error_Zratio)
+    return single_res_params
+
+
 class ResFit:
     def __init__(self, file, group_delay=None, remove_baseline_ripple=False, verbose=True, freq_units="MHz", auto_process=True):
         self.filename = file
@@ -220,44 +262,7 @@ class ResFit:
                                                make_plot=self.fit_guess_plots, plot_dir=self.resonator_output_folder,
                                                file_prefix=self.plot_prefix, show_plot=show_plot)
 
-            fit_Amag  = popt[0]
-            fit_Aphase = popt[1]
-            fit_Aslope = popt[2]
-            fit_tau = popt[3]
-            fit_f0 = popt[4]
-            fit_Qi = popt[5]
-            fit_Qc = popt[6]
-            fit_Zratio = popt[7]
-
-            error_Amag = np.sqrt(pcov[0, 0])
-            error_Aphase = np.sqrt(pcov[1, 1])
-            error_Aslope = np.sqrt(pcov[2, 2])
-            error_tau = np.sqrt(pcov[3, 3])
-            error_f0 = np.sqrt(pcov[4, 4])
-            error_Qi = np.sqrt(pcov[5, 5])
-            error_Qc = np.sqrt(pcov[6, 6])
-            error_Zratio = np.sqrt(pcov[7, 7])
-
-            if self.verbose:
-                print('Fit Result')
-                print('Amag          : %.4f +/- %.6f' % (fit_Amag, error_Amag))
-                print('Aphase        : %.2f +/- %.4f Deg' % (fit_Aphase, error_Aphase))
-                print('Aslope        : %.3f +/- %.3f /GHz' % (fit_Aslope, error_Aslope))
-                print('Tau           : %.3f +/- %.3f ns' % (fit_tau, error_tau))
-                print('f0            : %.6f +/- %.8f GHz' % (fit_f0, error_f0))
-                print('Qi            : %.0f +/- %.0f' % (fit_Qi, error_Qi))
-                print('Qc            : %.0f +/- %.0f' % (fit_Qc, error_Qc))
-                print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_Zratio, error_Zratio))
-                print('')
-
-            self.res_params.append(ResParams(Amag=fit_Amag, Amag_error=error_Amag,
-                                             Aphase=fit_Aphase, Aphase_error=error_Aphase,
-                                             Aslope=fit_Aslope, Aslope_error=error_Aslope,
-                                             tau=fit_tau, tau_error=error_tau,
-                                             f0=fit_f0, f0_error=error_f0,
-                                             Qi=fit_Qi, Qi_error=error_Qi,
-                                             Qc=fit_Qc, Qc_error=error_Qc,
-                                             Zratio=fit_Zratio, Zratio_error=error_Zratio))
+            self.res_params.append(package_res_results(popt=popt, pcov=pcov, verbose=self.verbose))
         self.write_results()
         self.plot_results(show=show_plot)
 

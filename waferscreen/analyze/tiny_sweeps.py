@@ -3,9 +3,10 @@ import os
 import time
 from matplotlib import pyplot as plt
 from typing import NamedTuple
-from ref import output_dir, today_str, usbvna_address, volt_source_address, volt_source_port, agilent8722es_address
+from ref import output_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
 from waferscreen.inst_control import srs_sim928
-from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit
+from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
+from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.lamb_fit import lambdafit, Phi0
 from waferscreen.read.table_read import ClassyReader
@@ -14,6 +15,7 @@ from waferscreen.read.table_read import ClassyReader
 def ramp_name_parse(basename):
     res_num, current_uA_str = basename.rstrip('uA.csv').lstrip("sdata_res_").split('_cur_')
     return current_uA_str, res_num
+
 
 class TinySweeps:
     def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None,
@@ -41,7 +43,6 @@ class TinySweeps:
         if not os.path.isdir(self.res_out_dir):
             os.mkdir(self.res_out_dir)
         self.file_delimiter = ","
-
 
         # resonator frequencies file
         self.freqs_filename = os.path.join(output_dir, 's21', F"{wafer}", band_str, self.date_str,
@@ -73,6 +74,11 @@ class TinySweeps:
         self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
         self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps) # volts
 
+        # fitting options
+        self.fit_model = 'simple_res_gain_slope_complex'
+        self.error_est = 'prop'  # 'flat' or 'prop'
+        self.eager_analyze_retry_time = 20  # in seconds
+
         # make sure volts are in integer # of mV so SRS doesn't freak out
         for i in range(0, len(self.volts)):
             millivolts = int(round(self.volts[i] * 1000))
@@ -83,7 +89,7 @@ class TinySweeps:
             print("Voltages to measure at:")
             print(self.volts)
 
-        ### group delay removal (best to get correct within 180 degrees over dataset) ####
+        # group delay removal (best to get correct within 180 degrees over dataset)
         self.remove_group_delay = True
         self.group_delay = 27.292  # nanoseconds
 
@@ -95,8 +101,11 @@ class TinySweeps:
         self.vna_meas = None
         self.res_num_dict = None
 
+        # load the data from the initial course S21 sweep over the band
+        self.load_res_freqs()
+
+        # take data
         if auto_run:
-            self.load_res_freqs()
             self.take_sweep()
 
     def load_res_freqs(self):
@@ -204,6 +213,23 @@ class TinySweeps:
         return os.path.join(self.res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}.csv")
 
     def analyze_sweep(self, file):
+        # open the sweep file with the resonator
+        with open(file=file, mode='r') as f:
+            raw_sweep = f.readlines()
+        split_sweep = [tuple(raw_line.rstrip().split(',')) for raw_line in raw_sweep]
+        # there is a legacy file type without a header, we test for that here
+        try:
+            float(split_sweep[0][0])
+        except ValueError:
+            header = split_sweep[0]
+            split_sweep.pop(0)
+        else:
+            header = ['freq', 'real', "imag"]
+        by_column_data = list(zip(*split_sweep))
+        sweep_dict = {header_value: np.array(column_values, dtype=float)
+                      for header_value, column_values in zip(header, by_column_data)}
+
+        # get the current and resonator number information
         basename = os.path.basename(file)
         current_uA_str, res_num = ramp_name_parse(basename)
         if "m" == current_uA_str[0]:
@@ -211,15 +237,24 @@ class TinySweeps:
         else:
             current_uA = float(current_uA_str)
         output_filename = self.make_res_fit_file(res_num=res_num)
+        # if making a new file, make the header now
         if not os.path.isfile(output_filename):
             with open(output_filename, "w") as f:
                 f.write("ramp_current_uA,res_num," + res_params_header + "\n")
-        res_fit = ResFit(file=file, group_delay=0, verbose=self.verbose, freq_units=self.res_freq_units,
-                         remove_baseline_ripple=self.remove_baseline_ripple,
-                         auto_process=True)
+        # fit the resonator
+        popt, pcov = fit_resonator(freqs=sweep_dict['freq'],
+                                   s21data=np.array(list(zip(sweep_dict['real'], sweep_dict['imag']))),
+                                   data_format='RI', model=self.fit_model,
+                                   error_est=self.error_est, throw_out=0,
+                                   make_plot=False, plot_dir=output_dir,
+                                   file_prefix="",
+                                   show_plot=False)
+        single_res_params = package_res_results(popt=popt, pcov=pcov, verbose=self.verbose)
+        # res_fit = ResFit(file=file, group_delay=0, verbose=self.verbose, freq_units=self.res_freq_units,
+        #                  remove_baseline_ripple=self.remove_baseline_ripple,
+        #                  auto_process=True)
         with open(output_filename, 'a') as f:
-            for single_res_params in res_fit.res_params:
-                f.write(str(current_uA) + "," + res_num + "," + str(single_res_params) + "\n")
+            f.write(str(current_uA) + "," + res_num + "," + str(single_res_params) + "\n")
 
     def analyze_unprocessed(self):
         # get all the resonators sweeps that are available
@@ -229,15 +264,17 @@ class TinySweeps:
                                    if os.path.isfile(os.path.join(self.data_output_folder, f))]
         for available_filename in list_of_available_files:
             current_uA_str, res_num = ramp_name_parse(os.path.basename(available_filename))
-            current_tuple = (current_uA_str, res_num)
+            if current_uA_str[0] == "m":
+                current_uA_str = "-" + current_uA_str[1:]
+            current_tuple = (float(current_uA_str), float(res_num))
             available_resonator_currents.add(current_tuple)
             current_tuple_to_filename[current_tuple] = available_filename
         # find the resonators that have been processed
-        res_fit_dir = os.path.join(self.data_output_folder, "res_fit")
+        res_fit_dir = os.path.join(self.data_output_folder, "res_fits")
         processed_resonator_currents = set()
         if os.path.isdir(res_fit_dir):
             processed_resonator_files = [os.path.join(res_fit_dir, f) for f in os.listdir(res_fit_dir)
-                                         if os.path.isfile(os.path.join(self.data_output_folder, f))]
+                                         if os.path.isfile(os.path.join(res_fit_dir, f))]
             for resonator_file in processed_resonator_files:
                 res_data = ClassyReader(filename=resonator_file, delimiter=',')
                 processed_resonator_currents.update({(ramp_current_uA, res_num)
@@ -248,9 +285,9 @@ class TinySweeps:
         for current_tuple in available_resonator_currents - processed_resonator_currents:
             self.analyze_sweep(file=current_tuple_to_filename[current_tuple])
         if unprocessed_currents == set():
-            return False
-        else:
             return True
+        else:
+            return False
 
     def eager_analyze(self):
         """
@@ -259,11 +296,14 @@ class TinySweeps:
         """
         complete_status1 = False
         complete_status2 = False
-        while complete_status1 and complete_status2:
+        while not (complete_status1 and complete_status2):
             complete_status2 = complete_status1
             complete_status1 = self.analyze_unprocessed()
             if not (complete_status2 and complete_status1):
-                time.sleep(20)
+                time.sleep(self.eager_analyze_retry_time)
+        if self.verbose:
+            print(F"No new data for {self.eager_analyze_retry_time} seconds, " +
+                  "eager_analyze() is complete")
 
     def analyze_all(self):
         list_of_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
@@ -383,5 +423,6 @@ class LambdaParams(NamedTuple):
 
 
 if __name__ == "__main__":
-    ts = TinySweeps(wafer=7, band_number=1, date_str="2020-09-08", run_number=-1, auto_run=False, verbose=True)
-    ts.plot()
+    ts = TinySweeps(wafer=7, band_number=1, date_str="2020-09-08", run_number=9, auto_run=False, verbose=True)
+    ts.eager_analyze()
+    # ts.plot()
