@@ -291,8 +291,7 @@ class TinySweeps:
 
     def eager_analyze(self):
         """
-        Keep analysing unprocessed data until it was found that there was no additional data to process
-        that was found after 2 tries.
+        Keep analysing unprocessed data until it is found that there was no additional data to process after 2 tries.
         """
         complete_status1 = False
         complete_status2 = False

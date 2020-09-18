@@ -6,5 +6,5 @@ setup(name='WaferScreen',
       author='Caleb Wheeler, Jake Connors',
       author_email='chw3k5@gmail.com',
       packages=['waferscreen'],
-      requires=['numpy', 'matplotlib', 'scipy', "pyvisa"]
+      requires=['numpy', 'matplotlib', 'scipy', "pyvisa", "LabJackPython"]
       )
