@@ -1,4 +1,5 @@
 import os
+from getpass import getuser
 from datetime import datetime
 
 # Instrument addresses
@@ -16,7 +17,10 @@ today_str = F"{'%4i' % now.year}-{'%02i' % now.month}-{'%02i' % now.day}"
 # directory tree used by WaferScreen Database, including folder creation for things in .gitignore
 ref_file_path = os.path.dirname(os.path.realpath(__file__))
 parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
-working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
+if getuser() == 'uvwave':
+    working_dir = os.path.join("D:\\", "waferscreen")
+else:
+    working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
 s21_dir = os.path.join(working_dir, 's21')
 check_out_dir = os.path.join(s21_dir, "check_out")
 output_dir = os.path.join(working_dir, "output")
