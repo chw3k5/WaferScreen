@@ -7,15 +7,15 @@ from ref import today_str
 # for db in [-30, -20, -15, -10, 0, -40, -50]:
 #     check_out(coax_path="Thru1_wZX60", temperature=300, port_power_dBm=db)
 
-temperture_K = 300
+temperture_K = 3.16
 wafer = 7
 project = 'so'
 band_list = [1]
 run_number = 1
 port_power = -30  # dBm
 
-do_check_out = True
-do_band_sweeps = False
+do_check_out = False
+do_band_sweeps = True
 do_tiny_sweeps = False
 do_analyze_tiny_sweeps = False
 
