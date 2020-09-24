@@ -158,7 +158,7 @@ class TinySweeps:
                                 auto_init=True, temperature_K=self.temperature_K, use_exact_num_of_points=True,
                                 verbose=self.verbose)
         # connect to SIM928
-        voltsource = srs_sim928.SRS_SIM928(com_num=2, address=volt_source_address, port=volt_source_port)
+        voltsource = srs_sim928.SRS_SIM928(com_num=5, address=volt_source_address, port=volt_source_port)
         voltsource.setvolt(self.volts[0])
         voltsource.output_on()
         for j in range(len(self.res_freqs)):

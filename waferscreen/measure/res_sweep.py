@@ -69,7 +69,8 @@ class VnaMeas:
         self.preset_vna = preset_vna  # preset the VNA? Do if you don't know the state of the VNA ahead of time
         self.temperature_K = temperature_K
         # requested output parameters
-        self.output_params = ['basename', 'group_delay', "fcenter_GHz", "fspan_MHz", 'num_freq_points', "sweeptype",
+        self.output_params = ['output_filename', 'group_delay', "fcenter_GHz", "fspan_MHz",
+                              'num_freq_points', "sweeptype",
                               'if_bw_Hz', 'ifbw_track', 'ifbw_track', 'vna_avg', "temperature_K"]
 
         # setting and tools for this class
@@ -282,8 +283,11 @@ class VnaMeas:
             ind_filename = F"sdata_res_{res_number}_cur_" + str(int(round(single_current))) + "uA.csv"
         else:
             ind_filename = F"sdata_res_{res_number}_cur_m" + str(int(round(-1 * single_current))) + "uA.csv"
+        self.output_filename = os.path.join(self.dirname, ind_filename)
+        self.basename = os.path.basename(self.output_filename)
+        self.dirname = os.path.dirname(self.output_filename)
         # write out sdata
-        with open(os.path.join(self.dirname, ind_filename), 'w') as f:
+        with open(self.output_filename, 'w') as f:
             for i in range(len(self.freqs)):
                 f.write(str(self.freqs[i]) + "," + str(self.s21R[i]) + "," + str(self.s21I[i]) + "\n")
         self.record_params()
