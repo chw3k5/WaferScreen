@@ -1,5 +1,6 @@
 import u3
 import time
+import os
 
 
 class U3:
@@ -7,6 +8,13 @@ class U3:
         self.verbose = verbose
         self.lj = None
         self.is_open = False
+
+        self.num_channels = 1
+        self.sample_frequency_hz = 5000
+        self.voltage_resolution = 0
+        self.stream_file = ""
+        self.sample_time_s = 10
+
         if auto_init:
             self.open()
 
@@ -70,6 +78,77 @@ class U3:
                 time.sleep(0.2)
             else:
                 self.led(led_on=True)
+
+    def stream_config(self, num_channels=1, sample_frequency_hz=5000, voltage_resolution=0, sample_time_s=10, stream_file=""):
+        self.num_channels = num_channels
+        self.sample_frequency_hz = sample_frequency_hz
+        self.voltage_resolution = voltage_resolution
+        self.stream_file = stream_file
+        self.sample_time_s = sample_time_s
+
+    def stream(self, num_channels=None, sample_frequency_hz=None, voltage_resolution=None, sample_time_s=None,
+               stream_file=None):
+        if num_channels is not None:
+            self.num_channels = num_channels
+        if sample_frequency_hz is not None:
+            self.sample_frequency_hz = sample_frequency_hz
+        if voltage_resolution is not None:
+            self.voltage_resolution = voltage_resolution
+        if stream_file is not None:
+            self.stream_file = stream_file
+        if sample_time_s is not None:
+            self.sample_time_s = sample_time_s
+        """
+        voltage_resolution = 0 # 0,1,2, or 3 () is highest resolution, 3 is the lowest)
+        """
+        self.lj.streamConfig(NumChannels=self.num_channels,
+                             PChannels=range(self.num_channels),
+                             NChannels=[31 for x in range(self.num_channels)],
+                             Resolution=self.voltage_resolution,
+                             SampleFrequency=self.sample_frequency_hz)
+
+        if not os.path.isfile(self.stream_file):
+            with open(self.stream_file, 'w') as f:
+                f.write("frequency=%d" % self.sample_frequency_hz)
+                wavenames = ['wave%d' % n for n in range(self.num_channels)]
+                f.write('\t'.join(wavenames) + '\n')
+
+        # start the stream
+        self.lj.streamStart()
+        loop = 0
+
+        try:
+            finished = False
+            start = time.time()
+            while not finished:
+                self.get_stream()
+                loop += 1
+                diff_time = time.time() - start
+                if self.sample_time_s < diff_time:
+                    finished = True
+                if self.verbose:
+                    print("[%.4d %.2f s]" % (loop, diff_time))
+                    # print "start time", start
+                    # print 'Sample Time', SampleTime
+                    # print 'diff time', diff_time
+        finally:
+            self.lj.streamStop()
+        return
+
+    def get_stream(self):
+        try:
+            for buffer_data in self.lj.streamData():
+                if buffer_data is not None:
+                    if buffer_data['errors'] or buffer_data['numPackets'] != self.lj.packetsPerRequest or buffer_data['missed']:
+                        print("error: errors = '%s', numpackets = %d, missed = '%s'" % (
+                        buffer_data['errors'], buffer_data['numPackets'], buffer_data['missed']))
+                    break
+        finally:
+            pass
+        with open(self.stream_file, 'a') as f:
+            chans = [buffer_data['AIN%d' % n] for n in range(self.num_channels)]
+            for i in range(len(chans[0])):
+                f.write("\t".join(['%.6f' % c[i] for c in chans]) + '\n')
 
 
 if __name__ == "__main__":
