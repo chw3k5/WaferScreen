@@ -120,7 +120,7 @@ class VnaMeas:
                 self.vna.preset()
             self.vna.setup_thru()
             self.vna.set_cal(calstate='OFF')  # get raw S21 data
-        elif vna == '8822es':
+        elif vna == '8722es':
             self.vna_address = agilent8722es_address
             self.max_frequency_points = 1601
             multiple_of_max_points = 0
@@ -132,6 +132,7 @@ class VnaMeas:
                 self.num_freq_points = multiple_of_max_points
             self.calulations()
             self.vna = aly8722ES(address=self.vna_address)
+            self.vna.set_measure_type(measure_type='S21')
         else:
             raise KeyError("VNA: " + str(vna) + " if not a recognized")
         self.set_sweep_range_center_span()

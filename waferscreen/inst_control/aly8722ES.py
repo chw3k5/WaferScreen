@@ -254,6 +254,9 @@ class aly8722ES():
     def turn_ave_off(self):
         self.ctrl.write(F"AVERO OFF")
 
+    def set_measure_type(self, measure_type='S21'):
+        self.ctrl.write(measure_type)
+
     def setupFrequencySweep(self, fi=100, ff=200, power=-45, mtype='S21', displaytype='LOGM', numpts=1601, ifbw=1000):
         """ set instrument for a frequency sweep """
         self.setIFbandwidth(ifbw)

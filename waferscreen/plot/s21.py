@@ -1,5 +1,3 @@
-from ref import s21_dir
-import os
 import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.read.table_read import floats_table
