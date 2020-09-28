@@ -121,6 +121,8 @@ def find_resonances(freqs,
     smoothing_scale = int(round(smoothing_scale_kHz / freq_spacing))
     if smoothing_scale % 2 == 0:  # if even
         smoothing_scale = smoothing_scale + 1  # make it odd
+    if smoothing_scale >= smoothing_order:
+        smoothing_order = smoothing_scale - 1
     if verbose:
         print("Freq Spacing is " + str(freq_spacing) + "kHz")
         print("Requested smoothing scale is " + str(smoothing_scale_kHz) + "kHz")

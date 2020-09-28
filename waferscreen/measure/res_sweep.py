@@ -109,7 +109,7 @@ class VnaMeas:
             logfreqs = np.linspace(logfmin, logfmax, self.num_freq_points)
             self.freqs = 10.0 ** logfreqs
 
-    def vna_init(self, vna='8822es'):
+    def vna_init(self, vna='8722es'):
         vna = vna.lower()
         if vna == 'usbvna':
             self.vna_address = usbvna_address
