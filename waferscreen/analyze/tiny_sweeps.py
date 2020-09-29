@@ -3,6 +3,7 @@ import os
 import time
 from matplotlib import pyplot as plt
 from typing import NamedTuple
+from multiprocessing import Pool
 from ref import output_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
 from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
@@ -282,8 +283,10 @@ class TinySweeps:
                                                      in zip(res_data.ramp_current_uA, res_data.res_num)})
         # these are the resonators that are a available but have not been processed, process them now
         unprocessed_currents = available_resonator_currents - processed_resonator_currents
-        for current_tuple in available_resonator_currents - processed_resonator_currents:
-            self.analyze_sweep(file=current_tuple_to_filename[current_tuple])
+        files_to_analyze = [current_tuple_to_filename[current_tuple]
+                            for current_tuple in available_resonator_currents - processed_resonator_currents]
+        p = Pool(3)
+        p.map(self.analyze_sweep, files_to_analyze)
         if unprocessed_currents == set():
             return True
         else:
