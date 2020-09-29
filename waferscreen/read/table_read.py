@@ -143,14 +143,19 @@ def floats_table(file, delimiter=",", return_header=False):
     with open(file, 'r') as f:
         raw_lines = f.readlines()
     header = raw_lines[0].rstrip().split(delimiter)
-    data = [tuple(single_line.rstrip().split(delimiter)) for single_line in raw_lines[1:]]
-    by_column_data = list(zip(*data))
-    data_dict = {header_value: np.array(column_values, dtype=float)
-                 for header_value, column_values in zip(header, by_column_data)}
-    if return_header:
-        return data_dict, header
+    if isinstance(num_format(header[0]), str):
+        data = [tuple(single_line.rstrip().split(delimiter)) for single_line in raw_lines[1:]]
+        by_column_data = list(zip(*data))
+        data_dict = {header_value: np.array(column_values, dtype=float)
+                     for header_value, column_values in zip(header, by_column_data)}
+        if return_header:
+            return data_dict, header
+        else:
+            return data_dict
     else:
-        return data_dict
+        data = [tuple(single_line.rstrip().split(delimiter)) for single_line in raw_lines]
+        by_column_data = list(zip(*data))
+        return [np.array(single_data_column, dtype=float) for single_data_column in by_column_data]
 
 
 class ClassyReader:

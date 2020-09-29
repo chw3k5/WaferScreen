@@ -54,7 +54,7 @@ for band in band_list:
                             port_pwer_dBm=port_power)
 
     if do_analyze_tiny_sweeps:
-        ts = TinySweeps(wafer=wafer, band_number=band, date_str=today_str, run_number=run_number, auto_run=False,
+        ts = TinySweeps(wafer=wafer, band_number=band, date_str='2020-09-28', run_number=run_number, auto_run=False,
                         verbose=True)
         ts.eager_analyze()
         ts.plot()
