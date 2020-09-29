@@ -29,7 +29,8 @@ Toggle Script Variables
 do_check_out = False
 do_band_sweeps = False
 do_tiny_sweeps = False
-do_analyze_tiny_sweeps = True
+do_analyze_tiny_sweeps = False
+plot_tiny_sweeps = True
 
 """
 The Scripts
@@ -53,8 +54,9 @@ for band in band_list:
         acquire_tiny_sweeps(wafer=wafer, band_number=band, run_number=run_number, temperature_K=temperature_K,
                             port_pwer_dBm=port_power)
 
+    ts = TinySweeps(wafer=wafer, band_number=band, date_str='2020-09-28', run_number=run_number, auto_run=False,
+                    verbose=True)
     if do_analyze_tiny_sweeps:
-        ts = TinySweeps(wafer=wafer, band_number=band, date_str='2020-09-28', run_number=run_number, auto_run=False,
-                        verbose=True)
         ts.eager_analyze()
+    if plot_tiny_sweeps:
         ts.plot()

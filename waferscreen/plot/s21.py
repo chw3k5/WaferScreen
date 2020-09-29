@@ -18,5 +18,5 @@ def plot_21(file):
 
 if __name__ == "__main__":
     # file = os.path.join(s21_dir, "so", "7_Band01_2020-09-08_run9.csv")
-    file = "D:\\waferscreen\\output\\s21\\8\\Band03\\2020-09-28\\flux_ramp\\sdata_res_19_cur_30uA.csv"
+    file = "D:\\waferscreen\\output\\s21\\8\\Band03\\2020-09-28\\flux_ramp\\sdata_res_2_cur_30uA.csv"
     plot_21(file=file)

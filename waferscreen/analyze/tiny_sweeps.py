@@ -2,7 +2,7 @@ import numpy as np
 import os
 import time
 from matplotlib import pyplot as plt
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 from multiprocessing import Pool
 from ref import output_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
 from waferscreen.inst_control import srs_sim928
@@ -10,7 +10,7 @@ from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
 from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.lamb_fit import lambdafit, Phi0
-from waferscreen.read.table_read import ClassyReader
+from waferscreen.read.table_read import ClassyReader, floats_table
 
 
 def ramp_name_parse(basename):
@@ -36,8 +36,10 @@ class TinySweeps:
         self.temperature_K = temperature_K
 
         band_str = F"Band{'%02i' % self.band_number}"
-        self.data_output_folder = os.path.join(output_dir, 's21', F"{self.wafer}", band_str,
-                                               self.date_str, "flux_ramp")
+        self.parent_dir = os.path.join(output_dir, 's21', F"{self.wafer}", band_str, self.date_str)
+        self.lambda_filename = os.path.join(self.parent_dir, 'lambda_fits.csv')
+        self.plot_filename = os.path.join(self.parent_dir, F"{self.wafer}_{band_str}_{self.date_str}_flux_ramp.pdf")
+        self.data_output_folder =  os.path.join(self.parent_dir, "flux_ramp")
         if not os.path.isdir(self.data_output_folder):
             os.mkdir(self.data_output_folder)
         self.res_out_dir = os.path.join(self.data_output_folder, 'res_fits')
@@ -84,11 +86,6 @@ class TinySweeps:
         for i in range(0, len(self.volts)):
             millivolts = int(round(self.volts[i] * 1000))
             self.volts[i] = millivolts / 1000
-        if self.verbose:
-            print("Currents to measure at:")
-            print(self.currents)
-            print("Voltages to measure at:")
-            print(self.volts)
 
         # group delay removal (best to get correct within 180 degrees over dataset)
         self.remove_group_delay = True
@@ -101,6 +98,7 @@ class TinySweeps:
         self.freq_bounds_array = None
         self.vna_meas = None
         self.res_num_dict = None
+        self.lambda_params = None
 
         # load the data from the initial course S21 sweep over the band
         self.load_res_freqs()
@@ -149,9 +147,14 @@ class TinySweeps:
         self.freq_bounds_array = np.array(self.freq_bounds)
 
     def take_sweep(self):
-        print("")
-        total_est_time = (self.current_steps * len(self.res_freqs) * (0.5 + self.num_pts_per_sweep / self.if_bw)) / 3600.0
-        print("Total time to do FR sweep: " + str(total_est_time) + " hours")
+        if self.verbose:
+            print("Currents to measure at:")
+            print(self.currents)
+            print("Voltages to measure at:")
+            print(self.volts)
+            print("")
+            total_est_time = (self.current_steps * len(self.res_freqs) * (0.5 + self.num_pts_per_sweep / self.if_bw)) / 3600.0
+            print("Total time to do FR sweep: " + str(total_est_time) + " hours")
         self.vna_meas = VnaMeas(fcenter_GHz=self.res_freqs[0], fspan_MHz=self.meas_span * 1e-6,
                                 num_freq_points=self.num_pts_per_sweep, sweeptype="lin", if_bw_Hz=self.if_bw,
                                 ifbw_track=self.ifbw_track, port_power_dBm=self.port_power, vna_avg=1, preset_vna=False,
@@ -285,8 +288,8 @@ class TinySweeps:
         unprocessed_currents = available_resonator_currents - processed_resonator_currents
         files_to_analyze = [current_tuple_to_filename[current_tuple]
                             for current_tuple in available_resonator_currents - processed_resonator_currents]
-        p = Pool(3)
-        p.map(self.analyze_sweep, files_to_analyze)
+        with Pool(processes=3) as p:
+            p.map(self.analyze_sweep, files_to_analyze)
         if unprocessed_currents == set():
             return True
         else:
@@ -329,14 +332,51 @@ class TinySweeps:
                 current_dict[res_dict['ramp_current_uA']] = ResParams(**{column_name: res_dict[column_name]
                                                                          for column_name
                                                                          in res_params_header.split(',')})
-            self.res_num_dict[res_num] = current_dict
+            self.res_num_dict[int(res_num)] = current_dict
 
-    def plot(self):
+    def calc_lambda(self):
         # get the data
         self.load_flux_ramp_res_data()
         # arrange the data
-        plot_dict = {}
+        self.lambda_params = []
         for res_num in sorted(self.res_num_dict.keys()):
+            res_calc = {}
+            currents_uA, res_params = zip(*[(current, self.res_num_dict[res_num][current])
+                                          for current in sorted(self.res_num_dict[res_num].keys())])
+            try:
+                I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA) * 1.0e-6,
+                                                              f0=np.array([res_param.f0 for res_param in res_params]))
+            except RuntimeError:
+                I0fit = mfit = f2fit = Pfit = lambfit = np.nan
+            self.lambda_params.append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit,
+                                                   res_num=res_num))
+
+        with open(file=self.lambda_filename, mode='w') as f:
+            f.write(lambda_header + "\n")
+            res_params_to_lambda_params = {int(lamb_param.res_num): lamb_param for lamb_param in self.lambda_params}
+            for res_num in sorted(res_params_to_lambda_params.keys()):
+                single_lambda = res_params_to_lambda_params[res_num]
+                f.write(str(single_lambda) + "\n")
+
+    def read_lambda(self):
+        lambda_data = floats_table(file=self.lambda_filename)
+        self.lambda_params = []
+        for I0fit, mfit, f2fit, Pfit, lambfit, res_num in list(zip(lambda_data["I0fit"], lambda_data["mfit"],
+                                                                   lambda_data["f2fit"], lambda_data["Pfit"],
+                                                                   lambda_data["lambfit"], lambda_data["res_num"])):
+            self.lambda_params.append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit,
+                                                   res_num=res_num))
+
+    def plot(self, show=False):
+        self.load_flux_ramp_res_data()
+        if os.path.isfile(self.lambda_filename):
+            self.read_lambda()
+        else:
+            self.calc_lambda()
+        res_params_to_lambda_params = {int(lamb_param.res_num): lamb_param for lamb_param in self.lambda_params}
+        plot_dict = {}
+        sorted_res_nums = sorted(res_params_to_lambda_params.keys())
+        for res_num in list(sorted_res_nums):
             res_calc = {}
             currents_uA, res_params = zip(*[(current, self.res_num_dict[res_num][current])
                                           for current in sorted(self.res_num_dict[res_num].keys())])
@@ -345,19 +385,16 @@ class TinySweeps:
             res_calc['average_res_qi'] = np.mean([param.Qi for param in res_params])
             res_calc['average_res_zratio'] = np.mean([param.Zratio for param in res_params])
 
-
-            I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA) * 1.0e-6,
-                                                          f0=np.array([res_param.f0 for res_param in res_params]))
-            lambda_params = LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit)
+            lambda_params = res_params_to_lambda_params[int(res_num)]
             res_calc['lambfit'] = lambda_params.lambfit
             res_calc['flux_ramp_shift_kHz'] = lambda_params.Pfit * 1.0e6
             res_calc['fr_squid_mi_pH'] = (lambda_params.mfit * Phi0 / (2.0 * np.pi)) * 1.0e12  # converting to pico Henries
             plot_dict[average_res_freq] = res_calc
 
         # making the plots
-        fig1 = plt.figure(1)
+        fig1 = plt.figure(1, figsize=(16, 9))
         # set up figures
-        fig1.suptitle(F"Band{'%02i' % self.band_number} Wafer{'%02i' % self.wafer} {self.date_str}")
+        fig1.suptitle(F"{len(self.res_num_dict.keys())} resonators Band{'%02i' % self.band_number} Wafer{'%02i' % self.wafer} {self.date_str}")
         fig1.subplots_adjust(top=0.95, bottom=0.075, left=0.07, right=0.965, hspace=0.21, wspace=0.18)
         ax11 = fig1.add_subplot(231)
         ax12 = fig1.add_subplot(232)
@@ -367,17 +404,17 @@ class TinySweeps:
         ax16 = fig1.add_subplot(236)
         sorted_freq_list = sorted(plot_dict.keys())
         ax11.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qi'] for res_freq in sorted_freq_list],
-                  color='firebrick')
+                  color='firebrick', ls='None', marker='x')
         ax12.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qc'] for res_freq in sorted_freq_list],
-                  color='firebrick')
+                  color='dodgerblue', ls='None', marker='x')
         ax13.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_zratio'] for res_freq in sorted_freq_list],
-                  color='firebrick')
+                  color='darkorchid', ls='None', marker='x')
         ax14.plot(sorted_freq_list, [plot_dict[res_freq]['lambfit'] for res_freq in sorted_freq_list],
-                  color='firebrick')
+                  color='darkgoldenrod', ls='None', marker='x')
         ax15.plot(sorted_freq_list, [plot_dict[res_freq]['flux_ramp_shift_kHz'] for res_freq in sorted_freq_list],
-                  color='firebrick')
+                  color='forestgreen', ls='None', marker='x')
         ax16.plot(sorted_freq_list, [plot_dict[res_freq]['fr_squid_mi_pH'] for res_freq in sorted_freq_list],
-                  color='firebrick')
+                  color='saddlebrown', ls='None', marker='x')
 
         # make the figure look nice
         ax11.grid(True)
@@ -404,10 +441,12 @@ class TinySweeps:
         ax15.set_ylabel("Flux Ramp Span kHz")
         ax16.set_xlabel("Frequency (GHz)")
         ax16.set_ylabel("FR - SQUID Mutual Inductance (pH)")
-        plt.show()
+        plt.savefig(self.plot_filename)
+        if show:
+            plt.show()
 
 
-lambda_header = "I0fit,mfit,f2fit,Pfit,lambfit"
+lambda_header = "I0fit,mfit,f2fit,Pfit,lambfit,res_num"
 
 
 class LambdaParams(NamedTuple):
@@ -416,6 +455,7 @@ class LambdaParams(NamedTuple):
     f2fit: float
     Pfit: float
     lambfit: float
+    res_num: Optional[int] = None
 
     def __str__(self):
         output_string = ""
