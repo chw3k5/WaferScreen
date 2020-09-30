@@ -73,7 +73,7 @@ class TinySweeps:
         self.rseries = 10000  # ohms
         self.current_min = -125  # uA
         self.current_max = 125  # uA
-        self.current_steps = 251
+        self.current_steps = 51
         self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
         self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps) # volts
 
@@ -288,8 +288,7 @@ class TinySweeps:
         unprocessed_currents = available_resonator_currents - processed_resonator_currents
         files_to_analyze = [current_tuple_to_filename[current_tuple]
                             for current_tuple in available_resonator_currents - processed_resonator_currents]
-        with Pool(processes=3) as p:
-            p.map(self.analyze_sweep, files_to_analyze)
+        [self.analyze_sweep(a_file) for a_file in files_to_analyze]
         if unprocessed_currents == set():
             return True
         else:
