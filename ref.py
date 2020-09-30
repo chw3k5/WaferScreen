@@ -41,3 +41,23 @@ h = 6.6260755E-34  # Js
 c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
 
+band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4147},
+               "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
+               "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
+               "Band03": {"min_GHz": 4.419, "max_GHz": 4.581},
+               "Band04": {"min_GHz": 4.584, "max_GHz": 4.714},
+               "Band05": {"min_GHz": 4.718, "max_GHz": 4.848},
+               "Band06": {"min_GHz": 4.852, "max_GHz": 4.981},
+               "Band07": {"min_GHz": 5.019, "max_GHz": 5.147},
+               "Bans08": {"min_GHz": 5.152, "max_GHz": 5.280},
+               "Band09": {"min_GHz": 5.286, "max_GHz": 5.413},
+               "Band10": {"min_GHz": 5.421, "max_GHz": 5.581},
+               "Band11": {"min_GHz": 5.585, "max_GHz": 5.714},
+               "Band12": {"min_GHz": 5.718, "max_GHz": 5.848},
+               "Band13": {"min_GHz": 5.851, "max_GHz": 5.981},
+               }
+
+for band in band_params.keys():
+    params_dict = band_params[band]
+    params_dict["span_GHz"] = params_dict["max_GHz"] - params_dict["min_GHz"]
+    params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5

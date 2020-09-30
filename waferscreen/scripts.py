@@ -1,30 +1,10 @@
 import os
 import numpy as np
-from ref import s21_dir, today_str, check_out_dir
+from ref import s21_dir, today_str, check_out_dir, band_params
+from waferscreen.plot.s21 import plot_21
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.find_and_fit import ResFit
 from waferscreen.analyze.tiny_sweeps import TinySweeps
-
-band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4147},
-               "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
-               "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
-               "Band03": {"min_GHz": 4.419, "max_GHz": 4.581},
-               "Band04": {"min_GHz": 4.584, "max_GHz": 4.714},
-               "Band05": {"min_GHz": 4.718, "max_GHz": 4.848},
-               "Band06": {"min_GHz": 4.852, "max_GHz": 4.981},
-               "Band07": {"min_GHz": 5.019, "max_GHz": 5.147},
-               "Bans08": {"min_GHz": 5.152, "max_GHz": 5.280},
-               "Band09": {"min_GHz": 5.286, "max_GHz": 5.413},
-               "Band10": {"min_GHz": 5.421, "max_GHz": 5.581},
-               "Band11": {"min_GHz": 5.585, "max_GHz": 5.714},
-               "Band12": {"min_GHz": 5.718, "max_GHz": 5.848},
-               "Band13": {"min_GHz": 5.851, "max_GHz": 5.981},
-               }
-
-for band in band_params.keys():
-    params_dict = band_params[band]
-    params_dict["span_GHz"] = params_dict["max_GHz"] - params_dict["min_GHz"]
-    params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
 
 
 def calc_band_edges(min_GHz, max_GHz, center_GHz,
@@ -111,8 +91,8 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None, num_freq_po
     res_fits = []
     for port_power_dBm, band in sweeps_params:
         sweep_file = sweep_to_find_resonances(project=project, wafer=wafer,
-                                              fcenter_GHz=None, fspan_GHz=None, num_freq_points=num_freq_points, sweeptype='lin',
-                                              if_bw_Hz=if_bw_Hz,
+                                              fcenter_GHz=None, fspan_GHz=None, num_freq_points=num_freq_points,
+                                              sweeptype='lin', if_bw_Hz=if_bw_Hz,
                                               band=band, lower_extra_span_fraction=lower_extra_span_fraction,
                                               upper_extra_span_fraction=upper_extra_span_fraction,
                                               ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,
@@ -120,6 +100,7 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None, num_freq_po
 
         res_fit = ResFit(file=sweep_file,
                          group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)
+        plot_21(file=sweep_file, save=True, show=False, res_fit=res_fit)
         res_fits.append(res_fit)
     return res_fits
 
