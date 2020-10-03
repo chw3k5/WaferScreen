@@ -43,7 +43,7 @@ def find_center_band(center_GHz):
     return ordered_band_centers[nearest_band_center_index]
 
 
-def plot_21(file, save=True, show=False, res_fit=None):
+def plot_21(file, save=True, show=False, show_bands=True, res_fit=None):
     legend_dict = {}
     data_dict = floats_table(file, delimiter=",")
     if isinstance(data_dict, list):
@@ -61,16 +61,19 @@ def plot_21(file, save=True, show=False, res_fit=None):
     center_freq = (max_freq + min_freq) / 2.0
     axes = plt.gca()
     ymin, ymax = axes.get_ylim()
-    counter = 1
-    color = "black"
-    for freq, label_str in find_band_edges(min_freq=min_freq, max_freq=max_freq):
-        line_style = ls[counter % len_ls]
-        plt.plot([freq, freq], [ymin, ymax], color=color, ls=line_style)
-        legend_dict['leg_lines'].append(plt.Line2D(range(10), range(10), color=color, ls=line_style))
-        legend_dict['leg_labels'].append(label_str)
-        counter += 1
-    center_band_freq, center_band_str = find_center_band(center_GHz=center_freq)
-    plt.title(center_band_str)
+    if show_bands:
+        counter = 1
+        color = "black"
+        for freq, label_str in find_band_edges(min_freq=min_freq, max_freq=max_freq):
+            line_style = ls[counter % len_ls]
+            plt.plot([freq, freq], [ymin, ymax], color=color, ls=line_style)
+            legend_dict['leg_lines'].append(plt.Line2D(range(10), range(10), color=color, ls=line_style))
+            legend_dict['leg_labels'].append(label_str)
+            counter += 1
+        center_band_freq, center_band_str = find_center_band(center_GHz=center_freq)
+        plt.title(center_band_str)
+    else:
+        plt.title(file)
     plt.xlabel('Frequency (GHz)')
     plt.ylabel("S21 Transmission (dB)")
     plt.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=0, numpoints=3, handlelength=5, fontsize=16)
@@ -85,7 +88,16 @@ def plot_21(file, save=True, show=False, res_fit=None):
     return
 
 
+def make_s21_folder(folder):
+    for file in [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]:
+        plot_21(file=file, save=True, show_bands=False, show=False)
+
+
 if __name__ == "__main__":
     # file = os.path.join(s21_dir, "so", "7_Band01_2020-09-08_run9.csv")
-    file = os.path.join(output_dir, "s21", "8", "Band03", "2020-09-28", "8_Band03_2020-09-28_run4.csv")
-    plot_21(file=file)
+    # file = os.path.join(output_dir, "s21", "8", "Band03", "2020-09-28", "8_Band03_2020-09-28_run4.csv")
+    # file = os.path.join("D:\\", 'waferscreen', 's21', 'check_out', 'Input1_Trace0.15K_2020-09-01_run14.csv')
+    plot_21(file='D:\\waferscreen\\output\\s21\\8\\Band03\\2020-09-29\\flux_ramp\\sdata_res_18_cur_0uA.csv', show=True, save=False, show_bands=False)
+
+    # make_s21_folder(os.path.join("D:\\", 'waferscreen', 's21', 'check_out'))
+
