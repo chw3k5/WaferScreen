@@ -81,6 +81,7 @@ def plot_21(file, save=True, show=False, show_bands=True, res_fit=None):
     if show:
         plt.show()
     if save:
+        plt.draw()
         plot_file_name, _ = file.rsplit(".", 1)
         plot_file_name += '.pdf'
         plt.savefig(plot_file_name)

@@ -27,6 +27,24 @@ def data_format_and_phase_delay(s21Au, s21Bu, freqs, group_delay=None):
     return s21R, s21I, s21LM, s21PH
 
 
+def ramp_name_parse(basename):
+    res_num_str, current_uA_and_power_str = basename.rstrip('dBm.csv').lstrip("sdata_res_").split('_cur_')
+    current_str, power_str = current_uA_and_power_str.split("uA_")
+    if "m" == current_str[0]:
+        current_uA = -1.0 * float(current_str[1:])
+    else:
+        current_uA = float(current_str)
+    power_dBm = float(power_str)
+    res_num = int(res_num_str)
+    return power_dBm, current_uA, res_num
+
+def ramp_name_create(power_dBm, current_uA, res_num):
+    if current_uA >= 0:
+        ind_filename = F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm.csv"
+    else:
+        ind_filename = F"sdata_res_{res_num}_cur_m{int(round(-1 * current_uA))}uA_{power_dBm}dBm.csv"
+    return ind_filename
+
 class VnaMeas:
     """
     Code which will take an S21 measurement with a Keysight USB VNA (P937XA) and plot it LM and in a Smith Chart
@@ -280,10 +298,7 @@ class VnaMeas:
     def vna_tiny_sweeps(self, single_current, res_number):
 
         self.vna_sweep()
-        if single_current >= 0:
-            ind_filename = F"sdata_res_{res_number}_cur_" + str(int(round(single_current))) + "uA.csv"
-        else:
-            ind_filename = F"sdata_res_{res_number}_cur_m" + str(int(round(-1 * single_current))) + "uA.csv"
+        ind_filename = ramp_name_create(power_dBm=self.port_power_dBm, current_uA=single_current, res_num=res_number)
         self.output_filename = os.path.join(self.dirname, ind_filename)
         self.basename = os.path.basename(self.output_filename)
         self.dirname = os.path.dirname(self.output_filename)

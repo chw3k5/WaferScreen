@@ -8,14 +8,9 @@ from ref import output_dir, today_str, volt_source_address, volt_source_port, ag
 from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
 from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit, package_res_results
-from waferscreen.measure.res_sweep import VnaMeas
+from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
 from waferscreen.analyze.lamb_fit import lambdafit, Phi0
 from waferscreen.read.table_read import ClassyReader, floats_table
-
-
-def ramp_name_parse(basename):
-    res_num, current_uA_str = basename.rstrip('uA.csv').lstrip("sdata_res_").split('_cur_')
-    return current_uA_str, res_num
 
 
 class TinySweeps:
@@ -214,7 +209,7 @@ class TinySweeps:
             print("Connection to Instruments Closed")
 
     def make_res_fit_file(self, res_num):
-        return os.path.join(self.res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}.csv")
+        return os.path.join(self.res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}_{self.port_power}dBm.csv")
 
     def analyze_sweep(self, file):
         # open the sweep file with the resonator
@@ -235,16 +230,12 @@ class TinySweeps:
 
         # get the current and resonator number information
         basename = os.path.basename(file)
-        current_uA_str, res_num = ramp_name_parse(basename)
-        if "m" == current_uA_str[0]:
-            current_uA = -1.0 * float(current_uA_str[1:])
-        else:
-            current_uA = float(current_uA_str)
+        power_dBm, current_uA, res_num = ramp_name_parse(basename)
         output_filename = self.make_res_fit_file(res_num=res_num)
         # if making a new file, make the header now
         if not os.path.isfile(output_filename):
             with open(output_filename, "w") as f:
-                f.write("ramp_current_uA,res_num," + res_params_header + "\n")
+                f.write("ramp_current_uA,res_num,dBm," + res_params_header + "\n")
         # fit the resonator
         popt, pcov = fit_resonator(freqs=sweep_dict['freq'],
                                    s21data=np.array(list(zip(sweep_dict['real'], sweep_dict['imag']))),
@@ -258,7 +249,7 @@ class TinySweeps:
         #                  remove_baseline_ripple=self.remove_baseline_ripple,
         #                  auto_process=True)
         with open(output_filename, 'a') as f:
-            f.write(str(current_uA) + "," + res_num + "," + str(single_res_params) + "\n")
+            f.write(F"{current_uA},{res_num},{self.port_power},{single_res_params}\n")
 
     def analyze_unprocessed(self):
         # get all the resonators sweeps that are available
@@ -267,10 +258,8 @@ class TinySweeps:
         list_of_available_files = [os.path.join(self.data_output_folder, f) for f in os.listdir(self.data_output_folder)
                                    if os.path.isfile(os.path.join(self.data_output_folder, f))]
         for available_filename in list_of_available_files:
-            current_uA_str, res_num = ramp_name_parse(os.path.basename(available_filename))
-            if current_uA_str[0] == "m":
-                current_uA_str = "-" + current_uA_str[1:]
-            current_tuple = (float(current_uA_str), float(res_num))
+            power_dBm, current_uA, res_num = ramp_name_parse(os.path.basename(available_filename))
+            current_tuple = (float(current_uA), float(res_num))
             available_resonator_currents.add(current_tuple)
             current_tuple_to_filename[current_tuple] = available_filename
         # find the resonators that have been processed
