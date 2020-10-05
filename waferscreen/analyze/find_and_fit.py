@@ -131,8 +131,8 @@ class ResFit:
         self.resonator_output_folder = os.path.join(self.output_folder, 'resonators')
         if not os.path.isdir(self.resonator_output_folder):
             os.mkdir(self.resonator_output_folder)
-        shutil.copyfile(self.filename, os.path.join(self.output_folder, file_basename))
-
+        if self.filename != os.path.join(self.output_folder, file_basename):
+            shutil.copyfile(self.filename, os.path.join(self.output_folder, file_basename))
         self.fit_filename = os.path.join(self.output_folder, base_handle + "_fit.csv")
 
         """Data containers populated by the methods of this class"""
