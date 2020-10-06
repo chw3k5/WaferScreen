@@ -277,9 +277,14 @@ class TinySweeps:
         unprocessed_currents = available_resonator_currents - processed_resonator_currents
         files_to_analyze = [current_tuple_to_filename[current_tuple]
                             for current_tuple in available_resonator_currents - processed_resonator_currents]
-        # [self.analyze_sweep(a_file) for a_file in files_to_analyze]
-        with Pool(processes=4) as pool:
-            pool.map(func=self.analyze_sweep, iterable=files_to_analyze)
+        for a_file in files_to_analyze:
+            try:
+                self.analyze_sweep(a_file)
+            except RuntimeError:
+                print(a_file)
+                raise RuntimeError
+        # with Pool(processes=4) as pool:
+        #     pool.map(func=self.analyze_sweep, iterable=files_to_analyze)
         if unprocessed_currents == set():
             return True
         else:
