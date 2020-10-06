@@ -209,7 +209,7 @@ class TinySweeps:
             print("Connection to Instruments Closed")
 
     def make_res_fit_file(self, res_num):
-        return os.path.join(self.res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}_{self.port_power}dBm.csv")
+        return os.path.join(self.res_out_dir, F"sdata_res_{res_num}_fit_{self.fit_number}.csv")
 
     def analyze_sweep(self, file):
         # open the sweep file with the resonator
@@ -249,7 +249,7 @@ class TinySweeps:
         #                  remove_baseline_ripple=self.remove_baseline_ripple,
         #                  auto_process=True)
         with open(output_filename, 'a') as f:
-            f.write(F"{current_uA},{res_num},{self.port_power},{single_res_params}\n")
+            f.write(F"{current_uA},{res_num},{power_dBm},{single_res_params}\n")
 
     def analyze_unprocessed(self):
         # get all the resonators sweeps that are available
@@ -259,7 +259,7 @@ class TinySweeps:
                                    if os.path.isfile(os.path.join(self.data_output_folder, f))]
         for available_filename in list_of_available_files:
             power_dBm, current_uA, res_num = ramp_name_parse(os.path.basename(available_filename))
-            current_tuple = (float(current_uA), float(res_num))
+            current_tuple = (float(current_uA), float(res_num), float(power_dBm))
             available_resonator_currents.add(current_tuple)
             current_tuple_to_filename[current_tuple] = available_filename
         # find the resonators that have been processed
@@ -270,9 +270,9 @@ class TinySweeps:
                                          if os.path.isfile(os.path.join(res_fit_dir, f))]
             for resonator_file in processed_resonator_files:
                 res_data = ClassyReader(filename=resonator_file, delimiter=',')
-                processed_resonator_currents.update({(ramp_current_uA, res_num)
-                                                     for ramp_current_uA, res_num
-                                                     in zip(res_data.ramp_current_uA, res_data.res_num)})
+                processed_resonator_currents.update({(ramp_current_uA, res_num, power_dBm)
+                                                     for ramp_current_uA, res_num, power_dBm
+                                                     in zip(res_data.ramp_current_uA, res_data.res_num, res_data.dBm)})
         # these are the resonators that are a available but have not been processed, process them now
         unprocessed_currents = available_resonator_currents - processed_resonator_currents
         files_to_analyze = [current_tuple_to_filename[current_tuple]
@@ -312,6 +312,7 @@ class TinySweeps:
         self.res_num_dict = {}
         for res_file in list_of_res_fit_files:
             res_num, run_num = os.path.basename(res_file).rstrip(".csv").lstrip("sdata_res_").split('_fit_')
+            (res_num, run_num) = (int(res_num), int(run_num))
             with open(res_file, 'r') as f:
                 res_file_lines = f.readlines()
             header = res_file_lines[0].strip().split(',')
@@ -319,47 +320,68 @@ class TinySweeps:
             for res_data in res_file_lines[1:]:
                 res_dict = {header_name: float(row_value)
                             for header_name, row_value in zip(header, res_data.strip().split(','))}
-                current_dict[res_dict['ramp_current_uA']] = ResParams(**{column_name: res_dict[column_name]
-                                                                         for column_name
-                                                                         in res_params_header.split(',')})
-            self.res_num_dict[int(res_num)] = current_dict
+                cooridnates = (res_dict['ramp_current_uA'], res_dict['dBm'])
+                current_dict[cooridnates] = ResParams(**{column_name: res_dict[column_name] for column_name
+                                                         in res_params_header.split(',')})
+            if res_num not in self.res_num_dict.keys():
+                self.res_num_dict[res_num] = {}
+            self.res_num_dict[res_num].update(current_dict)
 
     def calc_lambda(self):
         # get the data
         self.load_flux_ramp_res_data()
         # arrange the data
-        self.lambda_params = []
+        self.lambda_params = {}
+        currents_uA_per_power = {}
+        res_params_per_power = {}
         for res_num in sorted(self.res_num_dict.keys()):
             res_calc = {}
-            currents_uA, res_params = zip(*[(current, self.res_num_dict[res_num][current])
-                                          for current in sorted(self.res_num_dict[res_num].keys())])
-            try:
-                I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA) * 1.0e-6,
-                                                              f0=np.array([res_param.f0 for res_param in res_params]))
-            except RuntimeError:
-                I0fit = mfit = f2fit = Pfit = lambfit = np.nan
-            self.lambda_params.append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit,
-                                                   res_num=res_num))
+            currents_uA, powers_dBm, res_params = zip(*[(coordinates[0], coordinates[1], self.res_num_dict[res_num][coordinates])
+                                          for coordinates in sorted(self.res_num_dict[res_num].keys())])
+            for current_uA, power_dBm, res_param in list(zip(currents_uA, powers_dBm, res_params)):
+                if power_dBm not in self.lambda_params.keys():
+                    self.lambda_params[power_dBm] = []
+                    currents_uA_per_power[power_dBm] = []
+                    res_params_per_power[power_dBm] = []
+                currents_uA_per_power[power_dBm].append(current_uA)
+                res_params_per_power[power_dBm].append(res_param)
+            for power_dBm in sorted(set(powers_dBm)):
+
+
+                try:
+                    I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA_per_power[power_dBm]) * 1.0e-6,
+                                                                  f0=np.array([res_param_this_power.f0
+                                                                               for res_param_this_power in
+                                                                               res_params_per_power[power_dBm]]))
+                except RuntimeError:
+                    I0fit = mfit = f2fit = Pfit = lambfit = np.nan
+                self.lambda_params[power_dBm].append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit,
+                                                                  lambfit=lambfit, res_num=res_num,
+                                                                  power_dBm=power_dBm))
 
         with open(file=self.lambda_filename, mode='w') as f:
             f.write(lambda_header + "\n")
-            res_params_to_lambda_params = {int(lamb_param.res_num): lamb_param for lamb_param in self.lambda_params}
-            for res_num in sorted(res_params_to_lambda_params.keys()):
-                single_lambda = res_params_to_lambda_params[res_num]
-                f.write(str(single_lambda) + "\n")
+            for power_dBm in sorted(self.lambda_params.keys()):
+                res_params_to_lambda_params = {int(lamb_param.res_num): lamb_param for lamb_param in self.lambda_params[power_dBm]}
+                for res_num in sorted(res_params_to_lambda_params.keys()):
+                    single_lambda = res_params_to_lambda_params[res_num]
+                    f.write(str(single_lambda) + "\n")
 
     def read_lambda(self):
         lambda_data = floats_table(file=self.lambda_filename)
-        self.lambda_params = []
-        for I0fit, mfit, f2fit, Pfit, lambfit, res_num in list(zip(lambda_data["I0fit"], lambda_data["mfit"],
+        self.lambda_params = {}
+        for I0fit, mfit, f2fit, Pfit, lambfit, res_num, power_dBm in list(zip(lambda_data["I0fit"], lambda_data["mfit"],
                                                                    lambda_data["f2fit"], lambda_data["Pfit"],
-                                                                   lambda_data["lambfit"], lambda_data["res_num"])):
-            self.lambda_params.append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit,
-                                                   res_num=res_num))
+                                                                   lambda_data["lambfit"], lambda_data["res_num"],
+                                                                   lambda_data["power_dBm"])):
+            if power_dBm not in self.lambda_params.keys():
+                self.lambda_params[power_dBm] = []
+            self.lambda_params[power_dBm].append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit,
+                                                              lambfit=lambfit, res_num=res_num, power_dBm=power_dBm))
 
-    def plot(self, show=False):
+    def plot(self, show=False, redo_lambda=False):
         self.load_flux_ramp_res_data()
-        if os.path.isfile(self.lambda_filename):
+        if os.path.isfile(self.lambda_filename) and not redo_lambda:
             self.read_lambda()
         else:
             self.calc_lambda()
@@ -436,7 +458,7 @@ class TinySweeps:
             plt.show()
 
 
-lambda_header = "I0fit,mfit,f2fit,Pfit,lambfit,res_num"
+lambda_header = "I0fit,mfit,f2fit,Pfit,lambfit,res_num,power_dBm"
 
 
 class LambdaParams(NamedTuple):
@@ -446,6 +468,7 @@ class LambdaParams(NamedTuple):
     Pfit: float
     lambfit: float
     res_num: Optional[int] = None
+    power_dBm: Optional[float] = None
 
     def __str__(self):
         output_string = ""

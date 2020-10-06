@@ -22,15 +22,17 @@ upper_extra_span_fraction = 0.0
 # for tiny_sweeps scripts
 run_number = 4
 
+# for plot_plot_tiny_sweeps
+redo_lambda = True
 
 """
 Toggle Script Variables
 """
-do_check_out = True
+do_check_out = False
 do_band_sweeps = False
 do_tiny_sweeps = False
-do_analyze_tiny_sweeps = False
-plot_tiny_sweeps = False
+do_analyze_tiny_sweeps = True
+plot_tiny_sweeps = True
 
 """
 The Scripts
@@ -56,9 +58,9 @@ if __name__ == '__main__':
                                     port_pwer_dBm=port_power)
 
             if any((do_analyze_tiny_sweeps, plot_tiny_sweeps)):
-                ts = TinySweeps(wafer=wafer, band_number=band, date_str=today_str, run_number=run_number, auto_run=False,
-                                verbose=True)
+                ts = TinySweeps(wafer=wafer, band_number=band, date_str='2020-10-04', run_number=run_number,
+                                auto_run=False, verbose=True)
                 if do_analyze_tiny_sweeps:
                     ts.eager_analyze()
                 if plot_tiny_sweeps:
-                    ts.plot()
+                    ts.plot(redo_lambda=redo_lambda)
