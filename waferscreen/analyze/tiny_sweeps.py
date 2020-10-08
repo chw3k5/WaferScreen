@@ -1,17 +1,31 @@
 import numpy as np
 import os
 import time
+import shutil
 from matplotlib import pyplot as plt
 from typing import NamedTuple, Optional
 from multiprocessing import Pool
 from ref import output_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
+from ref import multiprocessing_threads
 from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
 from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
 from waferscreen.analyze.lamb_fit import lambdafit, Phi0
 from waferscreen.read.table_read import ClassyReader, floats_table
+from waferscreen.plot.quick_plots import markers
 
+
+def make_lambda_dict(lambda_list):
+    lambda_dict = {}
+    for lambda_params in lambda_list:
+        power_dBm = lambda_params.power_dBm
+        res_num = lambda_params.res_num
+        if power_dBm not in lambda_dict.keys():
+            lambda_dict[power_dBm] = {}
+        lambda_dict[res_num] = lambda_params
+
+    return lambda_dict
 
 class TinySweeps:
     def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None,
@@ -236,20 +250,29 @@ class TinySweeps:
         if not os.path.isfile(output_filename):
             with open(output_filename, "w") as f:
                 f.write("ramp_current_uA,res_num,dBm," + res_params_header + "\n")
-        # fit the resonator
-        popt, pcov = fit_resonator(freqs=sweep_dict['freq'],
-                                   s21data=np.array(list(zip(sweep_dict['real'], sweep_dict['imag']))),
-                                   data_format='RI', model=self.fit_model,
-                                   error_est=self.error_est, throw_out=0,
-                                   make_plot=False, plot_dir=output_dir,
-                                   file_prefix="",
-                                   show_plot=False)
-        single_res_params = package_res_results(popt=popt, pcov=pcov, verbose=self.verbose)
-        # res_fit = ResFit(file=file, group_delay=0, verbose=self.verbose, freq_units=self.res_freq_units,
-        #                  remove_baseline_ripple=self.remove_baseline_ripple,
-        #                  auto_process=True)
-        with open(output_filename, 'a') as f:
-            f.write(F"{current_uA},{res_num},{power_dBm},{single_res_params}\n")
+        try:
+            # fit the resonator
+            popt, pcov = fit_resonator(freqs=sweep_dict['freq'],
+                                       s21data=np.array(list(zip(sweep_dict['real'], sweep_dict['imag']))),
+                                       data_format='RI', model=self.fit_model,
+                                       error_est=self.error_est, throw_out=0,
+                                       make_plot=False, plot_dir=output_dir,
+                                       file_prefix="",
+                                       show_plot=False)
+        except RuntimeError:
+            # If the resonator cannot be fitted move it to a folder, so the fitting is not attempted again.
+            file_dir = os.path.dirname(file)
+            file_basename = os.path.basename(file)
+            not_fitted_dir = os.path.join(file_dir, "unfitted")
+            move_name = os.path.join(not_fitted_dir, file_basename)
+            if not os.path.isdir(not_fitted_dir):
+                os.mkdir(not_fitted_dir)
+            shutil.move(file, move_name)
+        else:
+            # If the file was fitted, save the results.
+            single_res_params = package_res_results(popt=popt, pcov=pcov, verbose=self.verbose)
+            with open(output_filename, 'a') as f:
+                f.write(F"{current_uA},{res_num},{power_dBm},{single_res_params}\n")
 
     def analyze_unprocessed(self):
         # get all the resonators sweeps that are available
@@ -277,18 +300,20 @@ class TinySweeps:
         unprocessed_currents = available_resonator_currents - processed_resonator_currents
         files_to_analyze = [current_tuple_to_filename[current_tuple]
                             for current_tuple in available_resonator_currents - processed_resonator_currents]
-        for a_file in files_to_analyze:
-            try:
-                self.analyze_sweep(a_file)
-            except RuntimeError:
-                print(a_file)
-                raise RuntimeError
-        # with Pool(processes=4) as pool:
-        #     pool.map(func=self.analyze_sweep, iterable=files_to_analyze)
-        if unprocessed_currents == set():
-            return True
+        if multiprocessing_threads < 2:
+            for a_file in files_to_analyze:
+                try:
+                    self.analyze_sweep(a_file)
+                except RuntimeError:
+                    print(a_file)
+                    raise RuntimeError
         else:
-            return False
+            with Pool(processes=multiprocessing_threads) as pool:
+                pool.map(func=self.analyze_sweep, iterable=files_to_analyze)
+            if unprocessed_currents == set():
+                return True
+            else:
+                return False
 
     def eager_analyze(self):
         """
@@ -336,40 +361,58 @@ class TinySweeps:
         # get the data
         self.load_flux_ramp_res_data()
         # arrange the data
-        self.lambda_params = {}
+        self.lambda_params = []
         currents_uA_per_power = {}
         res_params_per_power = {}
-        for res_num in sorted(self.res_num_dict.keys()):
-            res_calc = {}
+        input_vector = []
+        sorted_res_nums = sorted(self.res_num_dict.keys())
+        # put all the parameters in a single vector for multiprocessing
+        for counter, res_num in list(enumerate(sorted_res_nums)):
             currents_uA, powers_dBm, res_params = zip(*[(coordinates[0], coordinates[1], self.res_num_dict[res_num][coordinates])
                                           for coordinates in sorted(self.res_num_dict[res_num].keys())])
             for current_uA, power_dBm, res_param in list(zip(currents_uA, powers_dBm, res_params)):
-                if power_dBm not in self.lambda_params.keys():
-                    self.lambda_params[power_dBm] = []
+                if power_dBm not in currents_uA_per_power.keys():
                     currents_uA_per_power[power_dBm] = []
                     res_params_per_power[power_dBm] = []
                 currents_uA_per_power[power_dBm].append(current_uA)
                 res_params_per_power[power_dBm].append(res_param)
             for power_dBm in sorted(set(powers_dBm)):
+                input_vector.append(
+                    (currents_uA_per_power[power_dBm], res_params_per_power[power_dBm], power_dBm, res_num))
 
+        # Calculate Lambda
+        if multiprocessing_threads > 1:
+            with Pool(processes=multiprocessing_threads) as pool:
+                pool.map(func=self.fit_lambda, iterable=input_vector)
+        else:
+            print_int = np.max((1, int(np.round(len(sorted_res_nums) / 10.0))))
+            if self.verbose:
+                print(F"Calulating Lambda values for {len(sorted_res_nums)} respnators")
+            for currents_uA, res_params, power_dBm, res_num in input_vector:
+                self.fit_lambda(currents_uA=currents_uA,
+                                res_params=res_params,
+                                power_dBm=power_dBm, res_num=res_num)
+        self.write_lambda()
 
-                try:
-                    I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA_per_power[power_dBm]) * 1.0e-6,
-                                                                  f0=np.array([res_param_this_power.f0
-                                                                               for res_param_this_power in
-                                                                               res_params_per_power[power_dBm]]))
-                except RuntimeError:
-                    I0fit = mfit = f2fit = Pfit = lambfit = np.nan
-                self.lambda_params[power_dBm].append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit,
-                                                                  lambfit=lambfit, res_num=res_num,
-                                                                  power_dBm=power_dBm))
+    def fit_lambda(self, mega_variable):
+        currents_uA, res_params, power_dBm, res_num = mega_variable
+        try:
+            I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA) * 1.0e-6,
+                                                          f0=np.array([res_param_this_power.f0
+                                                                       for res_param_this_power in res_params]))
+        except RuntimeError:
+            I0fit = mfit = f2fit = Pfit = lambfit = np.nan
+        self.lambda_params.append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit,
+                                                          lambfit=lambfit, res_num=res_num,
+                                                          power_dBm=power_dBm))
 
+    def write_lambda(self):
+        lambda_dict = make_lambda_dict(lambda_list=self.lambda_params)
         with open(file=self.lambda_filename, mode='w') as f:
             f.write(lambda_header + "\n")
-            for power_dBm in sorted(self.lambda_params.keys()):
-                res_params_to_lambda_params = {int(lamb_param.res_num): lamb_param for lamb_param in self.lambda_params[power_dBm]}
-                for res_num in sorted(res_params_to_lambda_params.keys()):
-                    single_lambda = res_params_to_lambda_params[res_num]
+            for power_dBm in sorted(self.lambda_dict.keys()):
+                for res_num in sorted(lambda_dict[power_dBm].keys()):
+                    single_lambda = lambda_dict[power_dBm][res_num]
                     f.write(str(single_lambda) + "\n")
 
     def read_lambda(self):
@@ -390,28 +433,13 @@ class TinySweeps:
             self.read_lambda()
         else:
             self.calc_lambda()
-        res_params_to_lambda_params = {int(lamb_param.res_num): lamb_param for lamb_param in self.lambda_params}
-        plot_dict = {}
-        sorted_res_nums = sorted(res_params_to_lambda_params.keys())
-        for res_num in list(sorted_res_nums):
-            res_calc = {}
-            currents_uA, res_params = zip(*[(current, self.res_num_dict[res_num][current])
-                                          for current in sorted(self.res_num_dict[res_num].keys())])
-            average_res_freq = np.mean([param.f0 for param in res_params])
-            res_calc['average_res_qc'] = np.mean([param.Qc for param in res_params])
-            res_calc['average_res_qi'] = np.mean([param.Qi for param in res_params])
-            res_calc['average_res_zratio'] = np.mean([param.Zratio for param in res_params])
-
-            lambda_params = res_params_to_lambda_params[int(res_num)]
-            res_calc['lambfit'] = lambda_params.lambfit
-            res_calc['flux_ramp_shift_kHz'] = lambda_params.Pfit * 1.0e6
-            res_calc['fr_squid_mi_pH'] = (lambda_params.mfit * Phi0 / (2.0 * np.pi)) * 1.0e12  # converting to pico Henries
-            plot_dict[average_res_freq] = res_calc
+        lambda_dict = make_lambda_dict(lambda_list=self.lambda_params)
 
         # making the plots
         fig1 = plt.figure(1, figsize=(16, 9))
         # set up figures
-        fig1.suptitle(F"{len(self.res_num_dict.keys())} resonators Band{'%02i' % self.band_number} Wafer{'%02i' % self.wafer} {self.date_str}")
+        fig1.suptitle(
+            F"{len(self.res_num_dict.keys())} resonators Band{'%02i' % self.band_number} Wafer{'%02i' % self.wafer} {self.date_str}")
         fig1.subplots_adjust(top=0.95, bottom=0.075, left=0.07, right=0.965, hspace=0.21, wspace=0.18)
         ax11 = fig1.add_subplot(231)
         ax12 = fig1.add_subplot(232)
@@ -419,19 +447,39 @@ class TinySweeps:
         ax14 = fig1.add_subplot(234)
         ax15 = fig1.add_subplot(235)
         ax16 = fig1.add_subplot(236)
-        sorted_freq_list = sorted(plot_dict.keys())
-        ax11.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qi'] for res_freq in sorted_freq_list],
-                  color='firebrick', ls='None', marker='x')
-        ax12.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qc'] for res_freq in sorted_freq_list],
-                  color='dodgerblue', ls='None', marker='x')
-        ax13.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_zratio'] for res_freq in sorted_freq_list],
-                  color='darkorchid', ls='None', marker='x')
-        ax14.plot(sorted_freq_list, [plot_dict[res_freq]['lambfit'] for res_freq in sorted_freq_list],
-                  color='darkgoldenrod', ls='None', marker='x')
-        ax15.plot(sorted_freq_list, [plot_dict[res_freq]['flux_ramp_shift_kHz'] for res_freq in sorted_freq_list],
-                  color='forestgreen', ls='None', marker='x')
-        ax16.plot(sorted_freq_list, [plot_dict[res_freq]['fr_squid_mi_pH'] for res_freq in sorted_freq_list],
-                  color='saddlebrown', ls='None', marker='x')
+        # Get llambda parameters
+        plot_dict = {}
+        for counter, power_dBm in list(enumerate(sorted(lambda_dict.keys()))):
+            sorted_res_nums = sorted(lambda_dict[power_dBm].keys())
+            for res_num in list(sorted_res_nums):
+                res_calc = {}
+                currents_uA, res_params = zip(*[(current, self.res_num_dict[res_num][current])
+                                              for current in sorted(self.res_num_dict[res_num].keys())])
+                average_res_freq = np.mean([param.f0 for param in res_params])
+                res_calc['average_res_qc'] = np.mean([param.Qc for param in res_params])
+                res_calc['average_res_qi'] = np.mean([param.Qi for param in res_params])
+                res_calc['average_res_zratio'] = np.mean([param.Zratio for param in res_params])
+
+                lambda_params = lambda_dict[power_dBm][res_num]
+                res_calc['lambfit'] = lambda_params.lambfit
+                res_calc['flux_ramp_shift_kHz'] = lambda_params.Pfit * 1.0e6
+                res_calc['fr_squid_mi_pH'] = (lambda_params.mfit * Phi0 / (2.0 * np.pi)) * 1.0e12  # converting to pico Henries
+                plot_dict[average_res_freq] = res_calc
+
+            sorted_freq_list = sorted(plot_dict.keys())
+            marker = markers[counter % len(markers)]
+            ax11.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qi'] for res_freq in sorted_freq_list],
+                      color='firebrick', ls='None', marker='x')
+            ax12.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qc'] for res_freq in sorted_freq_list],
+                      color='dodgerblue', ls='None', marker='x')
+            ax13.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_zratio'] for res_freq in sorted_freq_list],
+                      color='darkorchid', ls='None', marker='x')
+            ax14.plot(sorted_freq_list, [plot_dict[res_freq]['lambfit'] for res_freq in sorted_freq_list],
+                      color='darkgoldenrod', ls='None', marker='x')
+            ax15.plot(sorted_freq_list, [plot_dict[res_freq]['flux_ramp_shift_kHz'] for res_freq in sorted_freq_list],
+                      color='forestgreen', ls='None', marker='x')
+            ax16.plot(sorted_freq_list, [plot_dict[res_freq]['fr_squid_mi_pH'] for res_freq in sorted_freq_list],
+                      color='saddlebrown', ls='None', marker='x')
 
         # make the figure look nice
         ax11.grid(True)

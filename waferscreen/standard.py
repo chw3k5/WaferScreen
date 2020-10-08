@@ -23,7 +23,7 @@ upper_extra_span_fraction = 0.0
 run_number = 4
 
 # for plot_plot_tiny_sweeps
-redo_lambda = True
+redo_lambda = False
 
 """
 Toggle Script Variables
@@ -31,7 +31,7 @@ Toggle Script Variables
 do_check_out = False
 do_band_sweeps = False
 do_tiny_sweeps = False
-do_analyze_tiny_sweeps = True
+do_analyze_tiny_sweeps = False
 plot_tiny_sweeps = True
 
 """

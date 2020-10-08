@@ -21,6 +21,7 @@ len_ls = len(ls)
 hatches = ['/', '*', '|', '\\', 'x', 'o', '-', '.', '0', '+']
 len_hatches = len(hatches)
 
+markers = ['x', 'o', '^', 'D', '+', '*']
 
 default_plot_dict = {}
 
