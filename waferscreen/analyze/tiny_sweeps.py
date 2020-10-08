@@ -387,11 +387,13 @@ class TinySweeps:
         else:
             print_int = np.max((1, int(np.round(len(sorted_res_nums) / 10.0))))
             if self.verbose:
-                print(F"Calulating Lambda values for {len(sorted_res_nums)} respnators")
+                print(F"Calculating Lambda values for {len(sorted_res_nums)} respnators")
+            counter = 0
             for currents_uA, res_params, power_dBm, res_num in input_vector:
-                self.fit_lambda(currents_uA=currents_uA,
-                                res_params=res_params,
-                                power_dBm=power_dBm, res_num=res_num)
+                if self.verbose and 0 == (counter % print_int):
+                    print(F"  {'%2.2f'% (100.0 * counter / len(input_vector))}% complete.")
+                self.fit_lambda(mega_variable=(currents_uA, res_params, power_dBm, res_num))
+                counter += 1
         self.write_lambda()
 
     def fit_lambda(self, mega_variable):
