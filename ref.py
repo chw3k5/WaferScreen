@@ -9,7 +9,7 @@ volt_source_address = "GPIB0::16::INSTR"
 volt_source_port = 1
 
 # multiprocessing
-multiprocessing_threads = 6  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
+multiprocessing_threads = 1  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
 
 # References used in the WaferScreen Catalog
 now = datetime.now()

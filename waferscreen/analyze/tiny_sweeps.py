@@ -16,6 +16,10 @@ from waferscreen.read.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
 
 
+colors = ['firebrick', 'dodgerblue', 'darkorchid', 'darkgoldenrod', 'forestgreen', 'saddlebrown']
+colors.reverse()
+
+
 def make_lambda_dict(lambda_list):
     lambda_dict = {}
     for lambda_params in lambda_list:
@@ -23,7 +27,7 @@ def make_lambda_dict(lambda_list):
         res_num = lambda_params.res_num
         if power_dBm not in lambda_dict.keys():
             lambda_dict[power_dBm] = {}
-        lambda_dict[res_num] = lambda_params
+        lambda_dict[power_dBm][res_num] = lambda_params
 
     return lambda_dict
 
@@ -362,12 +366,12 @@ class TinySweeps:
         self.load_flux_ramp_res_data()
         # arrange the data
         self.lambda_params = []
-        currents_uA_per_power = {}
-        res_params_per_power = {}
         input_vector = []
         sorted_res_nums = sorted(self.res_num_dict.keys())
         # put all the parameters in a single vector for multiprocessing
         for counter, res_num in list(enumerate(sorted_res_nums)):
+            currents_uA_per_power = {}
+            res_params_per_power = {}
             currents_uA, powers_dBm, res_params = zip(*[(coordinates[0], coordinates[1], self.res_num_dict[res_num][coordinates])
                                           for coordinates in sorted(self.res_num_dict[res_num].keys())])
             for current_uA, power_dBm, res_param in list(zip(currents_uA, powers_dBm, res_params)):
@@ -385,7 +389,7 @@ class TinySweeps:
             with Pool(processes=multiprocessing_threads) as pool:
                 pool.map(func=self.fit_lambda, iterable=input_vector)
         else:
-            print_int = np.max((1, int(np.round(len(sorted_res_nums) / 10.0))))
+            print_int = np.max((1, int(np.round(len(sorted_res_nums) / 20.0))))
             if self.verbose:
                 print(F"Calculating Lambda values for {len(sorted_res_nums)} respnators")
             counter = 0
@@ -412,24 +416,25 @@ class TinySweeps:
         lambda_dict = make_lambda_dict(lambda_list=self.lambda_params)
         with open(file=self.lambda_filename, mode='w') as f:
             f.write(lambda_header + "\n")
-            for power_dBm in sorted(self.lambda_dict.keys()):
+            for power_dBm in sorted(lambda_dict.keys()):
                 for res_num in sorted(lambda_dict[power_dBm].keys()):
                     single_lambda = lambda_dict[power_dBm][res_num]
                     f.write(str(single_lambda) + "\n")
 
     def read_lambda(self):
         lambda_data = floats_table(file=self.lambda_filename)
-        self.lambda_params = {}
+        self.lambda_params = []
         for I0fit, mfit, f2fit, Pfit, lambfit, res_num, power_dBm in list(zip(lambda_data["I0fit"], lambda_data["mfit"],
                                                                    lambda_data["f2fit"], lambda_data["Pfit"],
                                                                    lambda_data["lambfit"], lambda_data["res_num"],
                                                                    lambda_data["power_dBm"])):
-            if power_dBm not in self.lambda_params.keys():
-                self.lambda_params[power_dBm] = []
-            self.lambda_params[power_dBm].append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit,
-                                                              lambfit=lambfit, res_num=res_num, power_dBm=power_dBm))
+
+            self.lambda_params.append(LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit,
+                                                          lambfit=lambfit, res_num=res_num, power_dBm=power_dBm))
 
     def plot(self, show=False, redo_lambda=False):
+        alpha = 1.0
+        power_offset = -50.0
         self.load_flux_ramp_res_data()
         if os.path.isfile(self.lambda_filename) and not redo_lambda:
             self.read_lambda()
@@ -449,9 +454,12 @@ class TinySweeps:
         ax14 = fig1.add_subplot(234)
         ax15 = fig1.add_subplot(235)
         ax16 = fig1.add_subplot(236)
-        # Get llambda parameters
-        plot_dict = {}
+        # Get lambda parameters
+        ax_str_vec = ["11", "12", "13", "14", "15", "16"]
+        leglines = {ax_str: [] for ax_str in ax_str_vec}
+        leglabels = {ax_str: [] for ax_str in ax_str_vec}
         for counter, power_dBm in list(enumerate(sorted(lambda_dict.keys()))):
+            plot_dict = {}
             sorted_res_nums = sorted(lambda_dict[power_dBm].keys())
             for res_num in list(sorted_res_nums):
                 res_calc = {}
@@ -470,30 +478,32 @@ class TinySweeps:
 
             sorted_freq_list = sorted(plot_dict.keys())
             marker = markers[counter % len(markers)]
+
+            color = colors[counter % len(markers)]
+            for ax_str in ax_str_vec:
+                leglines[ax_str].append(plt.Line2D(range(10), range(10), color=color, ls='None', linewidth=10, marker=marker,
+                                               markersize=8, markerfacecolor=color, alpha=alpha))
+                leglabels[ax_str].append(F"{power_dBm + power_offset}dBm")
             ax11.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qi'] for res_freq in sorted_freq_list],
-                      color='firebrick', ls='None', marker='x')
+                      color=color, ls='None', marker=marker, alpha=alpha)
             ax12.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_qc'] for res_freq in sorted_freq_list],
-                      color='dodgerblue', ls='None', marker='x')
+                      color=color, ls='None', marker=marker, alpha=alpha)
             ax13.plot(sorted_freq_list, [plot_dict[res_freq]['average_res_zratio'] for res_freq in sorted_freq_list],
-                      color='darkorchid', ls='None', marker='x')
+                      color=color, ls='None', marker=marker, alpha=alpha)
             ax14.plot(sorted_freq_list, [plot_dict[res_freq]['lambfit'] for res_freq in sorted_freq_list],
-                      color='darkgoldenrod', ls='None', marker='x')
+                      color=color, ls='None', marker=marker, alpha=alpha)
             ax15.plot(sorted_freq_list, [plot_dict[res_freq]['flux_ramp_shift_kHz'] for res_freq in sorted_freq_list],
-                      color='forestgreen', ls='None', marker='x')
+                      color=color, ls='None', marker=marker, alpha=alpha)
             ax16.plot(sorted_freq_list, [plot_dict[res_freq]['fr_squid_mi_pH'] for res_freq in sorted_freq_list],
-                      color='saddlebrown', ls='None', marker='x')
+                      color=color, ls='None', marker=marker, alpha=alpha)
 
         # make the figure look nice
-        ax11.grid(True)
-        ax12.grid(True)
-        ax13.grid(True)
-        ax14.grid(True)
-        ax15.grid(True)
-        ax16.grid(True)
-        ax11.legend(loc='upper right')
-        ax12.legend(loc='upper right')
-        ax13.legend(loc='upper right')
-        ax14.legend(loc='upper right')
+        grid = True
+        for ax_str in ax_str_vec:
+            axis = eval("ax" + ax_str)
+            axis.grid(grid)
+            axis.legend(leglines[ax_str], leglabels[ax_str], loc=0, numpoints=3, handlelength=3, fontsize=8)
+
         ax11.set_xlabel("Frequency (GHz)")
         ax11.set_ylabel(r"Mean $Q_i$")
         ax12.set_xlabel("Frequency (GHz)")
@@ -508,6 +518,8 @@ class TinySweeps:
         ax15.set_ylabel("Flux Ramp Span kHz")
         ax16.set_xlabel("Frequency (GHz)")
         ax16.set_ylabel("FR - SQUID Mutual Inductance (pH)")
+        # call the legend command
+
         plt.savefig(self.plot_filename)
         if show:
             plt.show()
