@@ -41,7 +41,7 @@ class SRS_SIM928:
         else:
             self.write(write_str=query_str)
             time.sleep(0.1)
-            b_resp = self.ctrl.read_all()
+            b_resp = self.ctrl.readall()
             resp = b_resp.decode(encoding="utf-8")
         return resp.strip()
 

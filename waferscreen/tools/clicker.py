@@ -8,7 +8,7 @@ y_button_location = 260
 
 
 total_time = 24.0 * 60.0 * 60.0  # in seconds
-cycle_rate = 60.0 * 60.0  # in seconds
+cycle_rate = 20.0 * 60.0  # in seconds
 open_time = 60.0  # in seconds
 close_time = cycle_rate - (3.0 * open_time)
 
