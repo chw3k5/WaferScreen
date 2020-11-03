@@ -5,7 +5,7 @@ import shutil
 from matplotlib import pyplot as plt
 from typing import NamedTuple, Optional
 from multiprocessing import Pool
-from ref import output_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
+from ref import pro_data_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
 from ref import multiprocessing_threads
 from waferscreen.inst_control import srs_sim928
 from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
@@ -49,7 +49,7 @@ class TinySweeps:
         self.temperature_K = temperature_K
 
         band_str = F"Band{'%02i' % self.band_number}"
-        self.parent_dir = os.path.join(output_dir, 's21', F"{self.wafer}", band_str, self.date_str)
+        self.parent_dir = os.path.join(pro_data_dir, 's21', F"{self.wafer}", band_str, self.date_str)
         self.lambda_filename = os.path.join(self.parent_dir, 'lambda_fits.csv')
         self.plot_filename = os.path.join(self.parent_dir, F"{self.wafer}_{band_str}_{self.date_str}_flux_ramp.pdf")
         self.data_output_folder =  os.path.join(self.parent_dir, "flux_ramp")
@@ -61,7 +61,7 @@ class TinySweeps:
         self.file_delimiter = ","
 
         # resonator frequencies file
-        self.freqs_filename = os.path.join(output_dir, 's21', F"{wafer}", band_str, self.date_str,
+        self.freqs_filename = os.path.join(pro_data_dir, 's21', F"{wafer}", band_str, self.date_str,
                                            F"{self.wafer}_{band_str}_{self.date_str}" +
                                            F"_run{self.run_number}_fit.csv")
         self.res_freq_units = "GHz"
@@ -260,7 +260,7 @@ class TinySweeps:
                                        s21data=np.array(list(zip(sweep_dict['real'], sweep_dict['imag']))),
                                        data_format='RI', model=self.fit_model,
                                        error_est=self.error_est, throw_out=0,
-                                       make_plot=False, plot_dir=output_dir,
+                                       make_plot=False, plot_dir=pro_data_dir,
                                        file_prefix="",
                                        show_plot=False)
         except RuntimeError:

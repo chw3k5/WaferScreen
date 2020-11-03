@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from waferscreen.inst_control import Keysight_USB_VNA
 from waferscreen.inst_control.aly8722ES import aly8722ES
 from waferscreen.plot import pySmith
-from ref import file_extension_to_delimiter, usbvna_address, agilent8722es_address, output_dir
+from ref import file_extension_to_delimiter, usbvna_address, agilent8722es_address, pro_data_dir
 
 
 def data_format_and_phase_delay(s21Au, s21Bu, freqs, group_delay=None):
@@ -63,7 +63,7 @@ class VnaMeas:
             self.output_filename = output_filename
         self.basename = os.path.basename(self.output_filename)
         self.dirname = os.path.dirname(self.output_filename)
-        self.params_file = os.path.join(output_dir, "sweep_params.txt")
+        self.params_file = os.path.join(pro_data_dir, "sweep_params.txt")
 
         # group delay removal settings
         self.group_delay = 2.787  # nanoseconds

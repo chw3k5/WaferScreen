@@ -23,14 +23,14 @@ if getuser() == 'uvwave':
     working_dir = os.path.join("D:\\", "waferscreen")
 else:
     working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
-s21_dir = os.path.join(working_dir, 's21')
-check_out_dir = os.path.join(s21_dir, "check_out")
-output_dir = os.path.join(working_dir, "output")
-resonances_dir = os.path.join(output_dir, 'resonances')
-if not os.path.isdir(output_dir):
-    os.mkdir(output_dir)
-if not os.path.isdir(resonances_dir):
-    os.mkdir(resonances_dir)
+raw_data_dir = os.path.join(working_dir, 'raw')
+check_out_dir = os.path.join(raw_data_dir, "check_out")
+pro_data_dir = os.path.join(working_dir, "pro")
+# resonances_dir = os.path.join(pro_data_dir, 'resonances')
+if not os.path.isdir(pro_data_dir):
+    os.mkdir(pro_data_dir)
+if not os.path.isdir(raw_data_dir):
+    os.mkdir(raw_data_dir)
 if not os.path.isdir(check_out_dir):
     os.mkdir(check_out_dir)
 

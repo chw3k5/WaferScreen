@@ -4,7 +4,7 @@ import math
 import os
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from ref import output_dir
+from ref import pro_data_dir
 
 
 """
@@ -39,7 +39,7 @@ def find_resonances(freqs,
                     freqs_filename="D:\\Data\\uMux\\scratch\\test_freq_output.txt",
                     verbose=False,
                     make_plots=False,
-                    plot_dir=output_dir,
+                    plot_dir=pro_data_dir,
                     file_prefix="",
                     show_plot=False):
     """

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from ref import s21_dir, today_str, check_out_dir, band_params
+from ref import raw_data_dir, today_str, check_out_dir, band_params
 from waferscreen.plot.s21 import plot_21
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.find_and_fit import ResFit
@@ -36,7 +36,7 @@ def sweep_to_find_resonances(project, wafer, temperature_K=300,
     else:
         band = "BandNone"
 
-    sweep_dir = os.path.join(s21_dir, project.lower())
+    sweep_dir = os.path.join(raw_data_dir, project.lower())
     if not os.path.isdir(sweep_dir):
         os.mkdir(sweep_dir)
 

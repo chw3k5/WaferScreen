@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from operator import itemgetter
 import bisect
 import os
-from ref import band_params, output_dir
+from ref import band_params, pro_data_dir
 from waferscreen.read.table_read import floats_table
 from waferscreen.plot.quick_plots import ls, len_ls
 

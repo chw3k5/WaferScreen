@@ -4,8 +4,9 @@ import os
 
 
 class U3:
-    def __init__(self, auto_init=True, verbose=True):
+    def __init__(self, auto_init=True, verbose=True, local_id=None):
         self.verbose = verbose
+        self.local_id = local_id
         self.lj = None
         self.is_open = False
 
@@ -19,7 +20,8 @@ class U3:
             self.open()
 
     def open(self):
-        self.lj = u3.U3()
+        self.lj = u3.U3(autoOpen=False)
+        self.lj.open(localId=self.local_id)
         self.is_open = True
 
     def close(self):
@@ -153,6 +155,6 @@ class U3:
 
 
 if __name__ == "__main__":
-    u = U3()
+    u = U3(local_id=None)
     u.alive_test(voltage=3, zero_after=True)
 

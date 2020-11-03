@@ -3,7 +3,7 @@ import shutil
 from typing import NamedTuple, Optional, Union
 import numpy as np
 import matplotlib.pyplot as plt
-from ref import s21_dir, output_dir, s21_file_extensions
+from ref import raw_data_dir, pro_data_dir, s21_file_extensions
 import waferscreen.analyze.find_resonances as find_res
 import waferscreen.analyze.resonator_fitter as fit_res
 from waferscreen.read.table_read import num_format
@@ -122,7 +122,7 @@ class ResFit:
         self.fit_guess_plots = True  # make plots of each fit guess
 
         """File name a directory determinations"""
-        output_folder = output_dir
+        output_folder = pro_data_dir
         for dir_name in ['s21', self.wafer_name, self.trace_number, self.data_str]:
             output_folder = os.path.join(output_folder, dir_name)
             if not os.path.isdir(output_folder):
@@ -341,7 +341,7 @@ def process_all(s21_data_dir, group_delay):
 
 
 if __name__ == "__main__":
-    data_dir = os.path.join(s21_dir, 'umux', "s4data")
+    data_dir = os.path.join(raw_data_dir, 'umux', "s4data")
     example_file = os.path.join(data_dir, "WaferName_TraceNumber_2020-07-13.csv")
     group_delay = 31.839
     # res_fit = ResFit(file=file, group_delay=group_delay, verbose=True, freq_units="MHz", auto_process=True)
