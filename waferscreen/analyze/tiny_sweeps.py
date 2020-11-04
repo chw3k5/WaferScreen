@@ -392,7 +392,7 @@ class TinySweeps:
         else:
             print_int = np.max((1, int(np.round(len(sorted_res_nums) / 20.0))))
             if self.verbose:
-                print(F"Calculating Lambda values for {len(sorted_res_nums)} respnators")
+                print(F"Calculating Lambda values for {len(sorted_res_nums)} resonators")
             counter = 0
             for currents_uA, res_params, power_dBm, res_num in input_vector:
                 if self.verbose and 0 == (counter % print_int):

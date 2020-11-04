@@ -51,7 +51,7 @@ band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4147},
                "Band05": {"min_GHz": 4.718, "max_GHz": 4.848},
                "Band06": {"min_GHz": 4.852, "max_GHz": 4.981},
                "Band07": {"min_GHz": 5.019, "max_GHz": 5.147},
-               "Bans08": {"min_GHz": 5.152, "max_GHz": 5.280},
+               "Band08": {"min_GHz": 5.152, "max_GHz": 5.280},
                "Band09": {"min_GHz": 5.286, "max_GHz": 5.413},
                "Band10": {"min_GHz": 5.421, "max_GHz": 5.581},
                "Band11": {"min_GHz": 5.585, "max_GHz": 5.714},
@@ -63,3 +63,4 @@ for band in band_params.keys():
     params_dict = band_params[band]
     params_dict["span_GHz"] = params_dict["max_GHz"] - params_dict["min_GHz"]
     params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
+    params_dict["band_num"] = int(band.lower().replace("band", ""))

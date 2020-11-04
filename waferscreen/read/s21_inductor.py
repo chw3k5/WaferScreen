@@ -1,14 +1,35 @@
 import os
+import time
 import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.read.table_read import num_format
 from waferscreen.tools.rename import get_all_file_paths
+from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import pro_data_dir, raw_data_dir
 
 
-def lin_equation(x, m, b):
-    y = (m * x) + b
-    return y
+class MetaS21:
+    def __init__(self):
+        self.file_to_meta = {}
+        self.paths = []
+
+    def meta_from_file(self, path):
+        with open(path, mode='r') as f:
+            raw_file = f.readlines()
+        for raw_line in raw_file:
+            meta_data_this_line = {}
+            key_value_phrases = raw_line.split("|")
+            for key_value_phrase in key_value_phrases:
+                key_str, value_str = key_value_phrase.split(",")
+                meta_data_this_line[key_str.strip()] = num_format(value_str.strip())
+            else:
+                if "path" in meta_data_this_line.keys():
+                    local_test_path = os.path.join(os.path.dirname(path), meta_data_this_line["path"])
+                    if os.path.isfile(local_test_path):
+                        meta_data_this_line["path"] = local_test_path
+                    self.file_to_meta[meta_data_this_line["path"]] = meta_data_this_line
+                else:
+                    raise KeyError("No path. All S21 meta data requires a unique path to the S21 file.")
 
 
 class InductS21:
@@ -42,7 +63,7 @@ class InductS21:
         self.meta_data = {}
         self.group_delay = None
         self.output_file = None
-        self.delta_freq = None
+        self.freq_step = None
         self.max_delay = None
 
         if auto_process:
@@ -78,6 +99,8 @@ class InductS21:
         real = data_matrix[:, 1]
         imag = data_matrix[:, 2]
         self.s21_complex = real + (1j * imag)
+        self.freq_step = np.mean(self.freqs_GHz[1:] - self.freqs_GHz[:-1]) * 1.0e9
+        self.max_delay = 1.0 / (2.0 * np.sqrt(2.0) * self.freq_step)
 
     def get_mag_phase(self):
         if self.s21_complex is None:
@@ -95,11 +118,22 @@ class InductS21:
         else:
             self.meta_data.update(kwargs)
 
-    def calc_group_delay(self, plot=False):
-        _s21_mag, s21_phase = self.get_mag_phase()
-        self.delta_freq = np.mean(self.freqs_GHz[1:] - self.freqs_GHz[:-1]) * 1.0e9
-        self.max_delay = 1.0 / (2.0 * np.sqrt(2.0) * self.delta_freq)
+    def calc_meta_data(self):
+        if self.freqs_GHz is not None:
+            self.meta_data["freq_min_GHz"] = np.min(self.freqs_GHz)
+            self.meta_data["freq_max_GHz"] = np.max(self.freqs_GHz)
+            self.meta_data["freq_center_GHz"] = (self.meta_data["freq_max_GHz"] + self.meta_data["freq_min_GHz"]) / 2.0
+            self.meta_data["freq_span_GHz"] = self.meta_data["freq_max_GHz"] - self.meta_data["freq_min_GHz"]
+            self.meta_data["freq_step"] = self.freq_step
+            self.meta_data['band'] = band_center_to_band_number(self.meta_data["freq_center_GHz"])
+        if "time" in self.meta_data.keys():
+            self.meta_data["datetime"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.meta_data["time"]))
+        self.prepare_output_file()
+        self.meta_data['raw_path'] = self.meta_data['path']
+        self.meta_data['path'] = self.output_file
 
+    def calc_group_delay(self):
+        _s21_mag, s21_phase = self.get_mag_phase()
         radians_per_second = self.freqs_GHz * 1.0e9 * 2.0 * np.pi
         s21_phase_zones = []
         was_increasing = None
@@ -156,27 +190,69 @@ class InductS21:
         # remove group delay
         phase_factors = np.exp(-1j * 2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay)
         self.s21_complex = self.s21_complex / phase_factors
+        self.group_delay_removed = True
 
-    def write(self):
-        basename = os.path.basename(self.path)
+    def prepare_output_file(self):
+        # output the file in the standard directory structure
         if "location" in self.meta_data.keys():
             location = self.meta_data["location"]
         else:
             location = "null"
-        self.output_file = os.path.join(pro_data_dir)
+        if "wafer" in self.meta_data.keys():
+            wafer = str(self.meta_data["wafer"])
+        else:
+            wafer = "null"
+        if "datetime" in self.meta_data.keys():
+            day_str, _time_of_day_str = self.meta_data["datetime"].split(" ")
+        else:
+            day_str = "0000-00-00"
+        if "band" in self.meta_data.keys():
+            band = F"Band{'%02i' % (self.meta_data['band'])}"
+        else:
+            band = "null"
+        self.output_file = pro_data_dir
+        for directory in [location, wafer, band, day_str]:
+            self.output_file = os.path.join(self.output_file, directory)
+            if not os.path.exists(self.output_file):
+                os.mkdir(self.output_file)
+        else:
+            basename = os.path.basename(self.path)
+            self.output_file = os.path.join(self.output_file, basename)
+
+
+    def write(self):
+        if not self.group_delay_removed:
+            self.remove_group_delay()
+
+        # write the output S21 file
+        with open(self.output_file, 'w') as f:
+            meta_data_line = ""
+            for key in sorted(self.meta_data.keys()):
+                if key == "path":
+                    meta_data_line = F"path,{self.meta_data['path']}|" + meta_data_line
+                else:
+                    meta_data_line += F"{key},{self.meta_data[key]}|"
+            f.write("% MetaData :" + meta_data_line[:-1] + "\n")
+            f.write("% Header :freq_ghz,real,imag\n")
+            for freq, s21_value in list(zip(self.freqs_GHz, self.s21_complex)):
+                real = s21_value.real
+                imag = s21_value.imag
+                f.write(F"{freq},{real},{imag}\n")
 
 
 if __name__ == "__main__":
-    # filename = "1603928373.66-F_4.00_TO_5.00-BW_1000.0-ATTEN_20.0-VOLTS_0.000.CSV"
-    # meta_data = {"ctime": 1603928373.66, "freq_min_GHz": 4.0, "freq_max_GHz": 5.0, "IF_band_Hz": 1000,
-    #              "atten": 20, "volts": 0.0, "location": "princeton", "wafer": 8}
     base = os.path.join(raw_data_dir, "princeton", "SMBK_wafer8")
+    meta_data_path = os.path.join(base, "meta_data.txt")
+    m21 = MetaS21()
+    m21.meta_from_file(meta_data_path)
     paths = get_all_file_paths(base)
     raw_data = {}
     for path in paths:
         _, extension = path.rsplit('.', 1)
         if extension.lower() == "csv":
             raw_data[path] = InductS21(path=path, columns=("freq_Hz", 'real', "imag"))
-
+            raw_data[path].add_meta_data(**m21.file_to_meta[path])
+            raw_data[path].calc_meta_data()
+            raw_data[path].write()
 
 

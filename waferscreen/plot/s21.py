@@ -1,46 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from operator import itemgetter
-import bisect
 import os
-from ref import band_params, pro_data_dir
 from waferscreen.read.table_read import floats_table
 from waferscreen.plot.quick_plots import ls, len_ls
-
-
-band_edges = []
-band_centers = []
-for band in band_params.keys():
-    band_edges.append((band_params[band]["min_GHz"], F"Start {band}"))
-    band_edges.append((band_params[band]["max_GHz"], F"End {band}"))
-    band_centers.append((band_params[band]["center_GHz"], F"{band}  Center at {'%1.3f' % band_params[band]['center_GHz']} GHz"))
-ordered_band_edges = sorted(band_edges, key=itemgetter(0))
-ordered_band_list = [band_tuple[0] for band_tuple in ordered_band_edges]
-ordered_band_centers = sorted(band_centers, key=itemgetter(0))
-
-
-def find_band_edges(min_freq, max_freq, extened=False):
-    start_index = bisect.bisect(ordered_band_list, min_freq)
-    end_index = bisect.bisect_left(ordered_band_list, max_freq)
-    if extened:
-        if start_index != 0:
-            start_index -= 1
-        if end_index != len(ordered_band_list):
-            end_index += 1
-    return ordered_band_edges[start_index: end_index]
-
-
-def find_center_band(center_GHz):
-    min_diff = float('inf')
-    nearest_band_center_index = -1
-    count = 0
-    for freq, _ in ordered_band_centers:
-        diff = np.abs(center_GHz - freq)
-        if diff < min_diff:
-            min_diff = diff
-            nearest_band_center_index = count
-        count += 1
-    return ordered_band_centers[nearest_band_center_index]
+from waferscreen.tools.band_calc import find_band_edges, find_center_band
 
 
 def plot_21(file, save=True, show=False, show_bands=True, res_fit=None):

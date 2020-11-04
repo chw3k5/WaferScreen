@@ -5,16 +5,7 @@ from waferscreen.plot.s21 import plot_21
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.analyze.find_and_fit import ResFit
 from waferscreen.analyze.tiny_sweeps import TinySweeps
-
-
-def calc_band_edges(min_GHz, max_GHz, center_GHz,
-                    lower_extra_span_fraction=0.1, upper_extra_span_fraction=0.1, return_span_center=False):
-    lower_edge = center_GHz - ((center_GHz - min_GHz) * (1.0 + lower_extra_span_fraction))
-    upper_edge = center_GHz + ((max_GHz - center_GHz) * (1.0 + upper_extra_span_fraction))
-    if return_span_center:
-        return (upper_edge - lower_edge), ((upper_edge + lower_edge) * 0.5)
-    else:
-        return lower_edge, upper_edge
+from waferscreen.tools.band_calc import calc_band_edges
 
 
 def sweep_to_find_resonances(project, wafer, temperature_K=300,
