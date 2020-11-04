@@ -31,6 +31,7 @@ def make_lambda_dict(lambda_list):
 
     return lambda_dict
 
+
 class TinySweeps:
     def __init__(self, wafer, band_number, run_number, port_power_dBm=-40, temperature_K=300, date_str=None,
                  fit_number=1, remove_baseline_ripple=False, vna_address=agilent8722es_address,
