@@ -8,10 +8,10 @@ from multiprocessing import Pool
 from ref import pro_data_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
 from ref import multiprocessing_threads
 from waferscreen.inst_control import srs_sim928
-from waferscreen.analyze.resonator_fitter import single_res_fit, fit_resonator
-from waferscreen.analyze.find_and_fit import ResParams, res_params_header, ResFit, package_res_results
+from waferscreen.res.single_fits import fit_resonator
+from waferscreen.res.finder import ResParams, res_params_header, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
-from waferscreen.analyze.lamb_fit import lambdafit, Phi0
+from waferscreen.res.lamb_fit import lambdafit, Phi0
 from waferscreen.read.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
 

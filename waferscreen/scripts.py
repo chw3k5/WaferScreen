@@ -3,7 +3,7 @@ import numpy as np
 from ref import raw_data_dir, today_str, check_out_dir, band_params
 from waferscreen.plot.s21 import plot_21
 from waferscreen.measure.res_sweep import VnaMeas
-from waferscreen.analyze.find_and_fit import ResFit
+from waferscreen.res.finder import ResFinder
 from waferscreen.analyze.tiny_sweeps import TinySweeps
 from waferscreen.tools.band_calc import calc_band_edges
 
@@ -89,8 +89,8 @@ def band_sweeps(wafer, project="so", power_list=-30, band_list=None, num_freq_po
                                               ifbw_track=False, port_power_dBm=port_power_dBm, vna_avg=1,
                                               temperature_K=temperature_K, show_plot=show_sweep_plot)
 
-        res_fit = ResFit(file=sweep_file,
-                         group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)
+        res_fit = ResFinder(file=sweep_file,
+                            group_delay=31.839, verbose=True, freq_units="GHz", auto_process=True)
         plot_21(file=sweep_file, save=True, show=False, res_fit=res_fit)
         res_fits.append(res_fit)
     return res_fits

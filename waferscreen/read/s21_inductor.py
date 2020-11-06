@@ -1,11 +1,79 @@
 import os
 import time
+from copy import deepcopy
 import numpy as np
-from matplotlib import pyplot as plt
+from scipy.signal import savgol_filter
+from waferscreen.plot.s21 import plot_21
 from waferscreen.read.table_read import num_format
 from waferscreen.tools.rename import get_all_file_paths
 from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import pro_data_dir, raw_data_dir
+
+
+def jakes_prep(freqs, sdata, group_delay_ns, edge_search_depth, remove_baseline_ripple,
+               baseline_scale_kHz, smoothing_scale_kHz, baseline_order, smoothing_order, verbose=False):
+    # now remove given group delay and make sure sdata is array
+    phase_factors = np.exp(-1j * 2.0 * np.pi * freqs * group_delay_ns)  # e^(-j*w*t)
+    sdata = np.array(sdata) / phase_factors
+
+    if verbose:
+        print("Removed Group Delay")
+
+    # figure out complex gain and gain slope
+    ave_left_gain = 0
+    ave_right_gain = 0
+    for j in range(0, edge_search_depth):
+        ave_left_gain = ave_left_gain + sdata[j] / edge_search_depth
+        ave_right_gain = ave_right_gain + sdata[len(sdata) - 1 - j] / edge_search_depth
+    left_freq = freqs[int(edge_search_depth / 2.0)]
+    right_freq = freqs[len(freqs) - 1 - int(edge_search_depth / 2.0)]
+    gain_slope = (ave_right_gain - ave_left_gain) / (right_freq - left_freq)
+    if verbose:
+        # calculate extra group delay and abs gain slope removed for printing out purposes
+        left_phase = np.arctan2(np.imag(ave_left_gain), np.real(ave_left_gain))
+        right_phase = np.arctan2(np.imag(ave_right_gain), np.real(ave_right_gain))
+        excess_tau = (left_phase - right_phase) / (2.0 * np.pi * (right_freq - left_freq))
+        abs_gain = np.absolute(0.5 * ave_right_gain + 0.5 * ave_left_gain)
+        abs_gain_slope = (np.absolute(ave_right_gain) - np.absolute(ave_left_gain)) / (right_freq - left_freq)
+        print("Removing an excess group delay of " + str(excess_tau) + "ns from data")
+        print("Removing a gain of " + str(abs_gain) + " and slope of " + str(abs_gain_slope) + "/GHz from data")
+    gains = ave_left_gain + (freqs - left_freq) * gain_slope
+    sdata = sdata / gains
+
+    if verbose:
+        print("Removed Group Delay and Gain")
+    # remove baseline ripple if desired
+    if remove_baseline_ripple:
+        freq_spacing = (freqs[1] - freqs[0]) * 1.0e6  # GHz -> kHz
+        baseline_scale = int(round(baseline_scale_kHz / freq_spacing))
+        if baseline_scale % 2 == 0:  # if even
+            baseline_scale = baseline_scale + 1  # make it odd
+        if verbose:
+            print("Freq Spacing is " + str(freq_spacing) + "kHz")
+            print("Requested baseline smoothing scale is " + str(baseline_scale_kHz) + "kHz")
+            print("Number of points to smooth over is " + str(baseline_scale))
+        # smooth s21 trace in both real and imaginary to do peak finding
+        baseline_real = savgol_filter(np.real(sdata), baseline_scale, baseline_order)
+        baseline_imag = savgol_filter(np.imag(sdata), baseline_scale, baseline_order)
+        baseline = np.array(baseline_real + 1j * baseline_imag)
+        pre_baseline_removal_sdata = np.copy(sdata)
+        sdata = sdata / baseline
+
+    # figure out freq spacing, convert smoothing_scale_kHz to smoothing_scale (must be an odd number)
+    freq_spacing = (freqs[1] - freqs[0]) * 1e6  # GHz -> kHz
+    smoothing_scale = int(round(smoothing_scale_kHz / freq_spacing))
+    if smoothing_scale % 2 == 0:  # if even
+        smoothing_scale = smoothing_scale + 1  # make it odd
+    if smoothing_scale >= smoothing_order:
+        smoothing_order = smoothing_scale - 1
+    if verbose:
+        print("Freq Spacing is " + str(freq_spacing) + "kHz")
+        print("Requested smoothing scale is " + str(smoothing_scale_kHz) + "kHz")
+        print("Number of points to smooth over is " + str(smoothing_scale))
+    # smooth s21 trace in both real and imaginary to do peak finding
+    sdata_smooth_real = savgol_filter(np.real(sdata), smoothing_scale, smoothing_order)
+    sdata_smooth_imag = savgol_filter(np.imag(sdata), smoothing_scale, smoothing_order)
+    sdata_smooth = np.array(sdata_smooth_real + 1j * sdata_smooth_imag)
 
 
 class MetaS21:
@@ -109,7 +177,7 @@ class InductS21:
             real = np.real(self.s21_complex)
             imag = np.imag(self.s21_complex)
             self.s21_mag = 20 * np.log10(np.sqrt((real ** 2.0) + (imag ** 2.0)))
-            self.s21_phase = np.arctan(imag, real)
+            self.s21_phase = np.arctan2(imag, real)
         return self.s21_mag, self.s21_phase
 
     def add_meta_data(self, **kwargs):
@@ -178,6 +246,7 @@ class InductS21:
             print(print_str)
 
     def remove_group_delay(self, user_input_group_delay=None):
+        # get the calculate the group delay if no user input
         if user_input_group_delay is None:
             if self.group_delay is None:
                 self.calc_group_delay()
@@ -188,8 +257,9 @@ class InductS21:
         else:
             group_delay = user_input_group_delay
         # remove group delay
-        phase_factors = np.exp(-1j * 2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay)
-        self.s21_complex = self.s21_complex / phase_factors
+        # jakes_prep(freqs=self.freqs_GHz, sdata=self.s21_complex, group_delay_ns=group_delay * 1.0e9)
+        phase_factors = np.exp(1j * 2.0 * np.pi * self.freqs_GHz * 1.0e9 * self.group_delay)
+        self.s21_complex = self.s21_complex * phase_factors
         self.group_delay_removed = True
 
     def prepare_output_file(self):
@@ -217,8 +287,8 @@ class InductS21:
                 os.mkdir(self.output_file)
         else:
             basename = os.path.basename(self.path)
-            self.output_file = os.path.join(self.output_file, basename)
-
+            prefix, _extension = basename.rsplit(".", 1)
+            self.output_file = os.path.join(self.output_file, prefix + "_s21.csv")
 
     def write(self):
         if not self.group_delay_removed:
@@ -239,6 +309,11 @@ class InductS21:
                 imag = s21_value.imag
                 f.write(F"{freq},{real},{imag}\n")
 
+    def plot(self):
+        plot_21(file=self.path, freqs_GHz=self.freqs_GHz,
+                s21_complex=self.s21_complex, meta_data=self.meta_data, show_ri=True,
+                save=True, show=False, show_bands=True)
+
 
 if __name__ == "__main__":
     base = os.path.join(raw_data_dir, "princeton", "SMBK_wafer8")
@@ -250,9 +325,13 @@ if __name__ == "__main__":
     for path in paths:
         _, extension = path.rsplit('.', 1)
         if extension.lower() == "csv":
-            raw_data[path] = InductS21(path=path, columns=("freq_Hz", 'real', "imag"))
-            raw_data[path].add_meta_data(**m21.file_to_meta[path])
-            raw_data[path].calc_meta_data()
-            raw_data[path].write()
+            this_loop_s21 = InductS21(path=path, columns=("freq_Hz", 'real', "imag"), auto_process=False)
+            this_loop_s21.remove_group_delay()
+            this_loop_s21.add_meta_data(**m21.file_to_meta[path])
+            this_loop_s21.calc_meta_data()
+            this_loop_s21.write()
+            this_loop_s21.plot()
+            raw_data[path] = this_loop_s21
+
 
 

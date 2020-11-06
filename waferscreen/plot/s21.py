@@ -1,21 +1,30 @@
 import numpy as np
 from matplotlib import pyplot as plt
 import os
-from waferscreen.read.table_read import floats_table
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
+from waferscreen.read.prodata import read_pro_s21
 
 
-def plot_21(file, save=True, show=False, show_bands=True, res_fit=None):
+def plot_21(file=None, freqs_GHz=None, show_ri=True, s21_complex=None, meta_data=None, save=True, show=False, show_bands=True):
+    if show_ri:
+        show_bands = False
     legend_dict = {}
-    data_dict = floats_table(file, delimiter=",")
-    if isinstance(data_dict, list):
-        data_dict = {'freq': data_dict[0], 'real': data_dict[1], 'imag': data_dict[2]}
+    data_dict = {}
+    if file is not None and s21_complex is None and freqs_GHz is None and meta_data is None:
+        data_dict["freq"], s21_complex, meta_data = read_pro_s21(path=file)
+    else:
+        data_dict["freq"] = freqs_GHz
+    data_dict["real"], data_dict["imag"] = s21_complex.real, s21_complex.imag
     data_dict["mag"] = 20.0 * np.log10(np.sqrt(np.square(data_dict['real']) + np.square(data_dict['imag'])))
     data_dict['phase'] = np.arctan2(data_dict['imag'], data_dict['real'])
 
     plt.figure(figsize=(20, 8))
-    plt.plot(data_dict["freq"], data_dict['mag'], color='firebrick', ls='solid')
+    if show_ri:
+        plt.plot(data_dict["imag"], data_dict['real'], color='darkorchid', ls='solid')
+
+    else:
+        plt.plot(data_dict["freq"], data_dict['mag'], color='firebrick', ls='solid')
     legend_dict['leg_lines'] = [plt.Line2D(range(10), range(10), color='firebrick', ls='solid')]
     legend_dict['leg_labels'] = ['S21']
 
@@ -38,7 +47,10 @@ def plot_21(file, save=True, show=False, show_bands=True, res_fit=None):
     else:
         plt.title(file)
     plt.xlabel('Frequency (GHz)')
-    plt.ylabel("S21 Transmission (dB)")
+    if show_ri:
+        plt.ylabel("Real and Imaginary S21")
+    else:
+        plt.ylabel("S21 Transmission (dB)")
     plt.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=0, numpoints=3, handlelength=5, fontsize=16)
     plt.ylim((ymin, ymax))
     if show:
@@ -49,6 +61,7 @@ def plot_21(file, save=True, show=False, show_bands=True, res_fit=None):
         plot_file_name += '.pdf'
         plt.savefig(plot_file_name)
         print("Saved Plot to:", plot_file_name)
+    plt.clf()
     return
 
 
