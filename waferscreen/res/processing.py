@@ -12,7 +12,7 @@ class ResPro:
     def proall(self):
         for path in crawl_s21():
             self.show_s21(path)
-            # self.s21[path] = ResFinder(file=path, remove_baseline_ripple=False, verbose=self.verbose, auto_process=True)
+            self.s21[path] = ResFinder(file=path, remove_baseline_ripple=False, verbose=self.verbose, auto_process=True)
 
     def show_s21(self, path, save=True, show=True, show_bands=True):
         plot_21(file=path, save=save, show=show, show_bands=show_bands)

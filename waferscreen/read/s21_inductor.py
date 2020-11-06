@@ -98,14 +98,15 @@ class MetaS21:
                     self.file_to_meta[meta_data_this_line["path"]] = meta_data_this_line
                 else:
                     raise KeyError("No path. All S21 meta data requires a unique path to the S21 file.")
+        self.paths.append(path)
 
 
 class InductS21:
-    def __init__(self, path, columns=None, auto_process=True, verbose=True):
+    def __init__(self, path, columns=None, verbose=True):
         self.path = path
         self.verbose = verbose
         if columns is None:
-            self.columns = ("freq_GHz", 'real', "imag")
+            self.columns = ("freq_Hz", 'real', "imag")
         else:
             self.columns = columns
         _, self.freq_unit = self.columns[0].lower().split("_")
@@ -133,10 +134,6 @@ class InductS21:
         self.output_file = None
         self.freq_step = None
         self.max_delay = None
-
-        if auto_process:
-            self.induct()
-            self.remove_group_delay()
 
     def induct(self):
         """
@@ -258,7 +255,7 @@ class InductS21:
             group_delay = user_input_group_delay
         # remove group delay
         # jakes_prep(freqs=self.freqs_GHz, sdata=self.s21_complex, group_delay_ns=group_delay * 1.0e9)
-        phase_factors = np.exp(1j * 2.0 * np.pi * self.freqs_GHz * 1.0e9 * self.group_delay)
+        phase_factors = np.exp(1j * 2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay)
         self.s21_complex = self.s21_complex * phase_factors
         self.group_delay_removed = True
 
@@ -325,7 +322,7 @@ if __name__ == "__main__":
     for path in paths:
         _, extension = path.rsplit('.', 1)
         if extension.lower() == "csv":
-            this_loop_s21 = InductS21(path=path, columns=("freq_Hz", 'real', "imag"), auto_process=False)
+            this_loop_s21 = InductS21(path=path, columns=("freq_Hz", 'real', "imag"))
             this_loop_s21.remove_group_delay()
             this_loop_s21.add_meta_data(**m21.file_to_meta[path])
             this_loop_s21.calc_meta_data()

@@ -6,39 +6,46 @@ from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.read.prodata import read_pro_s21
 
 
-def plot_21(file=None, freqs_GHz=None, show_ri=True, s21_complex=None, meta_data=None, save=True, show=False, show_bands=True):
-    if show_ri:
-        show_bands = False
+def plot_21(file=None, freqs_GHz=None, show_ri=False, s21_complex=None, meta_data=None, save=True, show=False, show_bands=True):
     legend_dict = {}
     data_dict = {}
     if file is not None and s21_complex is None and freqs_GHz is None and meta_data is None:
         data_dict["freq"], s21_complex, meta_data = read_pro_s21(path=file)
     else:
         data_dict["freq"] = freqs_GHz
+    # Math
     data_dict["real"], data_dict["imag"] = s21_complex.real, s21_complex.imag
     data_dict["mag"] = 20.0 * np.log10(np.sqrt(np.square(data_dict['real']) + np.square(data_dict['imag'])))
     data_dict['phase'] = np.arctan2(data_dict['imag'], data_dict['real'])
 
-    plt.figure(figsize=(20, 8))
+    # Whole Plot
+    fig = plt.figure(figsize=(20, 16))
+    # Subplots
     if show_ri:
-        plt.plot(data_dict["imag"], data_dict['real'], color='darkorchid', ls='solid')
-
+        ax1 = fig.add_subplot(211)
+        ax2 = fig.add_subplot(212)
     else:
-        plt.plot(data_dict["freq"], data_dict['mag'], color='firebrick', ls='solid')
+        ax1 = fig.add_subplot(111)
+    ax1.plot(data_dict["freq"], data_dict['mag'], color='firebrick', ls='solid')
     legend_dict['leg_lines'] = [plt.Line2D(range(10), range(10), color='firebrick', ls='solid')]
     legend_dict['leg_labels'] = ['S21']
+    if show_ri:
+        ax2.plot(data_dict["imag"], data_dict['real'], color='darkorchid', ls='solid')
+        legend_dict['leg_lines'] = [plt.Line2D(range(10), range(10), color='darkorchid', ls='solid')]
+        legend_dict['leg_labels'] = ['S21']
+        ax2.set_xlabel('Real S21')
+        ax2.set_ylabel("Imaginary S21")
 
     min_freq = np.min(data_dict['freq'])
     max_freq = np.max(data_dict['freq'])
     center_freq = (max_freq + min_freq) / 2.0
-    axes = plt.gca()
-    ymin, ymax = axes.get_ylim()
+    ymin, ymax = ax1.get_ylim()
     if show_bands:
         counter = 1
         color = "black"
         for freq, label_str in find_band_edges(min_freq=min_freq, max_freq=max_freq):
             line_style = ls[counter % len_ls]
-            plt.plot([freq, freq], [ymin, ymax], color=color, ls=line_style)
+            ax1.plot([freq, freq], [ymin, ymax], color=color, ls=line_style)
             legend_dict['leg_lines'].append(plt.Line2D(range(10), range(10), color=color, ls=line_style))
             legend_dict['leg_labels'].append(label_str)
             counter += 1
@@ -46,16 +53,14 @@ def plot_21(file=None, freqs_GHz=None, show_ri=True, s21_complex=None, meta_data
         plt.title(center_band_str)
     else:
         plt.title(file)
-    plt.xlabel('Frequency (GHz)')
-    if show_ri:
-        plt.ylabel("Real and Imaginary S21")
-    else:
-        plt.ylabel("S21 Transmission (dB)")
-    plt.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=0, numpoints=3, handlelength=5, fontsize=16)
-    plt.ylim((ymin, ymax))
+    ax1.set_xlabel('Frequency (GHz)')
+    ax1.set_ylabel("S21 Transmission (dB)")
+
+    ax1.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=0, numpoints=3, handlelength=5, fontsize=16)
+    ax1.set_ylim((ymin, ymax))
     if show:
         plt.show()
-    if save:
+    if save and file is not None:
         plt.draw()
         plot_file_name, _ = file.rsplit(".", 1)
         plot_file_name += '.pdf'

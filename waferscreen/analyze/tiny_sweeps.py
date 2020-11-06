@@ -14,6 +14,7 @@ from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
 from waferscreen.res.lamb_fit import lambdafit, Phi0
 from waferscreen.read.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
+from waferscreen.read.prodata import read_res_params
 
 
 colors = ['firebrick', 'dodgerblue', 'darkorchid', 'darkgoldenrod', 'forestgreen', 'saddlebrown']
@@ -123,13 +124,7 @@ class TinySweeps:
 
     def load_res_freqs(self):
         # open resonant frequencies file
-        with open(self.freqs_filename, 'r') as f:
-            lines = f.readlines()
-        header = lines[0].strip().split(",")
-        self.res_params = []
-        for line in lines[1:]:
-            datavec = line.split(",")
-            self.res_params.append(ResParams(**{column_name: float(value) for column_name, value in zip(header, datavec)}))
+        self.res_params = read_res_params(self.freqs_filename)
         self.res_freqs = np.array([res_param.f0 for res_param in self.res_params])
 
         # figure out boundaries between resonators so we don't measure a neighbor

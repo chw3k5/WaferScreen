@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from ref import raw_data_dir, pro_data_dir, s21_file_extensions
 import waferscreen.res.single_fits as fit_res
-from waferscreen.read.prodata import read_pro_s21
+from waferscreen.read.prodata import read_pro_s21, ResParams
 
 
 """
@@ -21,43 +21,6 @@ Finds component of 1st derivative in the amplitude and phase directions given s2
 Searches for maxima of Qt~f/2*ds21/df*theta-hat above a given threshold and minimum spacing to identify resonances
 Returns a list of resonant frequencies and optionally writes this to a text file
 """
-
-
-primary_res_params = ["Amag", "Aphase", "Aslope", "tau", "f0", "Qi", "Qc", "Zratio"]
-res_params_header = ""
-for param_type in primary_res_params:
-    res_params_header += param_type + "," + param_type + "_error,"
-res_params_header = res_params_header[:-1]
-
-
-class ResParams(NamedTuple):
-    Amag: float
-    Aphase: float
-    Aslope: float
-    tau: float
-    f0: float
-    Qi: float
-    Qc: float
-    Zratio: float
-    Amag_error: Optional[float] = None
-    Aphase_error: Optional[float] = None
-    Aslope_error: Optional[float] = None
-    tau_error: Optional[float] = None
-    f0_error: Optional[float] = None
-    Qi_error: Optional[float] = None
-    Qc_error: Optional[float] = None
-    Zratio_error: Optional[float] = None
-
-    def __str__(self):
-        output_string = ""
-        for attr in primary_res_params:
-            error_value = str(self.__getattribute__(attr + "_error"))
-            if error_value is None:
-                error_str = ""
-            else:
-                error_str = str(error_value)
-            output_string += str(self.__getattribute__(attr)) + "," + error_str + ","
-        return output_string[:-1]
 
 
 def package_res_results(popt, pcov, verbose=False):
@@ -215,62 +178,6 @@ class ResFinder:
 
             self.res_params.append(package_res_results(popt=popt, pcov=pcov, verbose=self.verbose))
         self.write_results()
-        self.plot_results(show=show_plot)
-
-    def plot_results(self, show=False):
-        # plot fit results vs. frequency
-        fig2 = plt.figure(2)
-        ax21 = fig2.add_subplot(221)
-        ax22 = fig2.add_subplot(222)
-        ax23 = fig2.add_subplot(223)
-        ax24 = fig2.add_subplot(224)
-        # ["Amag", "Aphase", "Aslope", "tau", "f0", "Qi", "Qc", "Zratio"]
-        f0_vec = np.array([single_params.f0 for single_params in self.res_params])
-        Qi_vec = np.array([single_params.Qi for single_params in self.res_params])
-        Qc_vec = np.array([single_params.Qc for single_params in self.res_params])
-        Zratio_vec = np.array([single_params.Zratio for single_params in self.res_params])
-        ax21.scatter(self.res_freqs, 1.0e6 * (f0_vec - self.res_freqs))
-        ax21.set_xlabel("Found Resonance Freq. (GHz)")
-        ax21.set_ylabel("Fit - Found Resonance Freq. (kHz)")
-        ax21.set_ylim([-100, 100])
-        ax22.scatter(self.res_freqs, Qi_vec)
-        ax22.set_xlabel("Found Resonance Freq. (GHz)")
-        ax22.set_ylabel(r"$Q_i$")
-        ax22.set_ylim([0, 1.5e5])
-        ax23.scatter(self.res_freqs, Qc_vec)
-        ax23.set_xlabel("Found Resonance Freq. (GHz)")
-        ax23.set_ylabel(r"$Q_c$")
-        ax23.set_ylim([0, 1.5e5])
-        ax24.scatter(self.res_freqs, Zratio_vec)
-        ax24.set_xlabel("Found Resonance Freq. (GHz)")
-        ax24.set_ylabel("Fano Parameter")
-        ax24.set_ylim([-1, 1])
-        fig2.savefig(os.path.join(self.output_folder, self.plot_prefix +'fig2_scatter.pdf'))
-        fig2.clf()
-
-        # plot histograms of fit results
-        fig3 = plt.figure(3)
-        ax31 = fig3.add_subplot(221)
-        ax32 = fig3.add_subplot(222)
-        ax33 = fig3.add_subplot(223)
-        ax34 = fig3.add_subplot(224)
-
-        ax31.hist(1e6 * (f0_vec - self.res_freqs), bins=np.linspace(-100, 100, 51))
-        ax31.set_xlabel("Fit - Found Resonance Freq. (kHz)")
-        ax31.set_ylabel("# of occurrences")
-        ax32.hist(Qi_vec, bins=np.linspace(0, 150000, 31))
-        ax32.set_xlabel(r"$Q_i$")
-        ax32.set_ylabel("# of occurrences")
-        ax33.hist(Qc_vec, bins=np.linspace(0, 150000, 31))
-        ax33.set_xlabel(r"$Q_c$")
-        ax33.set_ylabel("# of occurrences")
-        ax34.hist(Zratio_vec, bins=np.linspace(-1, 1, 21))
-        ax34.set_xlabel("Fano Parameter")
-        ax34.set_ylabel("# of occurrences")
-        if show:
-            plt.show()
-        fig3.savefig(os.path.join(self.output_folder, self.plot_prefix + 'fig3_histogram.pdf'))
-        fig3.clf()
 
     def write_results(self):
         with open(self.fit_filename, 'w') as f:
@@ -293,7 +200,7 @@ def process_all(s21_data_dir):
 def find_resonances(freqs,
                     s21_complex,
                     edge_search_depth=50,
-                    smoothing_scale_kHz=75,
+                    smoothing_scale_kHz=25,
                     smoothing_order=5,
                     cutoff_rate=500,
                     minimum_spacing_kHz=100.0,
@@ -370,14 +277,18 @@ def find_resonances(freqs,
         smoothing_scale = smoothing_scale + 1  # make it odd
     if smoothing_scale >= smoothing_order:
         smoothing_order = smoothing_scale - 1
-    if verbose:
-        print("Freq Spacing is " + str(freq_spacing) + "kHz")
-        print("Requested smoothing scale is " + str(smoothing_scale_kHz) + "kHz")
-        print("Number of points to smooth over is " + str(smoothing_scale))
-    # smooth s21 trace in both real and imaginary to do peak finding
-    s21_complex_smooth_real = savgol_filter(np.real(s21_complex), smoothing_scale, smoothing_order)
-    s21_complex_smooth_imag = savgol_filter(np.imag(s21_complex), smoothing_scale, smoothing_order)
-    s21_complex_smooth = np.array(s21_complex_smooth_real + 1j * s21_complex_smooth_imag)
+    if smoothing_scale <= smoothing_order:
+        print(F"For smoothing scale of {smoothing_scale_kHz}kHz is too find, soothing skipped.")
+        s21_complex_smooth = s21_complex
+    else:
+        if verbose:
+            print("Freq Spacing is " + str(freq_spacing) + "kHz")
+            print("Requested smoothing scale is " + str(smoothing_scale_kHz) + "kHz")
+            print("Number of points to smooth over is " + str(smoothing_scale))
+        # smooth s21 trace in both real and imaginary to do peak finding
+        s21_complex_smooth_real = savgol_filter(np.real(s21_complex), smoothing_scale, smoothing_order)
+        s21_complex_smooth_imag = savgol_filter(np.imag(s21_complex), smoothing_scale, smoothing_order)
+        s21_complex_smooth = np.array(s21_complex_smooth_real + 1j * s21_complex_smooth_imag)
 
     if verbose:
         print("Smoothed Data")
@@ -453,47 +364,6 @@ def find_resonances(freqs,
             print("Files Written Out")
 
     if make_plots:
-        # plot data and smoothed data
-        fig1 = plt.figure(1)
-        ax11 = fig1.add_subplot(121)
-        ax11.plot(freqs, 20.0 * np.log10(np.absolute(s21_complex)), c='b', label='Raw')
-        ax11.plot(freqs, 20.0 * np.log10(np.absolute(s21_complex_smooth)), c='r', label='Smoothed')
-        # mark resonances
-        for i in range(0, len(frs)):
-            ax11.plot([frs[i], frs[i]], [-15, 0], c='k', linestyle='--')
-            ax11.text(frs[i] - 0.0001, 1.0, str(i), fontsize=10)
-        ax11.set_ylim([-15, 2.5])
-        ax11.set_xlabel("Freq. (GHz)")
-        ax11.set_ylabel(r"$\left| S_{21} \right|^2$ (dB)")
-        ax11.legend(loc='upper right')
-
-        ax12 = fig1.add_subplot(122)
-        ax12.plot(freqs, 180.0 / np.pi * np.arctan2(np.imag(s21_complex), np.real(s21_complex)), c='b', label='Raw')
-        ax12.plot(freqs, 180.0 / np.pi * np.arctan2(np.imag(s21_complex_smooth), np.real(s21_complex_smooth)), c='r',
-                  label='Smoothed')
-        for i in range(0, len(frs)):
-            ax12.plot([frs[i], frs[i]], [-180, 180], c='k', linestyle='--')
-        ax12.set_xlabel("Freq. (GHz)")
-        ax12.set_ylabel(r"$\angle S_{21}$ (Deg)")
-        ax12.legend(loc='upper right')
-        fig1.savefig(os.path.join(plot_dir, file_prefix + "fig1_results.pdf"))
-
-        # plot 1st derivative in r-hat and theta-hat vs. freq
-        fig4 = plt.figure(4)
-        ax42 = fig4.add_subplot(111)
-        ax42.plot(first_deriv_freqs, first_deriv_rot_smooth[:, 1] * (first_deriv_freqs / 2.0), c='r')
-        ax42.set_xlabel("Freq. (GHz)")
-        ax42.set_ylabel(
-            r"$\frac{Q_t^2}{Q_c} = \frac{\omega_0}{2}\frac{\partial S_{21}}{\partial f} \cdot \hat{\theta}$")
-        # mark found resonances
-        for i in range(0, len(frs)):
-            ax42.plot([frs[i], frs[i]], [Qts[i], -7500], c='k', linestyle='--')
-            ax42.text(frs[i] - 0.001, -10000, str(i), fontsize=10)
-        ax42.set_ylim([-15000, 1.1 * np.amax(first_deriv_rot_smooth[:, 1] * (first_deriv_freqs / 2.0))])
-        ax42.scatter(frs, Qts, color='b', s=20.0)
-        ax42.plot([np.amin(freqs), np.amax(freqs)], [cutoff_rate, cutoff_rate], linestyle='--', color='k')
-        fig4.savefig(os.path.join(plot_dir, file_prefix + "fig4_rhat_theata_hat.pdf"))
-
         if remove_baseline_ripple:
             # plot baseline removal data
             fig5 = plt.figure(5)
@@ -519,8 +389,6 @@ def find_resonances(freqs,
             fig5.savefig(os.path.join(plot_dir, file_prefix + "fig5_baseline_ripple.pdf"))
         if show_plot:
             plt.show()
-        fig1.clf()
-        fig4.clf()
         if remove_baseline_ripple:
             fig5.clf()
     return frs

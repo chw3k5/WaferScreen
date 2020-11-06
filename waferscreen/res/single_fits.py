@@ -103,6 +103,8 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
 
     # smooth s21 trace
     window_size, poly_order = 25, 3
+    while len(guess_s21) < window_size:
+        window_size -= 2
     guess_s21_filt = savgol_filter(guess_s21, window_size, poly_order)
 
     # guess f0
@@ -154,22 +156,6 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
 
     print('Qi     : %.0f' % Qi_guess)
     print('Qc     : %.0f' % Qc_guess)
-
-    if make_plot:
-        fig0 = plt.figure(0)
-        ax0 = fig0.add_subplot(111)
-        ax0.plot(fit_freqs, guess_s21)
-        ax0.plot(fit_freqs, guess_s21_filt)
-        ax0.plot([fit_freqs[0], fit_freqs[len(fit_freqs) - 1]], [1, 1], c='k', linestyle='--')
-        ax0.plot([fit_freqs[0], fit_freqs[len(fit_freqs) - 1]], [s21_min, s21_min], c='k', linestyle='--')
-        ax0.plot([fit_freqs[0], fit_freqs[len(fit_freqs) - 1]], [s21_search, s21_search], c='k', linestyle='--')
-        ax0.plot([f_lower, f_lower], [s21_min, 1], c='r', linestyle='--')
-        ax0.plot([f_upper, f_upper], [s21_min, 1], c='r', linestyle='--')
-        ax0.plot([f0_guess, f0_guess], [s21_min, 1], c='b', linestyle='--')
-        if show_plot:
-            plt.show()
-        fig0.savefig(os.path.join(plot_dir, file_prefix + str("%1.5f" % f0_guess) + "_GHz_resonator_fit.pdf"))
-        fig0.clf()
 
     # use curve fit to for these params
     popt, pcov = single_res_fit(model=model, fit_freqs=fit_freqs,

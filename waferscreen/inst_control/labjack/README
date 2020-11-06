@@ -1,0 +1,24 @@
+From http://labjack.com/support/linux-and-mac-os-x-drivers 2012-04-14 instructions on how to install the latest version of labjack drivers on Linux.  Go to the source for OSX instructions.
+
+sudo apt-get install build-essential
+sudo apt-get install libusb-1.0-0-dev
+sudo apt-get install git-core
+git clone git://github.com/labjack/exodriver.git
+cd exodriver/liblabjackusb/
+make
+sudo make install
+cd ..
+sudo cp 10-labjack.rules /etc/udev/rules.d/.
+sudo udevadm control --reload-rules
+cd ../..
+git clone git://github.com/labjack/LabJackPython.git
+cd LabJackPython/
+sudo python setup.py install
+
+Now you should be able to use it, try:
+ipython
+>>> import u3
+>>> d = u3.U3()
+>>> d.configU3()
+ipython
+
