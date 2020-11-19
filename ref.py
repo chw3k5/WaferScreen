@@ -1,4 +1,5 @@
 import os
+import getpass
 from getpass import getuser
 from datetime import datetime
 
@@ -15,6 +16,8 @@ multiprocessing_threads = 1  # The Nist computer has an Intel Xeon W-2123, 8 thr
 now = datetime.now()
 today_str = F"{'%4i' % now.year}-{'%02i' % now.month}-{'%02i' % now.day}"
 
+# for initializations that are dependent on the machine and user
+nist_users = ["uvwave", 'chw3k5']
 
 # directory tree used by WaferScreen Database, including folder creation for things in .gitignore
 ref_file_path = os.path.dirname(os.path.realpath(__file__))
@@ -24,15 +27,17 @@ if getuser() == 'uvwave':
 else:
     working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
 raw_data_dir = os.path.join(working_dir, 'raw')
-check_out_dir = os.path.join(raw_data_dir, "check_out")
+nist_data_dir = os.path.join(raw_data_dir, 'nist')
+princeton_data_dir = os.path.join(raw_data_dir, 'princeton')
+if getpass.getuser() in nist_users:
+    data_dir = nist_data_dir
+else:
+    data_dir = princeton_data_dir
+check_out_dir = os.path.join(data_dir, "check_out")
 pro_data_dir = os.path.join(working_dir, "pro")
-# resonances_dir = os.path.join(pro_data_dir, 'resonances')
-if not os.path.isdir(pro_data_dir):
-    os.mkdir(pro_data_dir)
-if not os.path.isdir(raw_data_dir):
-    os.mkdir(raw_data_dir)
-if not os.path.isdir(check_out_dir):
-    os.mkdir(check_out_dir)
+for dir_name in [raw_data_dir, nist_data_dir, princeton_data_dir, check_out_dir, pro_data_dir]:
+    if not os.path.isdir(dir_name):
+        os.mkdir(dir_name)
 
 # data types
 s21_file_extensions = {"txt", "csv"}
@@ -43,7 +48,7 @@ h = 6.6260755E-34  # Js
 c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
 
-band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4147},
+band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4.147},
                "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
                "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
                "Band03": {"min_GHz": 4.419, "max_GHz": 4.581},

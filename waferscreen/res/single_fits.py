@@ -67,24 +67,21 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
     fit_params = np.array(fit_params)
 
     # guess Amag and Aphase by looking at ends of data
-    est_A_range = 10  # number of data points on each end used to estimate A
-    A_low_guess = 0
-    A_high_guess = 0
-    for i in range(0, est_A_range):
-        A_low_guess = A_low_guess + (fit_params[i, 0] + 1j * fit_params[i, 1]) / est_A_range
-        A_high_guess = A_high_guess + (
-                    fit_params[len(fit_freqs) - i - 1, 0] + 1j * fit_params[len(fit_freqs) - i - 1, 1]) / est_A_range
-    Aave = 0.5 * (A_low_guess + A_high_guess)
+    amplitude_est_range = np.min((10, int(np.round(len(fit_freqs * 0.5)))))  # number of data points on each end used to estimate A
+    amplitude_ave_low = np.mean(fit_params[0:amplitude_est_range, 0] + 1j * fit_params[0:amplitude_est_range, 1])
+    amplitude_ave_high = np.mean(fit_params[-amplitude_est_range:, 0] + 1j * fit_params[-amplitude_est_range, 1])
+
+    Aave = 0.5 * (amplitude_ave_low + amplitude_ave_high)
     Amag_guess = np.abs(Aave)  # average of low and high magnitudes
     Aphase_guess = 180.0 / math.pi * np.arctan2(Aave.imag, Aave.real)  # average of high and low phases
 
     # guess Aslope and tau by looking at difference in A_high and A_low
-    delta_guess_index = int(round(est_A_range / 2.0))
+    delta_guess_index = int(round(amplitude_est_range / 2.0))
     delta_freq = fit_freqs[len(fit_freqs) - delta_guess_index] - fit_freqs[delta_guess_index]
-    Aslope_guess = (np.abs(A_high_guess) - np.abs(A_low_guess)) / delta_freq
+    Aslope_guess = (np.abs(amplitude_ave_high) - np.abs(amplitude_ave_low)) / delta_freq
 
-    phase_high_guess = np.arctan2(A_high_guess.imag, A_high_guess.real)  # in radians
-    phase_low_guess = np.arctan2(A_low_guess.imag, A_low_guess.real)  # in radians
+    phase_high_guess = np.arctan2(amplitude_ave_high.imag, amplitude_ave_high.real)  # in radians
+    phase_low_guess = np.arctan2(amplitude_ave_low.imag, amplitude_ave_low.real)  # in radians
     tau_guess = (phase_low_guess - phase_high_guess) / (2.0 * math.pi * delta_freq)
 
     print('Fit Guesses')

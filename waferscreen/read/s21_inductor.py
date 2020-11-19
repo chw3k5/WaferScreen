@@ -1,13 +1,55 @@
 import os
 import time
-from copy import deepcopy
+import copy
 import numpy as np
+from matplotlib import pyplot as plt
+from waferscreen.plot.quick_plots import ls, len_ls
+from waferscreen.tools.band_calc import find_band_edges, find_center_band
+from waferscreen.read.prodata import read_pro_s21
 from scipy.signal import savgol_filter
-from waferscreen.plot.s21 import plot_21
 from waferscreen.read.table_read import num_format
 from waferscreen.tools.rename import get_all_file_paths
 from waferscreen.tools.band_calc import band_center_to_band_number
-from ref import pro_data_dir, raw_data_dir
+from ref import pro_data_dir, raw_data_dir, today_str
+
+
+def ri_to_magphase(r, i):
+    s21_mag = 20 * np.log10(np.sqrt((r ** 2.0) + (i ** 2.0)))
+    s21_phase = np.arctan2(i, r)
+    return s21_mag, s21_phase
+
+
+def plot_bands(ax, plot_data, legend_dict):
+    min_freq, max_freq = plot_data["min_freq"], plot_data["max_freq"]
+    ymin, ymax = ax.get_ylim()
+    counter = 1
+    color = "black"
+    for freq, label_str in find_band_edges(min_freq=min_freq, max_freq=max_freq):
+        line_style = ls[counter % len_ls]
+        ax.plot([freq, freq], [ymin, ymax], color=color, ls=line_style)
+        legend_dict['leg_lines'].append(plt.Line2D(range(10), range(10), color=color, ls=line_style))
+        legend_dict['leg_labels'].append(label_str)
+        counter += 1
+    center_band_freq, center_band_str = find_center_band(center_GHz=plot_data["center_freq"])
+    return center_band_str
+
+
+def s21_subplot(ax, plot_data, x_data_str, y_data_str, y_label_str="", x_label_str="", leg_label_str="", title_str='',
+                color="black", ls="solid", show_bands=False):
+    legend_dict = {}
+    ax.plot(plot_data[x_data_str], plot_data[y_data_str], color=color, ls=ls)
+    ax.set_ylabel(y_label_str)
+    ax.set_xlabel(x_label_str)
+    legend_dict['leg_lines'] = [plt.Line2D(range(10), range(10), color=color, ls=ls)]
+    legend_dict['leg_labels'] = [leg_label_str]
+    if show_bands:
+        center_band_str = plot_bands(ax, plot_data, legend_dict)
+        if title_str == "":
+            ax.title.set_text(center_band_str)
+    else:
+        ax.title.set_text(title_str)
+    ax.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=1, numpoints=3, handlelength=5, fontsize=12)
+    return
 
 
 def jakes_prep(freqs, sdata, group_delay_ns, edge_search_depth, remove_baseline_ripple,
@@ -126,11 +168,21 @@ class InductS21:
         self.group_delay_removed = False
         # Initialized variables used in methods
         self.freqs_GHz = None
+        self.radians_per_second = None
+        self.s21_complex_raw = None
+        self.s21_complex_raw = None
+        self.s21_mag_raw = None
+        self.s21_phase_raw = None
+        self.s21_phase_unwrapped = None
         self.s21_complex = None
         self.s21_mag = None
         self.s21_phase = None
+        self.s21_phase_raw_unwrapped = None
         self.meta_data = {}
         self.group_delay = None
+        self.phase_offset = None
+        self.group_delay_slope = None
+        self.group_delay_offset = None
         self.output_file = None
         self.freq_step = None
         self.max_delay = None
@@ -161,20 +213,24 @@ class InductS21:
         s21_data = data[s21_start_index:]
         data_matrix = np.array(s21_data)
         self.freqs_GHz = data_matrix[:, 0] * self.convert_to_GHz
+        self.radians_per_second = self.freqs_GHz * 1.0e9 * 2.0 * np.pi
         real = data_matrix[:, 1]
         imag = data_matrix[:, 2]
-        self.s21_complex = real + (1j * imag)
+        self.s21_complex_raw = real + (1j * imag)
+        self.s21_complex = copy.deepcopy(self.s21_complex_raw)
         self.freq_step = np.mean(self.freqs_GHz[1:] - self.freqs_GHz[:-1]) * 1.0e9
         self.max_delay = 1.0 / (2.0 * np.sqrt(2.0) * self.freq_step)
 
-    def get_mag_phase(self):
+    def get_mag_phase(self, and_raw=False):
         if self.s21_complex is None:
             self.induct()
-        if self.s21_mag is None or self.s21_phase is None:
-            real = np.real(self.s21_complex)
-            imag = np.imag(self.s21_complex)
-            self.s21_mag = 20 * np.log10(np.sqrt((real ** 2.0) + (imag ** 2.0)))
-            self.s21_phase = np.arctan2(imag, real)
+        self.s21_mag, self.s21_phase = ri_to_magphase(r=self.s21_complex.real,
+                                                      i=self.s21_complex.imag)
+        self.s21_phase_unwrapped = np.unwrap(self.s21_phase, discont=np.pi)
+        if and_raw:
+            self.s21_mag_raw, self.s21_phase_raw = ri_to_magphase(r=self.s21_complex_raw.real,
+                                                                  i=self.s21_complex_raw.imag)
+            self.s21_phase_raw_unwrapped = np.unwrap(self.s21_phase_raw, discont=np.pi)
         return self.s21_mag, self.s21_phase
 
     def add_meta_data(self, **kwargs):
@@ -198,44 +254,14 @@ class InductS21:
         self.meta_data['path'] = self.output_file
 
     def calc_group_delay(self):
-        _s21_mag, s21_phase = self.get_mag_phase()
-        radians_per_second = self.freqs_GHz * 1.0e9 * 2.0 * np.pi
-        s21_phase_zones = []
-        was_increasing = None
-        last_phase = s21_phase[0]
-        index_count = 1
-        for a_phase in s21_phase[1:]:
-            phase_diff = a_phase - last_phase
-            if phase_diff == 0.0:
-                is_increasing = None
-            elif phase_diff < 0.0:
-                is_increasing = False
-            else:
-                is_increasing = True
-            if is_increasing is not None:
-                if was_increasing is None:
-                    s21_phase_zones.append([(radians_per_second[index_count - 1], last_phase),
-                                            (radians_per_second[index_count], a_phase)])
-                elif was_increasing == is_increasing:
-                    s21_phase_zones[-1].append((radians_per_second[index_count], a_phase))
-                else:
-                    is_increasing = None
-            # updates for the next loop
-            was_increasing = is_increasing
-            last_phase = a_phase
-            index_count += 1
-
-        group_delay_per_zone = []
-        for zone in s21_phase_zones:
-            s21_rads_per_second = [omega for omega, phase in zone]
-            s21_phase_zone = [phase for omega, phase in zone]
-            group_delay_this_zone, _offset = np.polyfit(s21_rads_per_second, s21_phase_zone, deg=1)
-            group_delay_per_zone.append(np.abs(group_delay_this_zone))
-        group_delay = np.average(group_delay_per_zone, weights=[len(zone) - 1 for zone in s21_phase_zones])
+        self.get_mag_phase()
+        self.group_delay_slope, self.group_delay_offset = np.polyfit(self.radians_per_second, self.s21_phase_unwrapped, deg=1)
+        group_delay = self.group_delay_slope * -1.0
         if group_delay < self.max_delay:
             self.group_delay = group_delay
+            self.phase_offset = ((self.group_delay_offset + np.pi) % (2.0 * np.pi)) - np.pi
         else:
-            self.group_delay = float("nan")
+            self.phase_offset = self.group_delay = float("nan")
         if self.verbose:
             print_str = F"{'%3.3f' % (self.group_delay * 1.0e9)} ns of cable delay, " + \
                         F"{'%3.3f' % (self.max_delay * 1.0e9)} ns is the maximum group delay measurable."
@@ -254,8 +280,7 @@ class InductS21:
         else:
             group_delay = user_input_group_delay
         # remove group delay
-        # jakes_prep(freqs=self.freqs_GHz, sdata=self.s21_complex, group_delay_ns=group_delay * 1.0e9)
-        phase_factors = np.exp(1j * 2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay)
+        phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay - self.phase_offset))
         self.s21_complex = self.s21_complex * phase_factors
         self.group_delay_removed = True
 
@@ -306,10 +331,115 @@ class InductS21:
                 imag = s21_value.imag
                 f.write(F"{freq},{real},{imag}\n")
 
-    def plot(self):
-        plot_21(file=self.path, freqs_GHz=self.freqs_GHz,
-                s21_complex=self.s21_complex, meta_data=self.meta_data, show_ri=True,
-                save=True, show=False, show_bands=True)
+    def plot(self, save=True, show=False, show_bands=True):
+        self.get_mag_phase(and_raw=True)
+        # Organization and Math
+        # frequency
+        plot_data = {"freq_ghz": self.freqs_GHz, "rad_per_sec": self.radians_per_second}
+        plot_data["min_freq"] = np.min(plot_data['freq_ghz'])
+        plot_data["max_freq"] = np.max(plot_data['freq_ghz'])
+        plot_data["center_freq"] = (plot_data["max_freq"] + plot_data["min_freq"]) / 2.0
+        # raw
+        plot_data["raw_real"], plot_data["raw_imag"] = self.s21_complex_raw.real, self.s21_complex_raw.imag
+        plot_data["raw_mag"], plot_data['raw_phase'], plot_data[
+            'raw_phase_unwrapped'] = self.s21_mag_raw, self.s21_phase_raw, self.s21_phase_raw_unwrapped
+        plot_data["lin_fit"] = plot_data["rad_per_sec"] * self.group_delay_slope + self.group_delay_offset
+        # processed
+        plot_data["pro_real"], plot_data["pro_imag"] = self.s21_complex.real, self.s21_complex.imag
+        plot_data["pro_mag"], plot_data['pro_phase'], plot_data[
+            'pro_phase_unwrapped'] = self.s21_mag, self.s21_phase, self.s21_phase_unwrapped
+
+        # Whole Plot
+        x_inches = 15.0
+        yx_ratio = 11.0 / 8.5
+        fig = plt.figure(figsize=(x_inches, x_inches * yx_ratio))
+        fig.suptitle('Data Inductor  ' + today_str, size='xx-large')
+        ax_mag = fig.add_subplot(311)
+        ax_raw_phase = fig.add_subplot(323)
+        ax_raw_ri = fig.add_subplot(324)
+        ax_pro_phase = fig.add_subplot(325)
+        ax_pro_ri = fig.add_subplot(326)
+
+        # Magnitude
+        legend_dict = {}
+        mag_x_data_str = "freq_ghz"
+        mag_x_label_str = "Frequency (GHz)"
+        mag_y_label_str = "Magnitude S21 (dBm)"
+        mag_title_str = "S21 Magnitude"
+        mag_ls = "solid"
+        ax_mag.plot(plot_data[mag_x_data_str], plot_data["raw_mag"], color="black", ls=mag_ls, linewidth=3)
+        legend_dict['leg_lines'] = [plt.Line2D(range(10), range(10), color="black", ls=mag_ls, linewidth=3)]
+        legend_dict['leg_labels'] = ["Raw"]
+        ax_mag.plot(plot_data[mag_x_data_str], plot_data["raw_mag"], color="chartreuse", ls=mag_ls, linewidth=1)
+        legend_dict['leg_lines'].append(plt.Line2D(range(10), range(10), color="chartreuse", ls=mag_ls, linewidth=1))
+        legend_dict['leg_labels'].append("Processed")
+
+        ax_mag.set_ylabel(mag_y_label_str)
+        ax_mag.set_xlabel(mag_x_label_str)
+
+        if show_bands:
+            center_band_str = plot_bands(ax_mag, plot_data, legend_dict)
+            if mag_title_str == "":
+                ax_mag.title.set_text(center_band_str)
+        else:
+            ax_mag.title.set_text(mag_title_str)
+        ax_mag.legend(legend_dict['leg_lines'], legend_dict['leg_labels'],
+                      loc=1, numpoints=3, handlelength=5, fontsize=12)
+
+        # Raw Phase
+        legend_dict = {}
+        raw_phase_x_data_str = "rad_per_sec"
+        raw_phase_x_label_str = "Frequency (radians / second)"
+        raw_phase_y_label_str = "Phase (radians)"
+        raw_phase_title_str = "Raw Unwrapped S21 Phase"
+        ax_raw_phase.plot(plot_data[raw_phase_x_data_str], plot_data['raw_phase_unwrapped'],
+                          color="firebrick", ls="solid", linewidth=6)
+        legend_dict['leg_lines'] = [plt.Line2D(range(10), range(10), color="firebrick", ls="solid", linewidth=6)]
+        legend_dict['leg_labels'] = ["Raw Unwrapped S21 Phase"]
+
+        ax_raw_phase.plot(plot_data[raw_phase_x_data_str], plot_data["lin_fit"],
+                          color="black", ls="dashed", linewidth=11)
+        legend_dict['leg_lines'].append(plt.Line2D(range(10), range(10), color="black", ls="dashed", linewidth=11))
+        legend_dict['leg_labels'].append(F"Fit group delay {'%2.2f' % (self.group_delay * 1.0e9)} ns,  offset {'%2.2f' % self.phase_offset} radians")
+
+        ax_raw_phase.set_ylabel(raw_phase_y_label_str)
+        ax_raw_phase.set_xlabel(raw_phase_x_label_str)
+        ax_raw_phase.legend(legend_dict['leg_lines'], legend_dict['leg_labels'],
+                            loc=1, numpoints=3, handlelength=5, fontsize=12)
+
+        # Raw Real Imaginary Plot
+        s21_subplot(ax_raw_ri, plot_data,
+                    x_data_str="raw_real", y_data_str='raw_imag',
+                    x_label_str="Real S21", y_label_str="Imaginary S21",
+                    leg_label_str="Raw Real-Imag S21", title_str="Raw Real(freq) vs Imaginary(freq) S21",
+                    color="firebrick", ls="solid", show_bands=False)
+
+        # Processed Data
+        s21_subplot(ax_pro_phase, plot_data,
+                    x_data_str="rad_per_sec", y_data_str='pro_phase_unwrapped',
+                    x_label_str="Frequency (radians / second)", y_label_str="Phase (radians)",
+                    leg_label_str="Phase S21", title_str="Processed S21 Phase Residuals",
+                    color="dodgerblue", ls="solid", show_bands=False)
+
+        s21_subplot(ax_pro_ri, plot_data,
+                    x_data_str="pro_real", y_data_str='pro_imag',
+                    x_label_str="Real S21", y_label_str="Imaginary S21",
+                    leg_label_str="Real-Imag S21", title_str="Processed Real(freq) vs Imaginary(freq) S21",
+                    color="dodgerblue", ls="solid", show_bands=False)
+
+        # Display
+        if show:
+            plt.show()
+        if save:
+            if self.output_file is None:
+                self.prepare_output_file()
+            plt.draw()
+            plot_file_name, _ = self.output_file.rsplit(".", 1)
+            plot_file_name += '.pdf'
+            plt.savefig(plot_file_name)
+            print("Saved Plot to:", plot_file_name)
+        plt.clf()
+        return
 
 
 if __name__ == "__main__":
