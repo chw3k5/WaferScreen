@@ -1,13 +1,14 @@
 import os
 import time
 import copy
+import pathlib
 import numpy as np
 from matplotlib import pyplot as plt
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.read.prodata import read_pro_s21
-from scipy.signal import savgol_filter
 from waferscreen.read.table_read import num_format
+from waferscreen.read.s21_metadata import S21MetadataPrinceton, S21MetadataNist
 from waferscreen.tools.rename import get_all_file_paths
 from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import pro_data_dir, raw_data_dir, today_str
@@ -52,97 +53,6 @@ def s21_subplot(ax, plot_data, x_data_str, y_data_str, y_label_str="", x_label_s
     return
 
 
-def jakes_prep(freqs, sdata, group_delay_ns, edge_search_depth, remove_baseline_ripple,
-               baseline_scale_kHz, smoothing_scale_kHz, baseline_order, smoothing_order, verbose=False):
-    # now remove given group delay and make sure sdata is array
-    phase_factors = np.exp(-1j * 2.0 * np.pi * freqs * group_delay_ns)  # e^(-j*w*t)
-    sdata = np.array(sdata) / phase_factors
-
-    if verbose:
-        print("Removed Group Delay")
-
-    # figure out complex gain and gain slope
-    ave_left_gain = 0
-    ave_right_gain = 0
-    for j in range(0, edge_search_depth):
-        ave_left_gain = ave_left_gain + sdata[j] / edge_search_depth
-        ave_right_gain = ave_right_gain + sdata[len(sdata) - 1 - j] / edge_search_depth
-    left_freq = freqs[int(edge_search_depth / 2.0)]
-    right_freq = freqs[len(freqs) - 1 - int(edge_search_depth / 2.0)]
-    gain_slope = (ave_right_gain - ave_left_gain) / (right_freq - left_freq)
-    if verbose:
-        # calculate extra group delay and abs gain slope removed for printing out purposes
-        left_phase = np.arctan2(np.imag(ave_left_gain), np.real(ave_left_gain))
-        right_phase = np.arctan2(np.imag(ave_right_gain), np.real(ave_right_gain))
-        excess_tau = (left_phase - right_phase) / (2.0 * np.pi * (right_freq - left_freq))
-        abs_gain = np.absolute(0.5 * ave_right_gain + 0.5 * ave_left_gain)
-        abs_gain_slope = (np.absolute(ave_right_gain) - np.absolute(ave_left_gain)) / (right_freq - left_freq)
-        print("Removing an excess group delay of " + str(excess_tau) + "ns from data")
-        print("Removing a gain of " + str(abs_gain) + " and slope of " + str(abs_gain_slope) + "/GHz from data")
-    gains = ave_left_gain + (freqs - left_freq) * gain_slope
-    sdata = sdata / gains
-
-    if verbose:
-        print("Removed Group Delay and Gain")
-    # remove baseline ripple if desired
-    if remove_baseline_ripple:
-        freq_spacing = (freqs[1] - freqs[0]) * 1.0e6  # GHz -> kHz
-        baseline_scale = int(round(baseline_scale_kHz / freq_spacing))
-        if baseline_scale % 2 == 0:  # if even
-            baseline_scale = baseline_scale + 1  # make it odd
-        if verbose:
-            print("Freq Spacing is " + str(freq_spacing) + "kHz")
-            print("Requested baseline smoothing scale is " + str(baseline_scale_kHz) + "kHz")
-            print("Number of points to smooth over is " + str(baseline_scale))
-        # smooth s21 trace in both real and imaginary to do peak finding
-        baseline_real = savgol_filter(np.real(sdata), baseline_scale, baseline_order)
-        baseline_imag = savgol_filter(np.imag(sdata), baseline_scale, baseline_order)
-        baseline = np.array(baseline_real + 1j * baseline_imag)
-        pre_baseline_removal_sdata = np.copy(sdata)
-        sdata = sdata / baseline
-
-    # figure out freq spacing, convert smoothing_scale_kHz to smoothing_scale (must be an odd number)
-    freq_spacing = (freqs[1] - freqs[0]) * 1e6  # GHz -> kHz
-    smoothing_scale = int(round(smoothing_scale_kHz / freq_spacing))
-    if smoothing_scale % 2 == 0:  # if even
-        smoothing_scale = smoothing_scale + 1  # make it odd
-    if smoothing_scale >= smoothing_order:
-        smoothing_order = smoothing_scale - 1
-    if verbose:
-        print("Freq Spacing is " + str(freq_spacing) + "kHz")
-        print("Requested smoothing scale is " + str(smoothing_scale_kHz) + "kHz")
-        print("Number of points to smooth over is " + str(smoothing_scale))
-    # smooth s21 trace in both real and imaginary to do peak finding
-    sdata_smooth_real = savgol_filter(np.real(sdata), smoothing_scale, smoothing_order)
-    sdata_smooth_imag = savgol_filter(np.imag(sdata), smoothing_scale, smoothing_order)
-    sdata_smooth = np.array(sdata_smooth_real + 1j * sdata_smooth_imag)
-
-
-class MetaS21:
-    def __init__(self):
-        self.file_to_meta = {}
-        self.paths = []
-
-    def meta_from_file(self, path):
-        with open(path, mode='r') as f:
-            raw_file = f.readlines()
-        for raw_line in raw_file:
-            meta_data_this_line = {}
-            key_value_phrases = raw_line.split("|")
-            for key_value_phrase in key_value_phrases:
-                key_str, value_str = key_value_phrase.split(",")
-                meta_data_this_line[key_str.strip()] = num_format(value_str.strip())
-            else:
-                if "path" in meta_data_this_line.keys():
-                    local_test_path = os.path.join(os.path.dirname(path), meta_data_this_line["path"])
-                    if os.path.isfile(local_test_path):
-                        meta_data_this_line["path"] = local_test_path
-                    self.file_to_meta[meta_data_this_line["path"]] = meta_data_this_line
-                else:
-                    raise KeyError("No path. All S21 meta data requires a unique path to the S21 file.")
-        self.paths.append(path)
-
-
 class InductS21:
     def __init__(self, path, columns=None, verbose=True):
         self.path = path
@@ -184,8 +94,16 @@ class InductS21:
         self.group_delay_slope = None
         self.group_delay_offset = None
         self.output_file = None
+        self.plot_file = None
         self.freq_step = None
         self.max_delay = None
+
+    def simple_induct(self, metadata_dict=None):
+        self.remove_group_delay()
+        self.add_meta_data(**metadata_dict)
+        self.calc_meta_data()
+        self.write()
+        self.plot()
 
     def induct(self):
         """
@@ -251,6 +169,7 @@ class InductS21:
             self.meta_data["datetime"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.meta_data["time"]))
         self.prepare_output_file()
         self.meta_data['raw_path'] = self.meta_data['path']
+        self.meta_data['plot_path'] = self.plot_file
         self.meta_data['path'] = self.output_file
 
     def calc_group_delay(self):
@@ -311,11 +230,12 @@ class InductS21:
             basename = os.path.basename(self.path)
             prefix, _extension = basename.rsplit(".", 1)
             self.output_file = os.path.join(self.output_file, prefix + "_s21.csv")
+            self.plot_file, _ = self.output_file.rsplit(".", 1)
+            self.plot_file += '.pdf'
 
     def write(self):
         if not self.group_delay_removed:
             self.remove_group_delay()
-
         # write the output S21 file
         with open(self.output_file, 'w') as f:
             meta_data_line = ""
@@ -331,7 +251,7 @@ class InductS21:
                 imag = s21_value.imag
                 f.write(F"{freq},{real},{imag}\n")
 
-    def plot(self, save=True, show=False, show_bands=True):
+    def plot(self, save=True, show=False, show_bands=False):
         self.get_mag_phase(and_raw=True)
         # Organization and Math
         # frequency
@@ -414,13 +334,14 @@ class InductS21:
                     leg_label_str="Raw Real-Imag S21", title_str="Raw Real(freq) vs Imaginary(freq) S21",
                     color="firebrick", ls="solid", show_bands=False)
 
-        # Processed Data
+        # Processed Phase residuals  Plot
         s21_subplot(ax_pro_phase, plot_data,
                     x_data_str="rad_per_sec", y_data_str='pro_phase_unwrapped',
                     x_label_str="Frequency (radians / second)", y_label_str="Phase (radians)",
                     leg_label_str="Phase S21", title_str="Processed S21 Phase Residuals",
                     color="dodgerblue", ls="solid", show_bands=False)
 
+        # Processed Real Imaginary Plot
         s21_subplot(ax_pro_ri, plot_data,
                     x_data_str="pro_real", y_data_str='pro_imag',
                     x_label_str="Real S21", y_label_str="Imaginary S21",
@@ -428,37 +349,65 @@ class InductS21:
                     color="dodgerblue", ls="solid", show_bands=False)
 
         # Display
-        if show:
-            plt.show()
         if save:
             if self.output_file is None:
                 self.prepare_output_file()
             plt.draw()
-            plot_file_name, _ = self.output_file.rsplit(".", 1)
-            plot_file_name += '.pdf'
-            plt.savefig(plot_file_name)
-            print("Saved Plot to:", plot_file_name)
+            plt.savefig(self.plot_file)
+            print("Saved Plot to:", self.plot_file)
+        if show:
+            plt.show()
         plt.clf()
         return
 
 
-if __name__ == "__main__":
+def crawl_raw_s21(search_dirs=None):
+    if search_dirs is None:
+        search_dirs = [raw_data_dir]
+    found_paths = []
+    for search_dir in search_dirs:
+        found_paths.extend([str(path) for path in pathlib.Path(search_dir).rglob('*.CSV')])
+    return found_paths
+
+
+def induct_nist(verbose=True):
+    s21by_path = {}
+    return s21by_path
+
+
+def induct_princeton(verbose=True):
     base = os.path.join(raw_data_dir, "princeton", "SMBK_wafer8")
     meta_data_path = os.path.join(base, "meta_data.txt")
-    m21 = MetaS21()
+    m21 = S21MetadataPrinceton()
     m21.meta_from_file(meta_data_path)
     paths = get_all_file_paths(base)
-    raw_data = {}
+    s21by_path = {}
     for path in paths:
         _, extension = path.rsplit('.', 1)
         if extension.lower() == "csv":
-            this_loop_s21 = InductS21(path=path, columns=("freq_Hz", 'real', "imag"))
-            this_loop_s21.remove_group_delay()
-            this_loop_s21.add_meta_data(**m21.file_to_meta[path])
-            this_loop_s21.calc_meta_data()
-            this_loop_s21.write()
-            this_loop_s21.plot()
-            raw_data[path] = this_loop_s21
+            this_loop_s21 = InductS21(path=path, columns=("freq_Hz", 'real', "imag"), verbose=verbose)
+            this_loop_s21.simple_induct(metadata_dict=m21.file_to_meta[path])
+            s21by_path[path] = this_loop_s21
+    return s21by_path
 
 
+def induct_dirs(search_dirs=None, columns=None, verbose=True):
+    s21by_path = {}
+    if search_dirs is None:
+        search_dirs = [raw_data_dir]
+    if columns is None:
+        columns = ("freq_Hz", 'real', "imag")
+    for path in crawl_raw_s21(search_dirs=search_dirs):
+        s21by_path[path] = InductS21(path=path, columns=columns, verbose=verbose)
+        s21by_path[path].simple_induct(metadata_dict=None)
+    return s21by_path
 
+
+def induct_all(verbose=True):
+    s21by_path = induct_princeton(verbose=verbose)
+    s21by_path.update(induct_nist(verbose=verbose))
+    return s21by_path
+
+
+if __name__ == "__main__":
+    s21 = induct_all()

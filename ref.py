@@ -39,8 +39,10 @@ for dir_name in [raw_data_dir, nist_data_dir, princeton_data_dir, check_out_dir,
     if not os.path.isdir(dir_name):
         os.mkdir(dir_name)
 
+# reference file locations
+s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
+
 # data types
-s21_file_extensions = {"txt", "csv"}
 file_extension_to_delimiter = {'csv': ",", 'psv': "|", 'txt': " ", "tsv": '\t'}
 
 # Constants used in WaferScreen
@@ -48,6 +50,7 @@ h = 6.6260755E-34  # Js
 c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
 
+# Simons Observatory Frequency Band definitions
 band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4.147},
                "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
                "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
