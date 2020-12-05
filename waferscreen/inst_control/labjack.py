@@ -155,6 +155,6 @@ class U3:
 
 
 if __name__ == "__main__":
-    u = U3(local_id=None)
-    u.alive_test(voltage=3, zero_after=True)
+    u = U3(local_id=3)
+    u.alive_test(voltage=5, zero_after=True)
 
