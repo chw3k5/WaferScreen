@@ -410,4 +410,6 @@ def induct_all(verbose=True):
 
 
 if __name__ == "__main__":
-    s21 = induct_all()
+    s21by_path = induct_all()
+    for path in s21by_path.keys():
+        s21by_path[path].plot()
