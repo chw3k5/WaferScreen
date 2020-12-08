@@ -154,7 +154,48 @@ class U3:
                 f.write("\t".join(['%.6f' % c[i] for c in chans]) + '\n')
 
 
+class VacuumContolLJ(U3):
+    def __init__(self, auto_init=True, verbose=True):
+        self.verbose = verbose
+        self.local_id = 3
+        self.lj = None
+        self.is_open = False
+
+        self.num_channels = 1
+        self.sample_frequency_hz = 5000
+        self.voltage_resolution = 0
+        self.stream_file = ""
+        self.sample_time_s = 10
+
+        self.valve_isOpen = {'green': True, "blue": True}
+        self.valve_name_to_daq_num = {'green': 0, "blue": 1}
+
+        if auto_init:
+            self.open()
+        for valve_name in self.valve_isOpen.keys():
+            self.move_valve(valve_name=valve_name)
+
+    def move_valve(self, valve_name, open_valve=False):
+        if not valve_name in self.valve_isOpen.keys():
+            raise KeyError(F"Valve name {valve_name} is not of the expected types: {self.isOpen.keys()}")
+        if open_valve:
+            voltage = 5
+            command_type = "open"
+        else:
+            voltage = 0
+            command_type = 'close'
+        if self.valve_isOpen[valve_name] == open_valve:
+            print(F"A command was set to {command_type} the {valve_name} valve.")
+            print(F"but the valves status is indicated the value is already currently {command_type}.")
+        else:
+            self.daq(voltage=voltage, daq_num=self.valve_name_to_daq_num[valve_name])
+            self.valve_isOpen[valve_name] = open_valve
+            if self.verbose:
+                print(F"A '{command_type}' command was issued to the '{valve_name}' valve.")
+
+
+
 if __name__ == "__main__":
-    u = U3(local_id=3)
-    u.alive_test(voltage=5, zero_after=True)
+    vc = VacuumContolLJ()
+    vc.move_valve(valve_name='blue', open_valve=True)
 
