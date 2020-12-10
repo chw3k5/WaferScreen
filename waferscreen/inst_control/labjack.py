@@ -1,6 +1,7 @@
 import u3
 import time
 import os
+from datetime import datetime
 from typing import NamedTuple
 
 
@@ -166,7 +167,7 @@ class ValvesStatus(NamedTuple):
                 open_or_closed = "'OPEN'"
             else:
                 open_or_closed = "'closed'"
-            status_str += F"  {valve_name} is {open_or_closed}.\n"
+            status_str += F"  {valve_name} is {open_or_closed}\n"
         return status_str
 
 
@@ -215,10 +216,10 @@ class VacuumControlLJ(U3):
         proposed_status_list = []
         for valve_name in list(self.valves_status._fields):
             if valve_name == internal_valve_name:
-                proposed_status_list = open_valve
+                proposed_status_list.append(open_valve)
             else:
                 proposed_status_list.append(self.valves_status.__getattribute__(valve_name))
-        proposed_status = NamedTuple(*proposed_status_list)
+        proposed_status = ValvesStatus(*proposed_status_list)
         if open_valve:
             voltage = 5
             command_type = "open"
@@ -226,18 +227,19 @@ class VacuumControlLJ(U3):
             voltage = 0
             command_type = 'close'
         if valve_current_state == open_valve:
-            print(F"A command was set to {command_type} {valve_name},")
+            print(F"\nA command was set to {command_type} {valve_name},\n")
             print(F"but the valves status is indicated that {valve_name} is already currently {command_type}.")
         elif proposed_status in self.forbidden_statuses:
-            print(F"The command to {command_type} {valve_name},")
+            print(F"\nA command to {command_type} {valve_name},\n")
             print("but this would lead to the forbidden command state:")
             print(str(proposed_status))
+            print("Command REJECTED")
         else:
             self.daq(voltage=voltage, daq_num=self.valve_name_to_daq_num[valve_name])
             self.valves_status = proposed_status
             if self.verbose:
                 print(F"A '{command_type}' command was issued to the '{valve_name}' valve.")
-                print("The current valve status is:")
+                print(F"The current valve status is ({datetime.now()}):")
                 print(self.valves_status)
 
 

@@ -13,7 +13,7 @@ class SRS_SIM928:
         if com_num is None:
             self.ResourceManager = visa.ResourceManager()
             self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
-            self.ctrl.timeout = 1000
+            self.ctrl.timeout = 10
             self.is_gpib = True
         else:
             baud_rate = '115200'
@@ -26,6 +26,7 @@ class SRS_SIM928:
             # self.write_to_port('BAUD' + baud_rate)
         self.flush_queue()
         self.say_hello()
+        self.flush_queue()
 
     def write(self, write_str):
         if self.is_gpib:
@@ -69,7 +70,11 @@ class SRS_SIM928:
         resp = ""
         while resp == "":
             self.write_to_port(write_to_port_str)
+            time.sleep(0.1)
             resp = self.query(query_str=from_port_query_str, resp_type=resp_type)
+            if self.is_gpib and resp != "":
+                while resp[-1] != '\n':
+                    resp += self.query(query_str=from_port_query_str, resp_type=resp_type)
         return resp
 
     def flush_queue(self):

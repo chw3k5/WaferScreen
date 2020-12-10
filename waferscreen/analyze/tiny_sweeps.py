@@ -88,7 +88,7 @@ class TinySweeps:
         self.rseries = 10000  # ohms
         self.current_min = -125  # uA
         self.current_max = 125  # uA
-        self.current_steps = 51
+        self.current_steps = 26
         self.currents = np.linspace(self.current_min, self.current_max, self.current_steps)
         self.volts = np.linspace(self.current_min * self.rseries * 1e-6, self.current_max * self.rseries * 1e-6, self.current_steps) # volts
 
@@ -171,7 +171,8 @@ class TinySweeps:
                                 auto_init=True, temperature_K=self.temperature_K, use_exact_num_of_points=True,
                                 verbose=self.verbose)
         # connect to SIM928
-        voltsource = srs_sim928.SRS_SIM928(com_num=5, address=volt_source_address, port=volt_source_port)
+        # voltsource = srs_sim928.SRS_SIM928(com_num=6, address=volt_source_address, port=volt_source_port)
+        voltsource = srs_sim928.SRS_SIM928()
         voltsource.setvolt(self.volts[0])
         voltsource.output_on()
         for j in range(len(self.res_freqs)):

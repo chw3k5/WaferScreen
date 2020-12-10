@@ -233,6 +233,12 @@ class InductS21:
             self.plot_file, _ = self.output_file.rsplit(".", 1)
             self.plot_file += '.pdf'
 
+    def __str__(self):
+        return ("Its a striung")
+
+    def __add__(self, new_data):
+        self.data += new_data
+
     def write(self):
         if not self.group_delay_removed:
             self.remove_group_delay()
@@ -413,3 +419,4 @@ if __name__ == "__main__":
     s21by_path = induct_all()
     for path in s21by_path.keys():
         s21by_path[path].plot()
+
