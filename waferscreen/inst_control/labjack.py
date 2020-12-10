@@ -1,6 +1,7 @@
 import u3
 import time
 import os
+from typing import NamedTuple
 
 
 class U3:
@@ -154,7 +155,22 @@ class U3:
                 f.write("\t".join(['%.6f' % c[i] for c in chans]) + '\n')
 
 
-class VacuumContolLJ(U3):
+class ValvesStatus(NamedTuple):
+    valve1: bool
+    valve2: bool
+
+    def __str__(self):
+        status_str = ""
+        for valve_status, valve_name in [(self.valve1, 'Valve 1'), (self.valve2, 'Valve 2')]:
+            if valve_status:
+                open_or_closed = "'OPEN'"
+            else:
+                open_or_closed = "'closed'"
+            status_str += F"  {valve_name} is {open_or_closed}.\n"
+        return status_str
+
+
+class VacuumControlLJ(U3):
     def __init__(self, auto_init=True, verbose=True):
         self.verbose = verbose
         self.local_id = 3
@@ -167,35 +183,65 @@ class VacuumContolLJ(U3):
         self.stream_file = ""
         self.sample_time_s = 10
 
-        self.valve_isOpen = {'green': True, "blue": True}
-        self.valve_name_to_daq_num = {'green': 0, "blue": 1}
+        self.valves_status = ValvesStatus(valve1=True, valve2=True)
+        self.forbidden_statuses = {ValvesStatus(valve1=True, valve2=True)}
+        self.valve_name_to_daq_num = {"valve1": 0, "valve2": 1}
+        self.valve1_aliases = {"valve1", "valve 1", "green", '1', 'one', 'valve one'}
+        self.valve2_aliases = {"valve2", "valve 2", "blue", 'white', '2', 'two', 'valve two'}
+        self.all_valve_names = self.valve1_aliases | self.valve2_aliases
 
         if auto_init:
             self.open()
-        for valve_name in self.valve_isOpen.keys():
-            self.move_valve(valve_name=valve_name)
+        for valve_name in list(self.valves_status._fields):
+            self.move_valve(valve_name=valve_name, open_valve=False)
+
+    def open_all(self):
+        for valve_name in list(self.valves_status._fields):
+            self.daq(voltage=5, daq_num=self.valve_name_to_daq_num[valve_name])
+
+    def close_all(self):
+        for valve_name in list(self.valves_status._fields):
+            self.daq(voltage=0, daq_num=self.valve_name_to_daq_num[valve_name])
 
     def move_valve(self, valve_name, open_valve=False):
-        if not valve_name in self.valve_isOpen.keys():
-            raise KeyError(F"Valve name {valve_name} is not of the expected types: {self.isOpen.keys()}")
+        formatted_value_name = str(valve_name).lower().strip()
+        if formatted_value_name not in self.all_valve_names:
+            raise KeyError(F"Valve name {valve_name} is not of the expected types:\n{self.all_valve_names}")
+        elif formatted_value_name in self.valve1_aliases:
+            internal_valve_name = 'valve1'
+        else:
+            internal_valve_name = 'valve2'
+        valve_current_state = self.valves_status.__getattribute__(internal_valve_name)
+        proposed_status_list = []
+        for valve_name in list(self.valves_status._fields):
+            if valve_name == internal_valve_name:
+                proposed_status_list = open_valve
+            else:
+                proposed_status_list.append(self.valves_status.__getattribute__(valve_name))
+        proposed_status = NamedTuple(*proposed_status_list)
         if open_valve:
             voltage = 5
             command_type = "open"
         else:
             voltage = 0
             command_type = 'close'
-        if self.valve_isOpen[valve_name] == open_valve:
-            print(F"A command was set to {command_type} the {valve_name} valve.")
-            print(F"but the valves status is indicated the value is already currently {command_type}.")
+        if valve_current_state == open_valve:
+            print(F"A command was set to {command_type} {valve_name},")
+            print(F"but the valves status is indicated that {valve_name} is already currently {command_type}.")
+        elif proposed_status in self.forbidden_statuses:
+            print(F"The command to {command_type} {valve_name},")
+            print("but this would lead to the forbidden command state:")
+            print(str(proposed_status))
         else:
             self.daq(voltage=voltage, daq_num=self.valve_name_to_daq_num[valve_name])
-            self.valve_isOpen[valve_name] = open_valve
+            self.valves_status = proposed_status
             if self.verbose:
                 print(F"A '{command_type}' command was issued to the '{valve_name}' valve.")
-
+                print("The current valve status is:")
+                print(self.valves_status)
 
 
 if __name__ == "__main__":
-    vc = VacuumContolLJ()
-    vc.move_valve(valve_name='blue', open_valve=True)
+    vc = VacuumControlLJ()
+    vc.move_valve(valve_name='valve1', open_valve=True)
 
