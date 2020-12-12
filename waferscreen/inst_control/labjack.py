@@ -185,7 +185,7 @@ class VacuumControlLJ(U3):
         self.sample_time_s = 10
 
         self.valves_status = ValvesStatus(valve1=True, valve2=True)
-        self.forbidden_statuses = {ValvesStatus(valve1=True, valve2=True)}
+        self.forbidden_statuses = {ValvesStatus(valve1=True, valve2=True), }
         self.valve_name_to_daq_num = {"valve1": 0, "valve2": 1}
         self.valve1_aliases = {"valve1", "valve 1", "green", '1', 'one', 'valve one'}
         self.valve2_aliases = {"valve2", "valve 2", "blue", 'white', '2', 'two', 'valve two'}
@@ -245,5 +245,5 @@ class VacuumControlLJ(U3):
 
 if __name__ == "__main__":
     vc = VacuumControlLJ()
-    vc.move_valve(valve_name='valve1', open_valve=True)
+    # vc.move_valve(valve_name='valve1', open_valve=True)
 

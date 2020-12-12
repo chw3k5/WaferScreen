@@ -7,7 +7,7 @@ from typing import NamedTuple, Optional
 from multiprocessing import Pool
 from ref import pro_data_dir, today_str, volt_source_address, volt_source_port, agilent8722es_address
 from ref import multiprocessing_threads
-from waferscreen.inst_control import srs_sim928
+from waferscreen.inst_control import srs
 from waferscreen.res.single_fits import fit_resonator
 from waferscreen.res.finder import ResParams, res_params_header, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
@@ -172,7 +172,7 @@ class TinySweeps:
                                 verbose=self.verbose)
         # connect to SIM928
         # voltsource = srs_sim928.SRS_SIM928(com_num=6, address=volt_source_address, port=volt_source_port)
-        voltsource = srs_sim928.SRS_SIM928()
+        voltsource = srs.SRS_SIM928()
         voltsource.setvolt(self.volts[0])
         voltsource.output_on()
         for j in range(len(self.res_freqs)):
