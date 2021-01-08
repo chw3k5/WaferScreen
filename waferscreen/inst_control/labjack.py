@@ -214,11 +214,12 @@ class VacuumControlLJ(U3):
             internal_valve_name = 'valve2'
         valve_current_state = self.valves_status.__getattribute__(internal_valve_name)
         proposed_status_list = []
-        for valve_name in list(self.valves_status._fields):
-            if valve_name == internal_valve_name:
+        for possible_valve_name in list(self.valves_status._fields):
+            if possible_valve_name == internal_valve_name:
                 proposed_status_list.append(open_valve)
             else:
                 proposed_status_list.append(self.valves_status.__getattribute__(valve_name))
+        
         proposed_status = ValvesStatus(*proposed_status_list)
         if open_valve:
             voltage = 5
@@ -227,18 +228,18 @@ class VacuumControlLJ(U3):
             voltage = 0
             command_type = 'close'
         if valve_current_state == open_valve:
-            print(F"\nA command was set to {command_type} {valve_name},\n")
-            print(F"but the valves status is indicated that {valve_name} is already currently {command_type}.")
+            print(F"\nA command was set to {command_type} {internal_valve_name},\n")
+            print(F"but the valves status is indicated that {internal_valve_name} is already currently {command_type}.")
         elif proposed_status in self.forbidden_statuses:
-            print(F"\nA command to {command_type} {valve_name},\n")
+            print(F"\nA command to {command_type} {internal_valve_name},\n")
             print("but this would lead to the forbidden command state:")
             print(str(proposed_status))
             print("Command REJECTED")
         else:
-            self.daq(voltage=voltage, daq_num=self.valve_name_to_daq_num[valve_name])
+            self.daq(voltage=voltage, daq_num=self.valve_name_to_daq_num[internal_valve_name])
             self.valves_status = proposed_status
             if self.verbose:
-                print(F"A '{command_type}' command was issued to the '{valve_name}' valve.")
+                print(F"A '{command_type}' command was issued to the '{internal_valve_name}' valve.")
                 print(F"The current valve status is ({datetime.now()}):")
                 print(self.valves_status)
 
