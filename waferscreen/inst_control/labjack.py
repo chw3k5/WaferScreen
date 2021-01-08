@@ -194,20 +194,20 @@ class VacuumControlLJ(U3):
         if auto_init:
             self.open()
         for valve_name in list(self.valves_status._fields):
-            self.move_valve(valve_name=valve_name, open_valve=False)
+            self.move_valve(user_valve_name=valve_name, open_valve=False)
 
     def open_all(self):
         for valve_name in list(self.valves_status._fields):
             self.daq(voltage=5, daq_num=self.valve_name_to_daq_num[valve_name])
 
     def close_all(self):
-        for valve_name in list(self.valves_status._fields):
-            self.daq(voltage=0, daq_num=self.valve_name_to_daq_num[valve_name])
+        for possible_valve_name in list(self.valves_status._fields):
+            self.daq(voltage=0, daq_num=self.valve_name_to_daq_num[possible_valve_name])
 
-    def move_valve(self, valve_name, open_valve=False):
-        formatted_value_name = str(valve_name).lower().strip()
+    def move_valve(self, user_valve_name, open_valve=False):
+        formatted_value_name = str(user_valve_name).lower().strip()
         if formatted_value_name not in self.all_valve_names:
-            raise KeyError(F"Valve name {valve_name} is not of the expected types:\n{self.all_valve_names}")
+            raise KeyError(F"Valve name {user_valve_name} is not of the expected types:\n{self.all_valve_names}")
         elif formatted_value_name in self.valve1_aliases:
             internal_valve_name = 'valve1'
         else:
@@ -218,7 +218,7 @@ class VacuumControlLJ(U3):
             if possible_valve_name == internal_valve_name:
                 proposed_status_list.append(open_valve)
             else:
-                proposed_status_list.append(self.valves_status.__getattribute__(valve_name))
+                proposed_status_list.append(self.valves_status.__getattribute__(possible_valve_name))
         
         proposed_status = ValvesStatus(*proposed_status_list)
         if open_valve:
@@ -246,5 +246,5 @@ class VacuumControlLJ(U3):
 
 if __name__ == "__main__":
     vc = VacuumControlLJ()
-    # vc.move_valve(valve_name='valve1', open_valve=True)
+    vc.move_valve(user_valve_name='valve1', open_valve=True)
 
