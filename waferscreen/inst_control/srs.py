@@ -150,12 +150,12 @@ class SRS_SIM928(SRS_Module):
 
 
 if __name__ == "__main__":
-    test_srs = get_test_srs()
+    test_srs = get_test_srs(is_gpib=False)
     volatage_source1 = SRS_SIM928(srs_port=1, srs_connect=test_srs)
     volatage_source2 = SRS_SIM928(srs_port=2, srs_connect=test_srs)
     for n in range(10):
         print(F"n = {n}")
-        volatage_source1.setvolt(voltage=-0.777)
+        volatage_source1.setvolt(voltage=-0.888)
         print(volatage_source1.getvolt())
         volatage_source1.setvolt(voltage=0.777)
         print(volatage_source1.getvolt())
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     for n in range(10):
         print(F"n = {n}")
-        volatage_source2.setvolt(voltage=-0.666)
+        volatage_source2.setvolt(voltage=-0.555)
         print(volatage_source2.getvolt())
         volatage_source2.setvolt(voltage=0.666)
         print(volatage_source2.getvolt())

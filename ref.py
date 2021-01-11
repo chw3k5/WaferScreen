@@ -41,6 +41,10 @@ for dir_name in [raw_data_dir, nist_data_dir, princeton_data_dir, check_out_dir,
 
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
+runtime_log = os.path.join(raw_data_dir, "runtime_log_waferscreeen.txt")
+if not os.path.isfile(runtime_log):
+    f = open(runtime_log, 'w')
+    f.close()
 
 # data types
 file_extension_to_delimiter = {'csv': ",", 'psv': "|", 'txt': " ", "tsv": '\t'}

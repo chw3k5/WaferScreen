@@ -9,6 +9,6 @@ def timer(func):
         value = func(*args, **kwargs)
         toc = time.perf_counter()
         elapsed_time = toc - tic
-        print(f"Elapsed time: {elapsed_time:0.4f} seconds for {func.__name__}")
+        print(F"Elapsed time: {elapsed_time:0.4f} seconds for {func.__name__}")
         return value
     return wrapper_timer
