@@ -6,7 +6,8 @@ from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.read.prodata import read_pro_s21
 
 
-def plot_21(file=None, freqs_GHz=None, show_ri=False, s21_complex=None, meta_data=None, save=True, show=False, show_bands=True):
+def plot_s21(file=None, freqs_GHz=None, s21_complex=None, show_ri=False,
+             meta_data=None, save=True, show=False, show_bands=True):
     legend_dict = {}
     data_dict = {}
     if file is not None and s21_complex is None and freqs_GHz is None and meta_data is None:

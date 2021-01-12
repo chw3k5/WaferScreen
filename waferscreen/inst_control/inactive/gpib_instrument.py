@@ -5,8 +5,8 @@ Created on Mar 3, 2009
 @version: 1.0.0
 '''
 
-from waferscreen.inst_control import instrument
-from waferscreen.inst_control.gpibinter import ibdev, ibfind, ibonl, ibcmd, ibcmda, ibclr, ibwrt, ibwrta, ibrd, ibln, ibwait, ibsta
+from waferscreen.inst_control.inactive import instrument
+from waferscreen.inst_control.inactive.gpibinter import ibdev, ibfind, ibonl, ibcmd, ibcmda, ibclr, ibwrt, ibwrta, ibrd, ibln, ibwait, ibsta
 import numpy
 
 # Constants

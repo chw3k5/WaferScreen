@@ -114,12 +114,21 @@ class USBVNA():
             self.ctrl.write("SENS:CORR OFF")
             print("Taking Un-Calibrated Data")
 
-    def set_sweep(self, numpoints, type="lin"):
-        self.ctrl.write("SENS:SWE:POIN %d" % numpoints)
-        if type == "lin":
+    def set_sweeptype(self, sweeptype="lin"):
+        test_type = sweeptype.lower().strip()
+        if test_type == "lin":
             self.ctrl.write("SENS:SWE:TYPE LIN")
-        if type == "log":
+        elif test_type == "log":
             self.ctrl.write("SENS:SWE:TYPE LOG")
+        else:
+            raise KeyError(F"{sweeptype} is not a recognized sweeptype.")
+
+    def set_num_freq_points(self, num_freq_points):
+        self.ctrl.write("SENS:SWE:POIN %d" % num_freq_points)
+
+    def set_sweep(self, num_freq_points, sweeptype="lin"):
+        self.set_num_freq_points(num_freq_points=num_freq_points)
+        self.set_sweeptype(sweeptype)
         self.sweep_inquire()
         print("Sweep type   = " + self.ctrl.sweeptype)
         print("Sweep points = " + str(self.ctrl.sweeppoints))
@@ -151,6 +160,12 @@ class USBVNA():
         print("Span        = " + str(1e-9 * self.ctrl.freqspan) + "GHz")
         self.sweep_inquire()
         self.reset_sweep()
+
+    def set_center_freq_GHz(self, center_freq_GHz):
+        self.ctrl.write("SENS:FREQ:CENT %fghz " % center_freq_GHz)
+
+    def set_span_GHz(self, span_GHz):
+        self.ctrl.write("SENS:FREQ:SPAN %fghz " % span_GHz)
 
     def freqs_inquire(self):
         self.ctrl.write("*WAI")
@@ -192,7 +207,7 @@ class USBVNA():
     def avg_clear(self):
         self.ctrl.write("SENS:AVER:CLE")
 
-    def set_ifbw(self, ifbw=100, track=False):
+    def set_ifbw(self, ifbw=100, track=None):
         self.ctrl.write("SENS:BWID:RES %d " % ifbw)
         self.ctrl.write("*WAI")
         # print("IF Bandwidth set to :" + str(ifbw) + "Hz")
@@ -210,6 +225,10 @@ class USBVNA():
         self.sweep_inquire()
         self.reset_sweep()
 
+    def set_if_bw_Hz(self, if_bw_Hz):
+        self.ctrl.write(F"SENS:BWID:RES {if_bw_Hz}")
+
+
     def ifbw_inquire(self):
         self.ctrl.write("*WAI")
         self.ctrl.ifbw = float(self.ctrl.query("SENS:BWID:RES?"))
@@ -217,11 +236,20 @@ class USBVNA():
         self.ctrl.ifbwtrack = int(self.ctrl.query("SENS:BWID:TRAC?"))
         self.ctrl.write("*WAI")
 
+    def set_port_power_dBm(self, port_power_dBm, port=1):
+        self.ctrl.write(F"SOUR:POW{port}:LEV {port_power_dBm} ")
+
+    def set_power_on(self):
+        self.ctrl.write("SOUR:POW1:MODE ON")
+
+    def set_power_off(self):
+        self.ctrl.write("SOUR:POW1:MODE OFF")
+
     def set_power(self, port=1, level=-5, state='ON'):
         if state == 'ON':
             if port == 1:
                 self.ctrl.write("SOUR:POW1:LEV %f " % level)
-                # self.ctrl.write("SOUR:POW1:MODE ON")
+                #
             if port == 2:
                 self.ctrl.write("SOUR:POW2:LEV %f " % level)
                 # self.ctrl.write("SOUR:POW2:MODE ON")

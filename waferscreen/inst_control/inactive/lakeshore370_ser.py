@@ -3,31 +3,33 @@ Lakesore370
 Created on Mar 11, 2009
 @author: bennett
 '''
-
-import gpib_instrument
+import serial_instrument
+from serial import SEVENBITS, PARITY_ODD
 from lookup import Lookup
 from time import sleep
 import math
 import numpy
 #from scipy.io import read_array #obsolete, replace with numpy.genfromtxt
 import pylab
-import scipy
-from scipy.interpolate import interp1d
-from tkSimpleDialog import askfloat
+from threading import Lock
 
-class Lakeshore370(gpib_instrument.Gpib_Instrument):
+#import scipy
+#from scipy.interpolate import interp1d
+#from tkSimpleDialog import askfloat
+
+class Lakeshore370_ser(serial_instrument.SerialInstrument):
     '''
-    The Lakeshore 370 AC Bridge GPIB communication class
+    The Lakeshore 370 AC Bridge Serial communication class
     '''
 
-
-    def __init__(self, pad, board_number = 0, name = '', sad = 0, timeout = 13, send_eoi = 1, eos_mode = 0):
+    def __init__(self, port='lakeshore370', baud=9600, shared=True,
+    ):
         '''Constructor  The PAD (Primary GPIB Address) is the only required parameter '''
 
-        super(Lakeshore370, self).__init__(board_number, name, pad, sad, timeout, send_eoi, eos_mode)
-        
-        # GPIB identity string of the instrument
-        self.id_string = "LSCI,MODEL370,370447,09272005"
+        super(Lakeshore370_ser, self).__init__(port, baud, shared, bytesize=SEVENBITS, parity=PARITY_ODD, timeout=5)
+
+        self.lock = Lock()
+        self.id_string = ""
         self.manufacturer = 'Lakeshore'
         self.model_number = '370'
         self.description  = 'Bridge - Temperature Controller'
@@ -48,15 +50,69 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
             'on' : '1'
             })
 
+    def write(self, cmd):
+        with self.lock:
+            command_string = cmd + '\r\n'
+            self.serial.write(command_string)
+            sleep(.1)
+            #result = self.serial.readline()
+            #if result != '\r\n':
+            #    print 'Data recievd when not expected!'
+
+    def ask(self, cmd):
+        with self.lock:
+            command_string = cmd + '\r\n'
+            self.serial.write(command_string)
+            sleep(.1)	
+            result = self.serial.readline()
+            result = result.split('\r\n')[0]
+            
+        return result
+
+    def askFloat(self, cmd):
+        with self.lock:
+            command_string = cmd + '\r\n'
+            self.serial.write(command_string)
+            sleep(.1)
+            result = self.serial.readline()
+            if result == '' or result == '\c\r':
+                print 'Response was empty'
+                self.write(cmd)
+                result = self.serial.readline()
+            fresult = float(result)
+            
+        return fresult
+ 
+    def askNull(self):
+        with self.lock:
+            buffer_empty = True
+            try:
+                result = self.serial.readline()
+                print result
+                if result != '':
+                    print 'Response was not empty'
+                    buffer_empty = False
+            except:
+                print 'Buffer was already empty and timeout'
+
+    def serialCheck(self):
+	with self.lock:
+            result = self.serial.readline()
+            while result != '':
+		result = self.serial.readline()
+		print 'Clearing buffer.'
+            print 'Buffer empty.'
+
     def getTemperature(self, channel=1):
         ''' Get temperature from a given channel as a float '''
         
         commandstring = 'RDGK? ' + str(channel)
-        #result = self.ask(commandstring)
-        #self.voltage = float(result)
+        #result = self.ask(commandstring)        
+	#self.voltage = float(result)
         self.voltage = self.askFloat(commandstring)
 
         return self.voltage
+
         
     def getResistance(self, channel=1):
         '''Get resistance from a given channel as a float.'''
@@ -159,7 +215,7 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
         
         return setpoint
        
-    def setHeaterRange(self, range=10):
+    def setHeaterRange(self, range=10):		
         ''' Set the temperature heater range in units of mA '''
        
         if range >= 0.0316 and range < .1:
@@ -202,7 +258,7 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
         commandstring = 'HTRRNG?'
         result = self.ask(commandstring)
         htrrange = switch.get(result , 'com error')
-        
+       
         return htrrange
 
     def setControlPolarity(self, polarity = 'unipolar'):
@@ -241,6 +297,7 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
         commandstring = 'SCAN ' + str(channel) + ', ' + switch.get(autoscan,'0') 
         self.write(commandstring)
 
+		
     def setRamp(self, rampmode = 'on' , ramprate = 0.1):
         ''' Set the ramp mode to 'on' or 'off' and specify ramp rate in Kelvin/minute'''
         
@@ -312,7 +369,7 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
         commandstring = 'CSET ' + str(channel) + ', ' + switchfilter.get(filterread,'0') + ', ' + switchunits.get(units,'1') + ', ' + str(delay) + ', ' + switchoutput.get(output,'1') + ', ' + rangestring + ', ' + str(htrres)  
         self.write(commandstring)
 
-    def setReadChannelSetup(self, channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 63.2e3,autorange = 'off', excitation = 'on'):
+    def setReadChannelSetup(self, channel = 4, mode = 'current', exciterange = 10e-9, resistancerange = 63.2e3,autorange = 'off', excitation = 'on'):
         '''
         Sets the measurment parameters for a given channel, in 'current' or 'voltage' excitation mode, excitation range in Amps or Volts, resistance range in ohms 
         '''
@@ -455,6 +512,16 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
         commandstring = 'RDGRNG ' + str(channel) + ', ' + switchmode.get(mode,'1') + ', ' + exciterangestring + ',' + resistancerangestring + ',' + switchautorange.get(autorange,'0') + ', ' + switchexcitation.get(excitation,'0')
         self.write(commandstring)
 
+    def setResistanceRangeToManual(self, channel):
+	'''Set resistance  range to maual and keep current settings.'''
+	
+	commandstring = 'RDGRNG? ' + str(channel)
+	result = self.ask(commandstring)
+	cmd_array = result.split(',')
+	cmd_array[3] = '0'
+	commandstring = 'RDGRNG '+ str(channel) + ','+ cmd_array[0] + ','+ cmd_array[1] + ','+ cmd_array[2] + ','+ cmd_array[3] + ','+ cmd_array[4]
+	self.write(commandstring)
+
     def getHeaterStatus(self):
 
         switch = {
@@ -471,7 +538,7 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
     def magUpSetup(self, heater_resistance=1):
         ''' Setup the lakeshore for magup '''
 
-        self.setTemperatureControlSetup(channel=1, units='Kelvin', maxrange=10, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
+        self.setTemperatureControlSetup(channel=4, units='Kelvin', maxrange=10, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.setControlMode(controlmode = 'open')
         self.setControlPolarity(polarity = 'unipolar')
         self.setHeaterRange(range=10) 	# 1 Volt max input to Kepco for 100 Ohm shunt 
@@ -492,16 +559,16 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
         '''Setup the lakeshore for temperature regulation '''
         self.setScan(channel = therm_control_channel, autoscan = 'off')
         sleep(3)
-        self.setReadChannelSetup(channel=1, mode='current', exciterange=exciterange, resistancerange=63.2e3,autorange='on')
+        self.setReadChannelSetup(channel=therm_control_channel, mode='current', exciterange=exciterange, resistancerange=63.2e3,autorange='on')
         sleep(15)  #Give time for range to settle, or servoing will fail
-        self.setReadChannelSetup(channel=1, mode='current', exciterange=exciterange, resistancerange=63.2e3,autorange='off')
+        self.setResistanceRangeToManual(channel=therm_control_channel)
         sleep(2)
-        self.setTemperatureControlSetup(channel=1, units='Kelvin', maxrange=100, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
+        self.setTemperatureControlSetup(channel=therm_control_channel, units='Kelvin', maxrange=100, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.setControlMode(controlmode = 'closed')
         self.setControlPolarity(polarity = 'unipolar')
         self.setRamp(rampmode = 'off') #Turn off ramp mode to not to ramp setpoint down to aprox 0
         sleep(.5) #Give time for Set Ramp to take effect
-        self.SetTemperatureSetPoint(setpoint=0.035)
+        self.SetTemperatureSetPoint(setpoint=0.021)
         sleep(.5) #Give time for Setpoint to take effect
         self.setRamp(rampmode = 'on' , ramprate = ramprate)
         self.setHeaterRange(range=100) #Set heater range to 100mA to get 10V output range
@@ -1189,9 +1256,9 @@ class Lakeshore370(gpib_instrument.Gpib_Instrument):
 
     def PIDSetup(self, heater_resistance=1):
         '''Setup the lakeshore for temperature regulation '''
-        self.SetReadChannelSetup(channel=1, mode='current', exciterange=1e-8, resistancerange=63.2e3,autorange='on')
+        self.SetReadChannelSetup(channel=1, mode='current', exciterange=1e-9, resistancerange=63.2e3,autorange='on')
         sleep(15)  #Give time for range to settle, or servoing will fail
-        self.SetReadChannelSetup(channel=1, mode='current', exciterange=1e-8, resistancerange=63.2e3,autorange='off')
+        self.SetReadChannelSetup(channel=1, mode='current', exciterange=1e-9, resistancerange=63.2e3,autorange='off')
         sleep(2)
         self.SetTemperatureControlSetup(channel=1, units='Kelvin', maxrange=100, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.SetControlMode(controlmode = 'closed')

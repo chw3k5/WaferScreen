@@ -219,7 +219,7 @@ class VacuumControlLJ(U3):
                 proposed_status_list.append(open_valve)
             else:
                 proposed_status_list.append(self.valves_status.__getattribute__(possible_valve_name))
-        
+
         proposed_status = ValvesStatus(*proposed_status_list)
         if open_valve:
             voltage = 5

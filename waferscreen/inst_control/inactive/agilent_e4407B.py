@@ -6,7 +6,7 @@ Created on April 16th, 2015
 import numpy
 import pylab
 import gpib_instrument
-from time import sleep
+
 
 class AgilentE4407B(gpib_instrument.Gpib_Instrument):
     '''

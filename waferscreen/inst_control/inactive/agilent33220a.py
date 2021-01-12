@@ -7,8 +7,7 @@ Created on October 11, 2009
 # Future functions GetLoad and SetLoad, GetUnits and SetUnits
 
 import gpib_instrument
-from lookup import Lookup
-from time import sleep
+
 
 class Agilent33220A(gpib_instrument.Gpib_Instrument):
     '''

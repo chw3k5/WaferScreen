@@ -1,7 +1,4 @@
-import math
-from time import sleep
 import time
-import struct
 import numpy
 
 import serial_instrument

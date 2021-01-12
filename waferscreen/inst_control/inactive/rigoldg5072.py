@@ -5,8 +5,7 @@ Created on August 11, 2016
 '''
 
 import gpib_instrument
-from lookup import Lookup
-from time import sleep
+
 
 class Rigoldg5072(gpib_instrument.Gpib_Instrument):
     '''

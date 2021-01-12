@@ -2,7 +2,6 @@ import sys
 import math
 import time
 from PyQt4 import Qt
-from PyQt4.QtCore import QEventLoop
 from scipy import linspace
 import numpy as np
 import dataplot

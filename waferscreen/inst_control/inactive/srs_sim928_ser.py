@@ -4,8 +4,6 @@ Created on October 24, 2014
 @author: bennettd
 '''
 
-import gpib_instrument
-from lookup import Lookup
 from time import sleep
 import serial_instrument
 import serial

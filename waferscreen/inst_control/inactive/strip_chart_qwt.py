@@ -5,10 +5,9 @@ Created on Mar 13, 2009
 '''
 import lakeshore370
 from pylab import *
-import sys, os
 import time
 from numpy import *
-from PyQt4 import Qt, QtGui, QtCore
+from PyQt4 import Qt, QtGui
 import PyQt4.Qwt5 as Qwt
 from PyQt4.Qwt5.anynumpy import *
 

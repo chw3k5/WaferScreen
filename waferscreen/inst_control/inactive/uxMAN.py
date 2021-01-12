@@ -1,4 +1,3 @@
-from time import sleep
 import serial_instrument
 import serial
 import numpy as np

@@ -5,8 +5,7 @@ Created on Augest 15, 2009
 '''
 
 import gpib_instrument
-from lookup import Lookup
-from time import sleep
+
 
 class HP34401a(gpib_instrument.Gpib_Instrument):
     '''

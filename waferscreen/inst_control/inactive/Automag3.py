@@ -11,15 +11,8 @@ def main():
 
     qtapp = Qt.QApplication(sys.argv)  #setup plot window
     my_adr = adr_system.AdrSystem(app=qtapp)
-    t1 = lakeshore370_thermometer.Lakeshore370Thermometer(address=1, name='ADR', \
-          lakeshore=my_adr.temperature_controller)
-    t2 = lakeshore370_thermometer.Lakeshore370Thermometer(address=2, name='GGG', \
-          lakeshore=my_adr.temperature_controller)    
-    therms = [t1, t2]
-    my_adr.adr_control.addThermometers(therms)
     pickle_file_name = 'automag_logs.pkl'
-    datestring = my_adr.adr_control.AutoMag(StartHour=4, StartMinute=0, DaysFromNow=1, Maguptime=45, Magdowntime=45, Holdtime=120)
-    #datestring = my_adr.adr_control.AutoMag(StartHour=9, StartMinute=35, DaysFromNow=0, Maguptime=45, Magdowntime=45, Holdtime=20)
+    datestring = my_adr.adr_control.AutoMag(StartHour=9, StartMinute=22, DaysFromNow=0, Maguptime=4, Magdowntime=4, Holdtime=4)
     #adr.AutoMag(StartHour = 7, StartMinute = 15, DaysFromNow = 1, Maguptime = 30, Magdowntime = 45, Holdtime = 60)
 
 
@@ -28,12 +21,13 @@ def main():
     print "Done with automag."
     print "Plot hold temperature."
 
-
+    t1 = lakeshore370_thermometer.Lakeshore370Thermometer(address=1, name='ADR', \
+                                                          lakeshore=my_adr.temperature_controller)
     #filename_holdtime = time.strftime("%Y_%m_%d_%H_%M", starttime)
 
     log_folder = "/home/pcuser/data/ADRLogs/"
     logfilename = "PostMag.txt"
-    
+    therms = [t1]
     tempmon = TempLoggerN.TempLogger(thermometers=therms, timerstep=6000, temperature_delay=5000, \
                                      log_folder=log_folder, log_file_name=logfilename, \
                                      pickle_datestring=datestring, pickle_key="MagMeasure", pickle_file_name=pickle_file_name, \

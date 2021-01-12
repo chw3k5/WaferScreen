@@ -15,7 +15,6 @@ import lr700
 import hp34401a
 from time import time
 from scipy.io import write_array
-from scipy.io import read_array
 
 import sip; sip.settracemask(0xff)
 

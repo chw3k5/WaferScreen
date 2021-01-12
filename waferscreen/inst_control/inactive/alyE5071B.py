@@ -5,9 +5,7 @@ Created on Jun, 2015
 '''
 
 import gpib_instrument
-from time import sleep
 import numpy as np
-from tkSimpleDialog import askfloat
 import pickle
 import pylab
 import math

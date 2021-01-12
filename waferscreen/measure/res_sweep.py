@@ -1,6 +1,5 @@
 import time
 from datetime import datetime
-import math
 import os
 import numpy as np
 from matplotlib import pyplot as plt
@@ -10,21 +9,7 @@ from waferscreen.plot import pySmith
 from ref import file_extension_to_delimiter, usbvna_address, agilent8722es_address, pro_data_dir
 
 
-def data_format_and_phase_delay(s21Au, s21Bu, freqs, group_delay=None):
-    # put uncalibrated data in complex format
-    s21data = np.array(s21Au) + 1j * np.array(s21Bu)
-    # remove group delay if desired
-    if group_delay is None:
-        group_delay = 0.0
-    phase_delays = np.exp(-1j * freqs * 2.0 * math.pi * group_delay)
-    # calculate the 'calibrated' S21 data by dividing by phase delay
-    cal_s21data = s21data / phase_delays
-    s21R = np.real(cal_s21data)
-    s21I = np.imag(cal_s21data)
-    # convert data from data_format to both LM for plotting
-    s21LM = 10 * np.log10(s21R ** 2 + s21I ** 2)
-    s21PH = 180.0 / np.pi * np.arctan2(s21I, s21R)
-    return s21R, s21I, s21LM, s21PH
+
 
 
 def ramp_name_parse(basename):
@@ -38,12 +23,14 @@ def ramp_name_parse(basename):
     res_num = int(res_num_str)
     return power_dBm, current_uA, res_num
 
+
 def ramp_name_create(power_dBm, current_uA, res_num):
     if current_uA >= 0:
         ind_filename = F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm.csv"
     else:
         ind_filename = F"sdata_res_{res_num}_cur_m{int(round(-1 * current_uA))}uA_{power_dBm}dBm.csv"
     return ind_filename
+
 
 class VnaMeas:
     """
@@ -103,7 +90,7 @@ class VnaMeas:
         """
         self.fmin = None
         self.fmax = None
-        self.freqs = None
+        self.freqs_GHz = None
         self.calulations()
         """ 
         Auto Initialization 
@@ -120,12 +107,12 @@ class VnaMeas:
             self.fmin = self.fcenter_GHz - freq_radius_GHz
             self.fmax = self.fcenter_GHz + freq_radius_GHz
         if self.sweeptype == "lin":
-            self.freqs = np.linspace(self.fmin, self.fmax, self.num_freq_points)
+            self.freqs_GHz = np.linspace(self.fmin, self.fmax, self.num_freq_points)
         elif self.sweeptype == 'log':
             logfmin = np.log10(self.fmin)
             logfmax = np.log10(self.fmax)
             logfreqs = np.linspace(logfmin, logfmax, self.num_freq_points)
-            self.freqs = 10.0 ** logfreqs
+            self.freqs_GHz = 10.0 ** logfreqs
 
     def vna_init(self, vna='8722es'):
         vna = vna.lower()
@@ -261,11 +248,11 @@ class VnaMeas:
             if loop_index + 1 == loops_required:
                 # thing to do on the last loop
                 points_this_loop = points_needed_last_loop
-                freqs_this_loop = self.freqs[start_index:]
+                freqs_this_loop = self.freqs_GHz[start_index:]
                 end_index = self.num_freq_points
             else:
                 points_this_loop = self.max_frequency_points
-                freqs_this_loop = self.freqs[start_index:end_index]
+                freqs_this_loop = self.freqs_GHz[start_index:end_index]
             fmin = freqs_this_loop[0]
             fmax = freqs_this_loop[-1]
             # change the number of frequency points if needed
@@ -304,8 +291,8 @@ class VnaMeas:
         self.dirname = os.path.dirname(self.output_filename)
         # write out sdata
         with open(self.output_filename, 'w') as f:
-            for i in range(len(self.freqs)):
-                f.write(str(self.freqs[i]) + "," + str(self.s21R[i]) + "," + str(self.s21I[i]) + "\n")
+            for i in range(len(self.freqs_GHz)):
+                f.write(str(self.freqs_GHz[i]) + "," + str(self.s21R[i]) + "," + str(self.s21I[i]) + "\n")
         self.record_params()
 
     def vna_close(self):
@@ -317,11 +304,11 @@ class VnaMeas:
         if self.data_format == 'LM':
             header = "freq,LM,PH"
             body = [str(freq) + delimiter + str(lm) + delimiter + str(ph)
-                    for freq, lm, ph in zip(self.freqs, self.s21LM, self.s21PH)]
+                    for freq, lm, ph in zip(self.freqs_GHz, self.s21LM, self.s21PH)]
         elif self.data_format == 'RI':
             header = "freq,real,imag"
             body = [str(freq) + delimiter + str(real) + delimiter + str(imag)
-                    for freq, real, imag in zip(self.freqs, self.s21R, self.s21I)]
+                    for freq, real, imag in zip(self.freqs_GHz, self.s21R, self.s21I)]
         else:
             raise KeyError(F"Data format: '{self.data_format}' not recognized!")
         output_filename = self.output_filename + "." + file_extension
@@ -347,8 +334,8 @@ class VnaMeas:
 
     def plot_sweep(self):
         plot_freqs = []
-        for i in range(0, len(self.freqs)):
-            plot_freqs.append(self.freqs[i])
+        for i in range(0, len(self.freqs_GHz)):
+            plot_freqs.append(self.freqs_GHz[i])
         plot_freqs = np.array(plot_freqs)
 
         fig1 = plt.figure(1)

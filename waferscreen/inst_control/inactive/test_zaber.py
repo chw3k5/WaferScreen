@@ -6,6 +6,6 @@ Created on Apr 21, 2010
 
 import zaber
 
-z=zaber.Zaber()
+z= zaber.Zaber()
 f=z.getFirmwareVersion()
 print f

@@ -7,7 +7,7 @@ Created on Jan 12, 2010
 from time import sleep
 import serial_instrument
 import serial
-import numpy as np
+
 
 class AgilentE3631A(serial_instrument.SerialInstrument):
     '''

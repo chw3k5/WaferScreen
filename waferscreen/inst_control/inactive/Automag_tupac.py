@@ -7,7 +7,6 @@ from PyQt4 import Qt
 import adr_system
 import lakeshore370_thermometer
 import os
-import numpy
 
 import tempControlTupac
 
@@ -25,7 +24,7 @@ def main():
     qtapp = Qt.QApplication(sys.argv)  #setup plot window
     my_adr = adr_system.AdrSystem(app=qtapp)
     t1 = lakeshore370_thermometer.Lakeshore370Thermometer(address=1, name='FAA GRT', \
-          lakeshore=my_adr.temperature_controller)
+                                                          lakeshore=my_adr.temperature_controller)
 
 #    print('logging temp for a long time')
 #    t0 = time.time()

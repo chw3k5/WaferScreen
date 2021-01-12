@@ -1,9 +1,10 @@
 '''
-Lakesore370
+Lakesore370 
 Created on Mar 11, 2009
 @author: bennett
 '''
 
+import gpib_instrument
 from lookup import Lookup
 from time import sleep
 import math
@@ -12,30 +13,27 @@ import numpy
 import pylab
 import scipy
 from scipy.interpolate import interp1d
-from tkSimpleDialog import askfloat
-import serial_instrument
-import serial
 
-class Lakeshore370(serial_instrument.SerialInstrument):
+
+class Lakeshore370(gpib_instrument.Gpib_Instrument):
     '''
     The Lakeshore 370 AC Bridge GPIB communication class
     '''
 
 
-    def __init__(self, port="lakeshore"):
+    def __init__(self, pad, board_number = 0, name = '', sad = 0, timeout = 13, send_eoi = 1, eos_mode = 0):
         '''Constructor  The PAD (Primary GPIB Address) is the only required parameter '''
 
-        super(Lakeshore370, self).__init__(port, bytesize=serial.SEVENBITS, parity=serial.PARITY_ODD,
-        stopbits=serial.STOPBITS_ONE, min_time_between_writes=0.05, readtimeout=0.05)
-
+        super(Lakeshore370, self).__init__(board_number, name, pad, sad, timeout, send_eoi, eos_mode)
+        
         # GPIB identity string of the instrument
         self.id_string = "LSCI,MODEL370,370447,09272005"
         self.manufacturer = 'Lakeshore'
         self.model_number = '370'
         self.description  = 'Bridge - Temperature Controller'
-
+        
         self.voltage = None
-
+        
         #self.compare_identity()
 
         self.control_mode_switch = Lookup({
@@ -52,27 +50,27 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def getTemperature(self, channel=1):
         ''' Get temperature from a given channel as a float '''
-
+        
         commandstring = 'RDGK? ' + str(channel)
         #result = self.ask(commandstring)
         #self.voltage = float(result)
         self.voltage = self.askFloat(commandstring)
 
         return self.voltage
-
+        
     def getResistance(self, channel=1):
         '''Get resistance from a given channel as a float.'''
-
+        
         commandstring = 'RDGR? ' + str(channel)
 #        result = self.ask(commandstring)
 #        resistance = float(result)
         resistance = self.askFloat(commandstring)
-
+        
         return resistance
 
     def setControlMode(self, controlmode = 'off'):
         ''' Set control mode 'off', 'zone', 'open' or 'closed' '''
-
+        
         #switch = {
         #    'closed' : '1',
         #    'zone' : '2',
@@ -80,36 +78,36 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #    'off' : '4'
         #}
 
-        #commandstring = 'CMODE ' + switch.get(controlmode,'4')
-        commandstring = 'CMODE ' + self.control_mode_switch.get(controlmode,'4')
+        #commandstring = 'CMODE ' + switch.get(controlmode,'4') 
+        commandstring = 'CMODE ' + self.control_mode_switch.get(controlmode,'4') 
         self.write(commandstring)
-
+        
     def getControlMode(self):
         ''' Get control mode 'off', 'zone', 'open' or 'closed' '''
-
+        
         #switch = {
         #    '1' : 'closed',
         #    '2' : 'zone',
         #    '3' : 'open',
         #    '4' : 'off'
         #}
-
+        
         commandstring = 'CMODE?'
-        result = self.ask(commandstring).rstrip()
+        result = self.ask(commandstring)
         #mode = switch.get(result, 'com error')
         mode = self.control_mode_switch.get_key(result)
-
+        
         return mode[0]
-
+        
     def setPIDValues(self, P=1, I=1, D=0):
         ''' Set P, I and D values where I and D are i nunits of seconds '''
-
+        
         commandstring = 'PID ' + str(P) + ', ' + str(I) + ', ' + str(D)
         self.write(commandstring)
 
     def getPIDValues(self):
         '''Returns P,I and D values as floats where is I and D have units of seconds '''
-
+        
         commandstring = 'PID?'
         result = self.ask(commandstring)
         valuestrings = result.split(',')
@@ -119,51 +117,51 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         PIDvalues[2] = float(valuestrings[2])
 
         return PIDvalues
-
+        
     def setManualHeaterOut(self, heatpercent=0):
         ''' Set the manual heater output as a percent of heater range '''
-
+        
         commandstring = 'MOUT ' + str(heatpercent)
         self.write(commandstring)
-
+        
     def getManualHeaterOut(self):
         ''' Get the manual heater output as a percent of heater range '''
-
+        
         commandstring = 'MOUT?'
 
         result = self.ask(commandstring)
         heaterout = float(result)
-
+        
         return heaterout
 
     def getHeaterOut(self):
         ''' Get the manual heater output as a percent of heater range '''
-
+        
         commandstring = 'HTR?'
 
         result = self.ask(commandstring)
         heaterout = float(result)
-
+        
         return heaterout
-
+        
     def setTemperatureSetPoint(self, setpoint=0.010):
         ''' Set the temperature set point in units of Kelvin '''
-
+        
         commandstring = 'SETP ' + str(setpoint)
         self.write(commandstring)
-
+        
     def getTemperatureSetPoint(self):
         ''' Get the temperature set point in units of Kelvin '''
-
+        
         commandstring = 'SETP?'
         result = self.ask(commandstring)
         setpoint = float(result)
-
+        
         return setpoint
-
+       
     def setHeaterRange(self, range=10):
         ''' Set the temperature heater range in units of mA '''
-
+       
         if range >= 0.0316 and range < .1:
             rangestring = '1'
         elif range >= .1 and range < .316:
@@ -182,10 +180,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             rangestring = '8'
         else:
             rangestring = '0'
-
+        
         commandstring = 'HTRRNG ' + str(rangestring)
         result = self.write(commandstring)
-
+        
     def getHeaterRange(self):
         ''' Get the temperature heater range in units of mA '''
 
@@ -200,24 +198,24 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '7' : 31.6,
             '8' : 100
             }
-
+        
         commandstring = 'HTRRNG?'
         result = self.ask(commandstring)
         htrrange = switch.get(result , 'com error')
-
+        
         return htrrange
 
     def setControlPolarity(self, polarity = 'unipolar'):
         ''' Set the heater output polarity 'unipolar' or 'bipolar' '''
-
+        
         switch = {
             'unipolar' : '0',
             'bipolar' : '1'
         }
 
-        commandstring = 'CPOL ' + switch.get(polarity,'0')
+        commandstring = 'CPOL ' + switch.get(polarity,'0') 
         self.write(commandstring)
-
+        
     def getControlPolarity(self):
         ''' Get the heater output polarity 'unipolar' or 'bipolar' '''
 
@@ -225,27 +223,27 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '0' : 'unipolar',
             '1' : 'bipolar'
         }
-
+        
         commandstring = 'CPOL?'
         result = self.ask(commandstring)
         polarity = switch.get(result , 'com error')
-
+        
         return polarity
 
     def setScan(self, channel = 1, autoscan = 'off'):
         ''' Set the channel autoscanner 'on' or 'off' '''
-
+        
         switch = {
             'off' : '0',
             'on' : '1'
         }
 
-        commandstring = 'SCAN ' + str(channel) + ', ' + switch.get(autoscan,'0')
+        commandstring = 'SCAN ' + str(channel) + ', ' + switch.get(autoscan,'0') 
         self.write(commandstring)
 
     def setRamp(self, rampmode = 'on' , ramprate = 0.1):
         ''' Set the ramp mode to 'on' or 'off' and specify ramp rate in Kelvin/minute'''
-
+        
         switch = {
             'off' : '0',
             'on' : '1'
@@ -254,7 +252,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         commandstring = 'RAMP ' + switch.get(rampmode,'1') + ', ' + str(ramprate)
         self.write(commandstring)
 
-
+        
     def getRamp(self):
         ''' Get the ramp mode either 'on' or 'off' and the ramp rate in Kelvin/minute '''
 
@@ -262,21 +260,21 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '0' : 'off',
             '1' : 'on'
         }
-
+        
         commandstring = 'RAMP?'
         result = self.ask(commandstring)
         results = result.split(',')
         ramp = ['off', 0]
         ramp[0] = switch.get(results[0] , 'com error')
         ramp[1] = float(results[1])
-
+        
         return ramp
 
     def setTemperatureControlSetup(self, channel = 1, units = 'Kelvin', maxrange = 10, delay = 2, htrres = 1, output = 'current', filterread = 'unfiltered'):
         '''
-        Setup the temperature control channel, units 'Kelvin' or 'Ohms', the maximum heater range in mA, delay in seconds, heater resistance in Ohms, output the 'current' or 'power', and 'filterer' or 'unfiltered'
+        Setup the temperature control channel, units 'Kelvin' or 'Ohms', the maximum heater range in mA, delay in seconds, heater resistance in Ohms, output the 'current' or 'power', and 'filterer' or 'unfiltered' 
         '''
-
+       
         switchunits = {
             'Kelvin' : '1',
              'Ohms' : '2'
@@ -300,40 +298,40 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             rangestring = '8'
         else:
             rangestring = '0'
-
+        
         switchoutput = {
             'current' : '1',
             'power' : '2'
         }
-
+        
         switchfilter = {
             'unfiltered' : '0',
             'filtered' : '1'
         }
 
-        commandstring = 'CSET ' + str(channel) + ', ' + switchfilter.get(filterread,'0') + ', ' + switchunits.get(units,'1') + ', ' + str(delay) + ', ' + switchoutput.get(output,'1') + ', ' + rangestring + ', ' + str(htrres)
+        commandstring = 'CSET ' + str(channel) + ', ' + switchfilter.get(filterread,'0') + ', ' + switchunits.get(units,'1') + ', ' + str(delay) + ', ' + switchoutput.get(output,'1') + ', ' + rangestring + ', ' + str(htrres)  
         self.write(commandstring)
 
     def setReadChannelSetup(self, channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 63.2e3,autorange = 'off', excitation = 'on'):
         '''
-        Sets the measurment parameters for a given channel, in 'current' or 'voltage' excitation mode, excitation range in Amps or Volts, resistance range in ohms
+        Sets the measurment parameters for a given channel, in 'current' or 'voltage' excitation mode, excitation range in Amps or Volts, resistance range in ohms 
         '''
 
         switchmode = {
             'voltage' : '0',
             'current' : '1'
         }
-
+        
         switchautorange = {
             'off' : '0',
             'on' : '1'
         }
-
+        
         switchexcitation = {
             'on' : '0',
             'off' : '1'
         }
-
+        
 
         #Get Excitation Range String
         if mode == 'voltage':
@@ -463,11 +461,11 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '0' : 'no error',
             '1' : 'heater open error'
         }
-
+        
         commandstring = 'HTRST?'
         result = self.ask(commandstring)
         status = switch.get(result, 'com error')
-
+        
         return status
 
     def magUpSetup(self, heater_resistance=1):
@@ -476,7 +474,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         self.setTemperatureControlSetup(channel=1, units='Kelvin', maxrange=10, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.setControlMode(controlmode = 'open')
         self.setControlPolarity(polarity = 'unipolar')
-        self.setHeaterRange(range=10) 	# 1 Volt max input to Kepco for 100 Ohm shunt
+        self.setHeaterRange(range=10) 	# 1 Volt max input to Kepco for 100 Ohm shunt 
         self.setReadChannelSetup(channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 2e3,autorange = 'on')
 
 
@@ -486,7 +484,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         self.setTemperatureControlSetup(channel=1, units='Kelvin', maxrange=10, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.setControlMode(controlmode = 'open')
         self.setControlPolarity(polarity = 'bipolar')  #Set to bipolar so that current can get to zero faster
-        self.setHeaterRange(range=10)  # 1 Volt max input to Kepco for 100 Ohm shunt
+        self.setHeaterRange(range=10)  # 1 Volt max input to Kepco for 100 Ohm shunt 
         self.setReadChannelSetup(channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 2e3,autorange = 'on')
 
 
@@ -513,10 +511,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def sendStandardRuOxCalibration(self):
         pass
-
+    
     def sendCalibrationFromArrays(self, rData, tData, curveindex, thermname='Cernox 1030', serialnumber='x0000',\
                             temp_lim=300, tempco = 1, units=4, makeFig = False):
-        ''' Send a calibration based on a input file
+        ''' Send a calibration based on a input file 
 
             Input:
             rData: array of themometer resistance values (Ohms for units=3 or log(R/Ohms) for units=4)
@@ -535,31 +533,31 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             print ' 1 <= curveindex <= 20 for lakeshore 370'
             return 1
 
-
+ 
 
 
         # Send Header
-        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative
+        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative 
         commandstring = 'CRVHDR ' + str(curveindex) + ', ' + thermname + ', ' + serialnumber + ', '+str(units)+', '+\
             str(temp_lim)+', '+ str(tempco)
         self.write(commandstring)
         print(commandstring)
-
+        
         # Send Data Points
         for i in range(len(rData)):
             pntindex = i+1
-
+            
             if rData[i] < 10:
                 stringRPoint = '%7.5f' % rData[i]
             else:
                 stringRPoint = '%8.5f' % rData[i]
-
+                
             stringTPoint = '%7.5f' % tData[i]
-
+            
             datapointstring = 'CRVPT ' + str(curveindex) + ', ' + str(pntindex) + ', ' + stringRPoint + ', ' + stringTPoint
             self.write(datapointstring)
             print datapointstring
-
+    
         if makeFig:
             pylab.figure()
             pylab.plot(rData,tData,'o')
@@ -568,7 +566,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def sendCalibration(self, filename, datacol, tempcol, curveindex, thermname='Cernox 1030', serialnumber='x0000', interp=True,\
                             temp_lim=300, tempco = 1, units=4):
-        ''' Send a calibration based on a input file
+        ''' Send a calibration based on a input file 
 
             Input:
             filename: location of calibration file
@@ -592,10 +590,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 	rawdata = numpy.genfromtxt(filename)
         rawdatat = rawdata.transpose()
         datat = numpy.array(rawdatat[:,rawdatat[datacol,:].argsort()])
-
+        
         #now remove doubles
         last = datat[datacol,-1]
-
+    
         for i in range(len(datat[datacol,:])-2,-1,-1):
             if last == datat[1,i]:
                 datat = numpy.hstack((datat[:,: i+1],datat[:,i+2 :]))
@@ -605,7 +603,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         pylab.figure()
         pylab.plot(datat[datacol],datat[tempcol],'o')
         pylab.show()
-
+        
         f = interp1d(datat[datacol],datat[tempcol])
         self.f = f
 
@@ -618,7 +616,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 	Rs[2] = 2930
 	Rs[3] = 3100
         Temps = f(Rs)
-
+        
         pylab.figure()
         pylab.plot(datat[datacol],datat[tempcol],'o')
         #pylab.holdon()
@@ -626,12 +624,12 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         pylab.show()
 
         # Send Header
-        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative
+        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative 
         commandstring = 'CRVHDR ' + str(curveindex) + ', ' + thermname + ', ' + serialnumber + ', '+str(units)+', '+\
             str(temp_lim)+', '+ str(tempco)
         self.write(commandstring)
         print commandstring
-
+        
         # Send Data Points
         for i in range(len(Rs)):
             pntindex = i+1
@@ -639,19 +637,19 @@ class Lakeshore370(serial_instrument.SerialInstrument):
                 logrofpoint = math.log10(Rs[i])
             else:
                 logrofpoint = Rs[i]
-
+            
             if Rs[i] < 10:
                 stringlogrofpoint = '%(logrofpoint)7.5f' % vars()
             else:
                 stringlogrofpoint = '%(logrofpoint)8.5f' % vars()
-
+                
             tempofpoint = Temps[i]
             stringtempofpoint = '%(tempofpoint)5.5f' % vars()
-
+            
             datapointstring = 'CRVPT ' + str(curveindex) + ', ' + str(pntindex) + ', ' + stringlogrofpoint + ', ' + stringtempofpoint
             self.write(datapointstring)
             print datapointstring
-
+    
         pylab.figure()
         pylab.plot(Rs,Temps,'o')
         pylab.xlabel('Resistance (Ohms)')
@@ -663,7 +661,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def sendMartinisCalibration(self, curveindex, thermname='RuOx Martinis', serialnumber='19740', interp=True,\
                             temp_lim=300, tempco = 1, units=4):
-        ''' Send a calibration based on a input file
+        ''' Send a calibration based on a input file 
 
             Input:
             filename: location of calibration file
@@ -686,10 +684,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #rawdata = read_array(filename)
         #rawdatat = rawdata.transpose()
         #datat = numpy.array(rawdatat[:,rawdatat[datacol,:].argsort()])
-
+        
         #now remove doubles
         #last = datat[datacol,-1]
-
+    
         #for i in range(len(datat[datacol,:])-2,-1,-1):
         #    if last == datat[1,i]:
         #        datat = numpy.hstack((datat[:,: i+1],datat[:,i+2 :]))
@@ -699,7 +697,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #pylab.figure()
         #pylab.plot(datat[datacol],datat[tempcol],'o')
         #pylab.show()
-
+        
         #f = interp1d(datat[datacol],datat[tempcol])
         #self.f = f
 
@@ -710,7 +708,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #else:
         #    Rs = datat[datacol]
         Temps = (2.85 / (numpy.log((Rs-652.)/100.)))**4
-
+        
 #        pylab.figure()
 #        #pylab.plot(datat[datacol],datat[tempcol],'o')
 #        #pylab.holdon()
@@ -718,29 +716,29 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 #        pylab.show()
 
         # Send Header
-        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative
+        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative 
         commandstring = 'CRVHDR ' + str(curveindex) + ', ' + thermname + ', ' + serialnumber + ', '+str(units)+', '+\
             str(temp_lim)+', '+ str(tempco)
         self.write(commandstring)
         print commandstring
-
+        
         # Send Data Points
         for i in range(len(Rs)):
             pntindex = i+1
             logrofpoint = math.log10(Rs[i])
-
+            
             if Rs[i] < 10:
                 stringlogrofpoint = '%(logrofpoint)7.5f' % vars()
             else:
                 stringlogrofpoint = '%(logrofpoint)8.5f' % vars()
-
+                
             tempofpoint = Temps[i]
             stringtempofpoint = '%(tempofpoint)7.5f' % vars()
-
+            
             datapointstring = 'CRVPT ' + str(curveindex) + ', ' + str(pntindex) + ', ' + stringlogrofpoint + ', ' + stringtempofpoint
             self.write(datapointstring)
             print datapointstring
-
+    
         pylab.figure()
         pylab.plot(Rs,Temps,'o')
         pylab.xlabel('Resistance (Ohms)')
@@ -753,27 +751,27 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def GetTemperature(self, channel=1):
         ''' Get temperature from a given channel as a float '''
-
+        
         commandstring = 'RDGK? ' + str(channel)
         #result = self.ask(commandstring)
         #self.voltage = float(result)
         self.voltage = self.askFloat(commandstring)
 
         return self.voltage
-
+        
     def GetResistance(self, channel=1):
         '''Get resistance from a given channel as a float.'''
-
+        
         commandstring = 'RDGR? ' + str(channel)
 #        result = self.ask(commandstring)
 #        resistance = float(result)
         resistance = self.askFloat(commandstring)
-
+        
         return resistance
 
     def SetControlMode(self, controlmode = 'off'):
         ''' Set control mode 'off', 'zone', 'open' or 'closed' '''
-
+        
         #switch = {
         #    'closed' : '1',
         #    'zone' : '2',
@@ -781,36 +779,36 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #    'off' : '4'
         #}
 
-        #commandstring = 'CMODE ' + switch.get(controlmode,'4')
-        commandstring = 'CMODE ' + self.control_mode_switch.get(controlmode,'4')
+        #commandstring = 'CMODE ' + switch.get(controlmode,'4') 
+        commandstring = 'CMODE ' + self.control_mode_switch.get(controlmode,'4') 
         self.write(commandstring)
-
+        
     def GetControlMode(self):
         ''' Get control mode 'off', 'zone', 'open' or 'closed' '''
-
+        
         #switch = {
         #    '1' : 'closed',
         #    '2' : 'zone',
         #    '3' : 'open',
         #    '4' : 'off'
         #}
-
+        
         commandstring = 'CMODE?'
         result = self.ask(commandstring)
         #mode = switch.get(result, 'com error')
         mode = self.control_mode_switch.get_key(result)
-
+        
         return mode[0]
-
+        
     def SetPIDValues(self, P=1, I=1, D=0):
         ''' Set P, I and D values where I and D are i nunits of seconds '''
-
+        
         commandstring = 'PID ' + str(P) + ', ' + str(I) + ', ' + str(D)
         self.write(commandstring)
 
     def GetPIDValues(self):
         '''Returns P,I and D values as floats where is I and D have units of seconds '''
-
+        
         commandstring = 'PID?'
         result = self.ask(commandstring)
         valuestrings = result.split(',')
@@ -820,51 +818,51 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         PIDvalues[2] = float(valuestrings[2])
 
         return PIDvalues
-
+        
     def SetManualHeaterOut(self, heatpercent=0):
         ''' Set the manual heater output as a percent of heater range '''
-
+        
         commandstring = 'MOUT ' + str(heatpercent)
         self.write(commandstring)
-
+        
     def GetManualHeaterOut(self):
         ''' Get the manual heater output as a percent of heater range '''
-
+        
         commandstring = 'MOUT?'
 
         result = self.ask(commandstring)
         heaterout = float(result)
-
+        
         return heaterout
 
     def GetHeaterOut(self):
         ''' Get the manual heater output as a percent of heater range '''
-
+        
         commandstring = 'HTR?'
 
         result = self.ask(commandstring)
         heaterout = float(result)
-
+        
         return heaterout
-
+        
     def SetTemperatureSetPoint(self, setpoint=0.010):
         ''' Set the temperature set point in units of Kelvin '''
-
+        
         commandstring = 'SETP ' + str(setpoint)
         self.write(commandstring)
-
+        
     def GetTemperatureSetPoint(self):
         ''' Get the temperature set point in units of Kelvin '''
-
+        
         commandstring = 'SETP?'
         result = self.ask(commandstring)
         setpoint = float(result)
-
+        
         return setpoint
-
+       
     def SetHeaterRange(self, range=10):
         ''' Set the temperature heater range in units of mA '''
-
+       
         if range >= 0.0316 and range < .1:
             rangestring = '1'
         elif range >= .1 and range < .316:
@@ -883,10 +881,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             rangestring = '8'
         else:
             rangestring = '0'
-
+        
         commandstring = 'HTRRNG ' + str(rangestring)
         result = self.write(commandstring)
-
+        
     def GetHeaterRange(self):
         ''' Get the temperature heater range in units of mA '''
 
@@ -901,24 +899,24 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '7' : 31.6,
             '8' : 100
             }
-
+        
         commandstring = 'HTRRNG?'
         result = self.ask(commandstring)
         htrrange = switch.get(result , 'com error')
-
+        
         return htrrange
 
     def SetControlPolarity(self, polarity = 'unipolar'):
         ''' Set the heater output polarity 'unipolar' or 'bipolar' '''
-
+        
         switch = {
             'unipolar' : '0',
             'bipolar' : '1'
         }
 
-        commandstring = 'CPOL ' + switch.get(polarity,'0')
+        commandstring = 'CPOL ' + switch.get(polarity,'0') 
         self.write(commandstring)
-
+        
     def GetControlPolarity(self):
         ''' Get the heater output polarity 'unipolar' or 'bipolar' '''
 
@@ -926,27 +924,27 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '0' : 'unipolar',
             '1' : 'bipolar'
         }
-
+        
         commandstring = 'CPOL?'
         result = self.ask(commandstring)
         polarity = switch.get(result , 'com error')
-
+        
         return polarity
 
     def SetScan(self, channel = 1, autoscan = 'off'):
         ''' Set the channel autoscanner 'on' or 'off' '''
-
+        
         switch = {
             'off' : '0',
             'on' : '1'
         }
 
-        commandstring = 'SCAN ' + str(channel) + ', ' + switch.get(autoscan,'0')
+        commandstring = 'SCAN ' + str(channel) + ', ' + switch.get(autoscan,'0') 
         self.write(commandstring)
 
     def SetRamp(self, rampmode = 'on' , ramprate = 0.1):
         ''' Set the ramp mode to 'on' or 'off' and specify ramp rate in Kelvin/minute'''
-
+        
         switch = {
             'off' : '0',
             'on' : '1'
@@ -955,7 +953,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         commandstring = 'RAMP ' + switch.get(rampmode,'1') + ', ' + str(ramprate)
         self.write(commandstring)
 
-
+        
     def GetRamp(self):
         ''' Get the ramp mode either 'on' or 'off' and the ramp rate in Kelvin/minute '''
 
@@ -963,21 +961,21 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '0' : 'off',
             '1' : 'on'
         }
-
+        
         commandstring = 'RAMP?'
         result = self.ask(commandstring)
         results = result.split(',')
         ramp = ['off', 0]
         ramp[0] = switch.get(results[0] , 'com error')
         ramp[1] = float(results[1])
-
+        
         return ramp
 
     def SetTemperatureControlSetup(self, channel = 1, units = 'Kelvin', maxrange = 10, delay = 2, htrres = 1, output = 'current', filterread = 'unfiltered'):
         '''
-        Setup the temperature control channel, units 'Kelvin' or 'Ohms', the maximum heater range in mA, delay in seconds, heater resistance in Ohms, output the 'current' or 'power', and 'filterer' or 'unfiltered'
+        Setup the temperature control channel, units 'Kelvin' or 'Ohms', the maximum heater range in mA, delay in seconds, heater resistance in Ohms, output the 'current' or 'power', and 'filterer' or 'unfiltered' 
         '''
-
+       
         switchunits = {
             'Kelvin' : '1',
              'Ohms' : '2'
@@ -1001,40 +999,40 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             rangestring = '8'
         else:
             rangestring = '0'
-
+        
         switchoutput = {
             'current' : '1',
             'power' : '2'
         }
-
+        
         switchfilter = {
             'unfiltered' : '0',
             'filtered' : '1'
         }
 
-        commandstring = 'CSET ' + str(channel) + ', ' + switchfilter.get(filterread,'0') + ', ' + switchunits.get(units,'1') + ', ' + str(delay) + ', ' + switchoutput.get(output,'1') + ', ' + rangestring + ', ' + str(htrres)
+        commandstring = 'CSET ' + str(channel) + ', ' + switchfilter.get(filterread,'0') + ', ' + switchunits.get(units,'1') + ', ' + str(delay) + ', ' + switchoutput.get(output,'1') + ', ' + rangestring + ', ' + str(htrres)  
         self.write(commandstring)
 
     def SetReadChannelSetup(self, channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 63.2e3,autorange = 'off', excitation = 'on'):
         '''
-        Sets the measurment parameters for a given channel, in 'current' or 'voltage' excitation mode, excitation range in Amps or Volts, resistance range in ohms
+        Sets the measurment parameters for a given channel, in 'current' or 'voltage' excitation mode, excitation range in Amps or Volts, resistance range in ohms 
         '''
 
         switchmode = {
             'voltage' : '0',
             'current' : '1'
         }
-
+        
         switchautorange = {
             'off' : '0',
             'on' : '1'
         }
-
+        
         switchexcitation = {
             'on' : '0',
             'off' : '1'
         }
-
+        
 
         #Get Excitation Range String
         if mode == 'voltage':
@@ -1162,11 +1160,11 @@ class Lakeshore370(serial_instrument.SerialInstrument):
             '0' : 'no error',
             '1' : 'heater open error'
         }
-
+        
         commandstring = 'HTRST?'
         result = self.ask(commandstring)
         status = switch.get(result, 'com error')
-
+        
         return status
 
     def MagUpSetup(self, heater_resistance=1):
@@ -1175,7 +1173,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         self.SetTemperatureControlSetup(channel=1, units='Kelvin', maxrange=10, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.SetControlMode(controlmode = 'open')
         self.SetControlPolarity(polarity = 'unipolar')
-        self.SetHeaterRange(range=10)     # 1 Volt max input to Kepco for 100 Ohm shunt
+        self.SetHeaterRange(range=10)     # 1 Volt max input to Kepco for 100 Ohm shunt 
         self.SetReadChannelSetup(channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 2e3,autorange = 'on')
 
 
@@ -1185,7 +1183,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         self.SetTemperatureControlSetup(channel=1, units='Kelvin', maxrange=10, delay=2, htrres=heater_resistance, output='current', filterread='unfiltered')
         self.SetControlMode(controlmode = 'open')
         self.SetControlPolarity(polarity = 'bipolar')  #Set to bipolar so that current can get to zero faster
-        self.SetHeaterRange(range=10)  # 1 Volt max input to Kepco for 100 Ohm shunt
+        self.SetHeaterRange(range=10)  # 1 Volt max input to Kepco for 100 Ohm shunt 
         self.SetReadChannelSetup(channel = 1, mode = 'current', exciterange = 10e-9, resistancerange = 2e3,autorange = 'on')
 
 
@@ -1213,7 +1211,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def SendCalibration(self, filename, datacol, tempcol, curveindex, thermname='Cernox 1030', serialnumber='x0000', interp=True,\
                             temp_lim=300, tempco = 1, units=4):
-        ''' Send a calibration based on a input file
+        ''' Send a calibration based on a input file 
 
             Input:
             filename: location of calibration file
@@ -1237,10 +1235,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 	rawdata = numpy.genfromtxt(filename)
         rawdatat = rawdata.transpose()
         datat = numpy.array(rawdatat[:,rawdatat[datacol,:].argsort()])
-
+        
         #now remove doubles
         last = datat[datacol,-1]
-
+    
         for i in range(len(datat[datacol,:])-2,-1,-1):
             if last == datat[1,i]:
                 datat = numpy.hstack((datat[:,: i+1],datat[:,i+2 :]))
@@ -1250,7 +1248,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         pylab.figure()
         pylab.plot(datat[datacol],datat[tempcol],'o')
         pylab.show()
-
+        
         f = interp1d(datat[datacol],datat[tempcol])
         self.f = f
 
@@ -1260,7 +1258,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         else:
             Rs = datat[datacol]
         Temps = f(Rs)
-
+        
         pylab.figure()
         pylab.plot(datat[datacol],datat[tempcol],'o')
         #pylab.holdon()
@@ -1268,12 +1266,12 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         pylab.show()
 
         # Send Header
-        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative
+        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative 
         commandstring = 'CRVHDR ' + str(curveindex) + ', ' + thermname + ', ' + serialnumber + ', '+str(units)+', '+\
             str(temp_lim)+', '+ str(tempco)
         self.write(commandstring)
         print commandstring
-
+        
         # Send Data Points
         for i in range(len(Rs)):
             pntindex = i+1
@@ -1281,19 +1279,19 @@ class Lakeshore370(serial_instrument.SerialInstrument):
                 logrofpoint = math.log10(Rs[i])
             else:
                 logrofpoint = Rs[i]
-
+            
             if Rs[i] < 10:
                 stringlogrofpoint = '%(logrofpoint)7.5f' % vars()
             else:
                 stringlogrofpoint = '%(logrofpoint)8.5f' % vars()
-
+                
             tempofpoint = Temps[i]
             stringtempofpoint = '%(tempofpoint)5.3f' % vars()
-
+            
             datapointstring = 'CRVPT ' + str(curveindex) + ', ' + str(pntindex) + ', ' + stringlogrofpoint + ', ' + stringtempofpoint
             self.write(datapointstring)
             print datapointstring
-
+    
         pylab.figure()
         pylab.plot(Rs,Temps,'o')
 
@@ -1303,7 +1301,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
 
     def SendMartinisCalibration(self, curveindex, thermname='RuOx Martinis', serialnumber='19740', interp=True,\
                             temp_lim=300, tempco = 1, units=4):
-        ''' Send a calibration based on a input file
+        ''' Send a calibration based on a input file 
 
             Input:
             filename: location of calibration file
@@ -1326,10 +1324,10 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #rawdata = read_array(filename)
         #rawdatat = rawdata.transpose()
         #datat = numpy.array(rawdatat[:,rawdatat[datacol,:].argsort()])
-
+        
         #now remove doubles
         #last = datat[datacol,-1]
-
+    
         #for i in range(len(datat[datacol,:])-2,-1,-1):
         #    if last == datat[1,i]:
         #        datat = numpy.hstack((datat[:,: i+1],datat[:,i+2 :]))
@@ -1339,7 +1337,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #pylab.figure()
         #pylab.plot(datat[datacol],datat[tempcol],'o')
         #pylab.show()
-
+        
         #f = interp1d(datat[datacol],datat[tempcol])
         #self.f = f
 
@@ -1350,7 +1348,7 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         #else:
         #    Rs = datat[datacol]
         Temps = (2.85 / (numpy.log((Rs-652.)/100.)))**4
-
+        
         pylab.figure()
         #pylab.plot(datat[datacol],datat[tempcol],'o')
         #pylab.holdon()
@@ -1358,28 +1356,30 @@ class Lakeshore370(serial_instrument.SerialInstrument):
         pylab.show()
 
         # Send Header
-        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative
+        # 4, 350 ,1 -- logOhm/K, temperature limit, temperature coefficient 1=negative 
         commandstring = 'CRVHDR ' + str(curveindex) + ', ' + thermname + ', ' + serialnumber + ', '+str(units)+', '+\
             str(temp_lim)+', '+ str(tempco)
         self.write(commandstring)
         print commandstring
-
+        
         # Send Data Points
         for i in range(len(Rs)):
             pntindex = i+1
             logrofpoint = math.log10(Rs[i])
-
+            
             if Rs[i] < 10:
                 stringlogrofpoint = '%(logrofpoint)7.5f' % vars()
             else:
                 stringlogrofpoint = '%(logrofpoint)8.5f' % vars()
-
+                
             tempofpoint = Temps[i]
             stringtempofpoint = '%(tempofpoint)7.5f' % vars()
-
+            
             datapointstring = 'CRVPT ' + str(curveindex) + ', ' + str(pntindex) + ', ' + stringlogrofpoint + ', ' + stringtempofpoint
             self.write(datapointstring)
             print datapointstring
-
+    
         pylab.figure()
         pylab.plot(Rs,Temps,'o')
+
+

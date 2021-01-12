@@ -12,7 +12,7 @@ import lakeshore370
 #import PyQt4.Qwt5 as Qwt
 #from PyQt4.Qwt5.anynumpy import *
 
-import sys, os, random
+import sys, os
 from PyQt4 import QtGui, QtCore
 
 from numpy import arange, sin, pi, concatenate, zeros

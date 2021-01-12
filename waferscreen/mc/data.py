@@ -1,6 +1,7 @@
 import os
 from ref import pro_data_dir, raw_data_dir
-from waferscreen.read.s21_inductor import InductS21, MetaS21
+from waferscreen.read.s21_inductor import InductS21
+from waferscreen.read.s21_metadata import S21MetadataPrinceton, S21MetadataNist
 from waferscreen.read.prodata import read_pro_s21, crawl_raw_s21, crawl_s21
 
 
@@ -34,6 +35,10 @@ class DataManager:
         inducts21.calc_meta_data()
         inducts21.write()
         inducts21.plot()
+
+
+class DataProcessing(DataManager):
+    pass
 
 
 if __name__ == "__main__":

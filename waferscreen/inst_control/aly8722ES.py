@@ -10,6 +10,7 @@ aly8722ES
 Created on Jan, 2015
 @author: hubmayr
 updated to python 3 and pyvisa, Jake 30 July 2020
+Caleb Wheeler edited for format and added methods, Aug 2020
 '''
 
 
@@ -21,9 +22,12 @@ class aly8722ES():
         self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
         self.ctrl.timeout = 300000
         self.ctrl.device_id = self.ctrl.query("*IDN?")
-        print("Connected to : " + self.ctrl.device_id)
+        print(F"Connected to: {self.ctrl.device_id}")
+
 
         self.ctrl.allowedpts = [3, 11, 21, 26, 51, 101, 201, 401, 801, 1601]  # allowed number of x-axis bins for VNA
+        self.allowedvals_ifbandwidth = {10, 30, 100, 300, 1000, 3000, 3700, 6000}
+        self.allowedvals_num_of_points = set(self.ctrl.allowedpts)
 
     def close(self):
         self.ctrl.close()
@@ -175,46 +179,11 @@ class aly8722ES():
             f.close()
         return result
 
-    def getComplexTrace(self, D=100000, savedata=False, filename='foo'):
-        # 'sets xfer format to float'
-        # 'D should be appropriately sized for the number of points in the trace'
-        print('getComplexTrace is depricated.  Consider using getTrace.')
-        self.ctrl.write('FORM4')
-        self.ctrl.write('OUTPDATA')
-        res = self.ctrl.read(D)
-        split_array = res.split('\x00')
-        raw_data_array = split_array[0].split('\n')
-        print(len(raw_data_array))
-        raw_data_array.pop  # clip inevitable garbage element
-        # 'list with form r,i \n'
-        N = len(raw_data_array)
-        result = np.zeros((N - 1, 1), 'complex')
-        for n in range(N - 1):
-            # 'breaks into nx2 matrix with r,i'
-            result[n] = float(raw_data_array[n].split(',')[0]) + 1j * float(raw_data_array[n].split(',')[1])
-        if savedata:
-            f = open(filename + '.pkl', 'w')
-            pylab.plot(np.real(result))
-            pickle.dump(result, f)
-        return result
-
-    #     def getTraceBinary(self):
-    #         ''' grab the data in the trace.  Should be twice as fast as getTrace.   '''
-    #
-    #         # FORM3 is 64-bit floating point.
-    #         # 8 bytes per data point.  There are two numbers per frequency bin (real and imag)
-    #         # thus a full 1601 bin trace has 1601 x 2 x 8 byte = 3216 bytes
-    #         # header is 4 bytes
-    #         print 'UNFINISHED!'
-    #         self.write('FORM3')
-    #         self.write('OUTPDATA')
-
-    # Set functions --------------------------------------------------------------------
     def setSweepTime(self, t):
         self.ctrl.write('SWET%.1f' % t)
 
     def setCWfreq(self, F):
-        'set the frequency for CW mode'
+        """set the frequency for CW mode"""
         self.ctrl.write('CWFREQ%.3fMHz' % (F))
 
     def setLinearFrequencySweep(self):
@@ -223,6 +192,12 @@ class aly8722ES():
     def setLogFrequencySweep(self):
         self.ctrl.write("LOGFREQ")
 
+    def set_sweeptype(self, sweeptype):
+        if sweeptype.lower() == 'log':
+            self.setLogFrequencySweep()
+        else:
+            self.setLinearFrequencySweep()
+
     def setPowerSwitch(self, P):
         if P == 'on' or P == 1 or P == 'ON':
             power = 'ON'
@@ -230,16 +205,25 @@ class aly8722ES():
             power = 'OFF'
         self.ctrl.write('SOUP' + power)
 
+    def set_power_on(self):
+        self.ctrl.write('SOUP ON')
+
+    def set_power_off(self):
+        self.ctrl.write('SOUP OFF')
+
     def setPower(self, P):
         self.ctrl.write('POWE %.3fDB' % (P))
 
     def setIFbandwidth(self, ifbw):
-        ''' set the intermediate frequency bandwidth (in Hz) '''
-        allowedvals = {10, 30, 100, 300, 1000, 3000, 3700, 6000}
-        if ifbw in allowedvals:
+        """ set the intermediate frequency bandwidth (in Hz) """
+        if ifbw in self.allowedvals_ifbandwidth:
             self.ctrl.write('IFBW%d' % ifbw)
         else:
-            raise KeyError('The IF bandwidth can only take the following discrete values:' + str(allowedvals))
+            raise KeyError('The IF bandwidth can only take the following discrete values:\n' +
+                           str(self.allowedvals_ifbandwidth))
+
+    def set_if_bw_Hz(self, if_bw_Hz):
+        self.setIFbandwidth(if_bw_Hz)
 
     def set_center_freq(self, center_freq_Hz):
         self.ctrl.write(F"CENT {center_freq_Hz}")
@@ -279,14 +263,17 @@ class aly8722ES():
         self.setSweepTime(sweeptime)
         self.ctrl.write('AUTO')
 
-    def setPoints(self, N):
-        'sets the number of points in a trace'
-        if N not in self.ctrl.allowedpts:
-            print('WARNING: ' + str(N) + ' points not allowed.  N must be in ' + str(self.ctrl.allowedpts))
-            self.ctrl.write('POIN %.3f' % (N))
+    def setPoints(self, num_of_points):
+        """sets the number of points in a trace"""
+        if num_of_points not in self.allowedvals_num_of_points:
+            print('WARNING: ' + str(num_of_points) + ' points not allowed.  N must be in ' + str(self.ctrl.allowedpts))
+            self.ctrl.write('POIN %.3f' % (num_of_points))
             print('Number of points set to: ' + str(self.getPoints()))
         else:
-            self.ctrl.write('POIN %.3f' % (N))
+            self.ctrl.write('POIN %.3f' % (num_of_points))
+
+    def set_num_freq_points(self, num_freq_points):
+        self.setPoints(num_freq_points)
 
     def setSpan(self, N):
         'sets the frequency span in Hz'
