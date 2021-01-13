@@ -1,4 +1,3 @@
-import os
 import time
 from datetime import datetime
 import numpy as np
@@ -110,14 +109,14 @@ class AbstractVNA:
 
     @timer
     def set_if_bw_Hz(self, if_bw_Hz):
-        self.vna.if_bw_Hz(if_bw_Hz)
+        self.vna.set_if_bw_Hz(if_bw_Hz)
 
     @timer
     def set_sweeptype(self, sweeptype):
         self.vna.set_sweeptype(sweeptype)
 
     @timer
-    def num_freq_points(self, num_freq_points):
+    def set_num_freq_points(self, num_freq_points):
         if self.vna_address == agilent8722es_address:
             multiple_of_max_points = 0
             while self.num_freq_points > multiple_of_max_points:
@@ -145,7 +144,8 @@ class AbstractVNA:
         if self.vna_address == usbvna_address:
             self.vna.set_center_freq_GHz(center_freq_GHz=fcenter_GHz)
         elif self.vna_address == agilent8722es_address:
-            self.vna.set_center_freq(center_freq_Hz=fcenter_GHz * 1.0e9)
+            center_freq_Hz = int(np.round(fcenter_GHz * 1.0e9))
+            self.vna.set_center_freq(center_freq_Hz=center_freq_Hz)
 
     @timer
     def set_fspan_GHz(self, fspan_GHz):
@@ -210,9 +210,9 @@ class AbstractVNA:
         points_needed_last_loop = self.max_frequency_points - (points_acquired_after_n_loops - self.num_freq_points)
         # initialized the data variables
         self.s21real = np.zeros(self.num_freq_points)
-        self.s21real = np.zeros(self.num_freq_points)
+        self.s21imag = np.zeros(self.num_freq_points)
         # do the loops to get the VNA data
-        points_last_loop = -1
+        points_last_loop = None
         start_index = 0
         end_index = self.max_frequency_points
         for loop_index in range(loops_required):
@@ -228,8 +228,8 @@ class AbstractVNA:
             fmin = freqs_this_loop[0]
             fmax = freqs_this_loop[-1]
             # change the number of frequency points if needed
-            if points_last_loop != points_this_loop:
-                self.set_freq_points(num_freq_points=points_this_loop)
+            if points_last_loop is not None and points_last_loop != points_this_loop:
+                self.set_num_freq_points(points_this_loop)
             # change the frequency
             self.set_sweep_range_min_max(fmin_GHz=fmin, fmax_GHz=fmax)
             # process the data into other formats and add the option phase delay
@@ -240,7 +240,7 @@ class AbstractVNA:
                     fmax_str = '%1.6f' % fmax
                     fmin_str = '%1.6f' % fmin
                 print(F"Loop {'%02i' % (loop_index + 1)} of {'%02i' % loops_required}  " +
-                      F"{fmin_str} GHz to {fmax_str}")
+                      F"{fmin_str} GHz to {fmax_str} GHz")
             freqs_this_loop, s21real_this_loop, s21imag_this_loop = self.get_sweep()
             # Store the data in the variables for this class
             self.s21real[start_index: end_index] = s21real_this_loop
@@ -257,10 +257,10 @@ class AbstractVNA:
     def vna_close(self):
         self.vna.close()
 
-    def plot_sweep(self):
+    def plot(self):
         plot_s21(file=None, freqs_GHz=self.freqs_GHz, s21_complex=self.s21real + 1j * self.s21imag,
                  show_ri=True,
-                 meta_data=self.export_metadata(), save=False, show=False, show_bands=True)
+                 meta_data=self.export_metadata(), save=False, show=True, show_bands=True)
 
 
 if __name__ == "__main__":
@@ -271,6 +271,7 @@ if __name__ == "__main__":
     avna = AbstractVNA(vna_address=agilent8722es_address, verbose=True)
     avna.vna_init(is_on=False)
     avna.update_settings(num_freq_points=3400, sweeptype='lin', if_bw_Hz=100, port_power_dBm=-20)
+
     vna_sweeps = []
     for f_center, f_span in [(4, 2), (8, 3)]:
         avna.update_settings(fcenter_GHz=f_center, fspan_GHz=f_span)

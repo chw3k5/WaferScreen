@@ -226,7 +226,7 @@ class aly8722ES():
         self.setIFbandwidth(if_bw_Hz)
 
     def set_center_freq(self, center_freq_Hz):
-        self.ctrl.write(F"CENT {center_freq_Hz}")
+        self.ctrl.write(F"CENT {int(center_freq_Hz)}")
 
     def set_ave_factor(self, ave_factor):
         if isinstance(ave_factor, int):
@@ -309,19 +309,30 @@ class aly8722ES():
         else:
             raise TimeoutError('The frequency sweep did not complete before pulling the data.')
         d = self.getTrace()
-        N, M = np.shape(d)
-        f = self.getFrequencyArray()
-        freqs = f
+        freqs_GHz = self.getFrequencyArray() * 1.0e-3
         real = d[:, 0]
         imag = d[:, 1]
         if show_plot:
             print('plotting the data')
-            pylab.plot(freqs, real, imag, 'b-')
-            pylab.xlabel('Frequency (MHz)')
+            pylab.plot(freqs_GHz, real, imag, 'b-')
+            pylab.xlabel('Frequency (GHz)')
             pylab.ylabel('Response (dB)')
-        return freqs, real, imag
+        return freqs_GHz, real, imag
 
-    # higher level data acquisition functions --------------------------------------------------------------
+    def fast_sweep(self):
+        self.ctrl.write('OPC?;SING')
+        complete = self.ctrl.read().rstrip()
+        self.ctrl.write('AUTO')
+        if complete == '1':
+            pass
+        else:
+            raise TimeoutError('The frequency sweep did not complete before pulling the data.')
+        d = self.getTrace()
+        real = d[:, 0]
+        imag = d[:, 1]
+        return real, imag
+
+        # higher level data acquisition functions --------------------------------------------------------------
     def alySnapShot(self, fi=100, ff=200, power=-45, ifbw=1000, mtype='S21', displaytype='LOGM', numpts=1601,
                     show_plot=False, savedata=False, filename='foo', dataformat=0):
         """ measure a frequency sweep in one frame of the network analyzer (1601 pts max)

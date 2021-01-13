@@ -73,14 +73,14 @@ def plot_s21(file=None, freqs_GHz=None, s21_complex=None, show_ri=False,
 
 def make_s21_folder(folder):
     for file in [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]:
-        plot_21(file=file, save=True, show_bands=False, show=False)
+        plot_s21(file=file, save=True, show_bands=False, show=False)
 
 
 if __name__ == "__main__":
     # file = os.path.join(s21_dir, "so", "7_Band01_2020-09-08_run9.csv")
     # file = os.path.join(output_dir, "s21", "8", "Band03", "2020-09-28", "8_Band03_2020-09-28_run4.csv")
     # file = os.path.join("D:\\", 'waferscreen', 's21', 'check_out', 'Input1_Trace0.15K_2020-09-01_run14.csv')
-    plot_21(file="D:\\waferscreen\\s21\\check_out\\InputB_1coldAmp_2warm_Trace300K_2020-10-09_run2.csv", show=True, save=True, show_bands=True)
+    plot_s21(file="D:\\waferscreen\\s21\\check_out\\InputB_1coldAmp_2warm_Trace300K_2020-10-09_run2.csv", show=True, save=True, show_bands=True)
 
     # make_s21_folder(os.path.join("D:\\", 'waferscreen', 's21', 'check_out'))
 
