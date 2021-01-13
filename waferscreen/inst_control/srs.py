@@ -1,6 +1,7 @@
 import visa
 import time
 import serial
+from collections import deque
 from waferscreen.tools.timer import timer
 
 
@@ -46,7 +47,6 @@ def get_test_srs(is_gpib=True):
 
 class SRS_Connect:
     def __init__(self, com_num=None, address="GPIB0::17::INSTR"):
-
         if com_num is None:
             self.ResourceManager = visa.ResourceManager()
             self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
@@ -70,14 +70,18 @@ class SRS_Connect:
 
 class SRS_Module:
     """ Basic communication with the an SRS module """
-    def __init__(self, srs_port, srs_connect):
+    def __init__(self, srs_port, srs_connect, in_a_hurry=False):
         self.device_id = None
         self.srs_port = str(srs_port)
-        self.voltage_precision = '3'
-        self.voltage_format_str = '%1.' + self.voltage_precision + 'e'
         self.is_gpib = srs_connect.is_gpib
         self.ctrl = srs_connect.ctrl
-        self.say_hello()
+        # SRS SIM 928 Settings
+        self.voltage_precision = '3'
+        self.voltage_format_str = '%1.' + self.voltage_precision + 'e'
+        self.last_set_voltage = None
+        # connection test
+        if not in_a_hurry:
+            self.say_hello()
 
     def write(self, write_str):
         if self.is_gpib:
@@ -142,9 +146,11 @@ class SRS_SIM928(SRS_Module):
         self.volts = float(resp)
         return self.volts
 
+    @timer
     def output_on(self):
         self.write_to_port('OPON')
 
+    @timer
     def output_off(self):
         self.write_to_port('OPOF')
 

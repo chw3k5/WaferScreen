@@ -254,7 +254,7 @@ class AbstractVNA:
         self.utc = str(datetime.utcnow())
         return self.freqs_GHz, self.s21real, self.s21imag, self.export_metadata()
 
-    def vna_close(self):
+    def close_connection(self):
         self.vna.close()
 
     def plot(self):

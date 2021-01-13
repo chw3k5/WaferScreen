@@ -6,7 +6,7 @@ from datetime import datetime
 # Instrument addresses
 usbvna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
 agilent8722es_address = "GPIB1::19::INSTR"
-volt_source_address = "GPIB0::16::INSTR"
+flux_ramp_address = "GPIB0::17::INSTR"
 volt_source_port = 1
 
 # multiprocessing

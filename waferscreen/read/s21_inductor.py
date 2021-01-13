@@ -14,6 +14,19 @@ from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import pro_data_dir, raw_data_dir, today_str
 
 
+s21_header = "# Header :freq_ghz,real,imag\n"
+
+
+def write_s21(output_file, freqs_ghz, s21_complex, metadata):
+    with open(output_file, 'w') as f:
+        f.write(F"{metadata}\n")
+        f.write(F"{s21_header}\n")
+        for freq, s21_value in list(zip(freqs_ghz, s21_complex)):
+            real = s21_value.real
+            imag = s21_value.imag
+            f.write(F"{freq},{real},{imag}\n")
+            
+            
 def ri_to_magphase(r, i):
     s21_mag = 20 * np.log10(np.sqrt((r ** 2.0) + (i ** 2.0)))
     s21_phase = np.arctan2(i, r)
@@ -88,7 +101,7 @@ class InductS21:
         self.s21_mag = None
         self.s21_phase = None
         self.s21_phase_raw_unwrapped = None
-        self.meta_data = {}
+        self.metadata = {}
         self.group_delay = None
         self.phase_offset = None
         self.group_delay_slope = None
@@ -100,8 +113,8 @@ class InductS21:
 
     def simple_induct(self, metadata_dict=None):
         self.remove_group_delay()
-        self.add_meta_data(**metadata_dict)
-        self.calc_meta_data()
+        self.add_metadata(**metadata_dict)
+        self.calc_metadata()
         self.write()
         self.plot()
 
@@ -151,26 +164,26 @@ class InductS21:
             self.s21_phase_raw_unwrapped = np.unwrap(self.s21_phase_raw, discont=np.pi)
         return self.s21_mag, self.s21_phase
 
-    def add_meta_data(self, **kwargs):
+    def add_metadata(self, **kwargs):
         if kwargs is None:
             pass
         else:
-            self.meta_data.update(kwargs)
+            self.metadata.update(kwargs)
 
-    def calc_meta_data(self):
+    def calc_metadata(self):
         if self.freqs_GHz is not None:
-            self.meta_data["freq_min_GHz"] = np.min(self.freqs_GHz)
-            self.meta_data["freq_max_GHz"] = np.max(self.freqs_GHz)
-            self.meta_data["freq_center_GHz"] = (self.meta_data["freq_max_GHz"] + self.meta_data["freq_min_GHz"]) / 2.0
-            self.meta_data["freq_span_GHz"] = self.meta_data["freq_max_GHz"] - self.meta_data["freq_min_GHz"]
-            self.meta_data["freq_step"] = self.freq_step
-            self.meta_data['band'] = band_center_to_band_number(self.meta_data["freq_center_GHz"])
-        if "time" in self.meta_data.keys():
-            self.meta_data["datetime"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.meta_data["time"]))
+            self.metadata["freq_min_GHz"] = np.min(self.freqs_GHz)
+            self.metadata["freq_max_GHz"] = np.max(self.freqs_GHz)
+            self.metadata["freq_center_GHz"] = (self.metadata["freq_max_GHz"] + self.metadata["freq_min_GHz"]) / 2.0
+            self.metadata["freq_span_GHz"] = self.metadata["freq_max_GHz"] - self.metadata["freq_min_GHz"]
+            self.metadata["freq_step"] = self.freq_step
+            self.metadata['band'] = band_center_to_band_number(self.metadata["freq_center_GHz"])
+        if "time" in self.metadata.keys():
+            self.metadata["datetime"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.metadata["time"]))
         self.prepare_output_file()
-        self.meta_data['raw_path'] = self.meta_data['path']
-        self.meta_data['plot_path'] = self.plot_file
-        self.meta_data['path'] = self.output_file
+        self.metadata['raw_path'] = self.metadata['path']
+        self.metadata['plot_path'] = self.plot_file
+        self.metadata['path'] = self.output_file
 
     def calc_group_delay(self):
         self.get_mag_phase()
@@ -205,20 +218,20 @@ class InductS21:
 
     def prepare_output_file(self):
         # output the file in the standard directory structure
-        if "location" in self.meta_data.keys():
-            location = self.meta_data["location"]
+        if "location" in self.metadata.keys():
+            location = self.metadata["location"]
         else:
             location = "null"
-        if "wafer" in self.meta_data.keys():
-            wafer = str(self.meta_data["wafer"])
+        if "wafer" in self.metadata.keys():
+            wafer = str(self.metadata["wafer"])
         else:
             wafer = "null"
-        if "datetime" in self.meta_data.keys():
-            day_str, _time_of_day_str = self.meta_data["datetime"].split(" ")
+        if "datetime" in self.metadata.keys():
+            day_str, _time_of_day_str = self.metadata["datetime"].split(" ")
         else:
             day_str = "0000-00-00"
-        if "band" in self.meta_data.keys():
-            band = F"Band{'%02i' % (self.meta_data['band'])}"
+        if "band" in self.metadata.keys():
+            band = F"Band{'%02i' % (self.metadata['band'])}"
         else:
             band = "null"
         self.output_file = pro_data_dir
@@ -233,29 +246,12 @@ class InductS21:
             self.plot_file, _ = self.output_file.rsplit(".", 1)
             self.plot_file += '.pdf'
 
-    def __str__(self):
-        return ("Its a striung")
-
-    def __add__(self, new_data):
-        self.data += new_data
-
     def write(self):
         if not self.group_delay_removed:
             self.remove_group_delay()
         # write the output S21 file
-        with open(self.output_file, 'w') as f:
-            meta_data_line = ""
-            for key in sorted(self.meta_data.keys()):
-                if key == "path":
-                    meta_data_line = F"path,{self.meta_data['path']}|" + meta_data_line
-                else:
-                    meta_data_line += F"{key},{self.meta_data[key]}|"
-            f.write("% MetaData :" + meta_data_line[:-1] + "\n")
-            f.write("% Header :freq_ghz,real,imag\n")
-            for freq, s21_value in list(zip(self.freqs_GHz, self.s21_complex)):
-                real = s21_value.real
-                imag = s21_value.imag
-                f.write(F"{freq},{real},{imag}\n")
+        write_s21(output_file=self.output_file, freqs_ghz=self.freqs_GHz, 
+                  s21_complex=self.s21_complex, metadata=self.metadata)
 
     def plot(self, save=True, show=False, show_bands=False):
         self.get_mag_phase(and_raw=True)
@@ -383,9 +379,9 @@ def induct_nist(verbose=True):
 
 def induct_princeton(verbose=True):
     base = os.path.join(raw_data_dir, "princeton", "SMBK_wafer8")
-    meta_data_path = os.path.join(base, "meta_data.txt")
+    metadata_path = os.path.join(base, "metadata.txt")
     m21 = S21MetadataPrinceton()
-    m21.meta_from_file(meta_data_path)
+    m21.meta_from_file(metadata_path)
     paths = get_all_file_paths(base)
     s21by_path = {}
     for path in paths:

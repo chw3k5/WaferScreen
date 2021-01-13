@@ -5,6 +5,7 @@ from ref import s21_metadata_nist
 
 allowed_meta_data_types = (str, float, int)
 raw_filename_key = "output_filename"
+metadata_primary_types = {"utc", "path"}
 
 
 def metadata_key_format(key):
@@ -37,6 +38,18 @@ class MetaDataDict(UserDict):
             else:
                 raise TypeError("The MetaDataDict only excepts values of the following types: " +
                                 F"{allowed_meta_data_types}\nHowever value of {formatted_value} was encountered.")
+
+    def __str__(self):
+        return_str = "# Metadata:"
+        for key in sorted(self.keys()):
+            formatted_datum = F"{key},{self.data[key]}|"
+            # put utc first, the rest in alphabetical order
+            if key in metadata_primary_types:
+                return_str = formatted_datum + return_str
+            else:
+                return_str += formatted_datum
+        # git rid of the last comma ","
+        return return_str[:-1]
 
 
 class S21MetadataPrinceton:
