@@ -26,7 +26,7 @@ class AbstractVNA:
         # Sets for quick access and comparison for various automated processes
         self.programmable_settings = {"fcenter_GHz", "fspan_GHz", "num_freq_points",
                                       "sweeptype", "if_bw_Hz", "port_power_dBm", "vna_avg"}
-        self.meta_data_types = self.programmable_settings | {"vna", "start_time", "end_time", "utc",
+        self.meta_data_types = self.programmable_settings | {"vna_address", "start_time", "end_time", "utc",
                                                              "fmin_GHz", "fmax_GHz"}
         self.auto_init_settings = {"fcenter_GHz", "fspan_GHz", "set_vna_avg", "if_bw_Hz", "port_power_dBm"}
         # meta data types (these attributes are here for notation, and have same names as the automated setting above.)

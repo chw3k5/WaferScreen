@@ -14,7 +14,7 @@ from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import pro_data_dir, raw_data_dir, today_str
 
 
-s21_header = "# Header :freq_ghz,real,imag\n"
+s21_header = "# Header:freq_ghz,real,imag"
 
 
 def write_s21(output_file, freqs_ghz, s21_complex, metadata):

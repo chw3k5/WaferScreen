@@ -40,7 +40,7 @@ class MetaDataDict(UserDict):
                                 F"{allowed_meta_data_types}\nHowever value of {formatted_value} was encountered.")
 
     def __str__(self):
-        return_str = "# Metadata:"
+        return_str = ""
         for key in sorted(self.keys()):
             formatted_datum = F"{key},{self.data[key]}|"
             # put utc first, the rest in alphabetical order
@@ -48,8 +48,8 @@ class MetaDataDict(UserDict):
                 return_str = formatted_datum + return_str
             else:
                 return_str += formatted_datum
-        # git rid of the last comma ","
-        return return_str[:-1]
+        # add prefix, get rid of the last comma ","
+        return "# Metadata:" + return_str[:-1]
 
 
 class S21MetadataPrinceton:
@@ -98,8 +98,6 @@ class S21MetadataNist:
                     raise KeyError(F"Required unique filename key, {raw_filename_key},\n" +
                                    "was not found")
 
-    def write(self, metadata_output_filename=None):
-        pass
 
     def hack_read(self, delimiter_major=",", delimiter_minor="="):
         self.metadata_by_path = {}

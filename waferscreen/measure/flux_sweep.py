@@ -55,7 +55,7 @@ class AbstractFluxSweep:
     def __enter__(self):
         self.power_on()
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         self.end()
 
     def power_on(self):
@@ -93,6 +93,7 @@ class AbstractFluxSweep:
         # preform the sweep
         freqs_GHz, s21real, s21imag, sweep_metadata = self.abstract_vna.vna_sweep()
         # write out sdata
+        metadata_this_sweep.update(sweep_metadata)
         self.write(output_file=output_filename, freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
                    metadata=metadata_this_sweep)
 
@@ -102,17 +103,18 @@ class AbstractFluxSweep:
 
 
 if __name__ == "__main__":
-    static_vna_settings = {'num_freq_points': 3400, 'sweeptype': 'lin', 'if_bw_Hz': 100, 'port_power_dBm': -20}
+    static_vna_settings = {'num_freq_points': 1601, 'sweeptype': 'lin', 'if_bw_Hz': 1000, 'port_power_dBm': -50}
     static_metadata = {"test output": "True"}
-    static_kwargs = static_vna_settings | static_metadata
+    static_metadata.update(static_vna_settings)
 
     counter = 1
-    with AbstractFluxSweep(rf_chain_letter="B") as afs:
+    afs = AbstractFluxSweep(rf_chain_letter="b")
+    with afs:
         for fcenter_GHz, fspan_GHz, flux_ramp_mV in [(4, 0.1, 0.011), (8, 0.2, -0.011)]:
             dynamic_kwargs = {"fcenter_GHz": fcenter_GHz, "fspan_GHz": fspan_GHz, "flux_ramp_mV": flux_ramp_mV,
                               "path": os.path.join(raw_data_dir, F"test_output{counter}.txt")}
-            input_kwargs = static_kwargs | dynamic_kwargs
-            afs.ramp_survey(**input_kwargs)
+            static_metadata.update(dynamic_kwargs)
+            afs.ramp_survey(**static_metadata)
             counter += 1
 
 
