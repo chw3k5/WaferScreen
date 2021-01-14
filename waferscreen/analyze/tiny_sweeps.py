@@ -54,7 +54,7 @@ class TinySweeps:
         self.parent_dir = os.path.join(pro_data_dir, 's21', F"{self.wafer}", band_str, self.date_str)
         self.lambda_filename = os.path.join(self.parent_dir, 'lambda_fits.csv')
         self.plot_filename = os.path.join(self.parent_dir, F"{self.wafer}_{band_str}_{self.date_str}_flux_ramp.pdf")
-        self.data_output_folder =  os.path.join(self.parent_dir, "flux_ramp")
+        self.data_output_folder = os.path.join(self.parent_dir, "flux_ramp")
         if not os.path.isdir(self.data_output_folder):
             os.mkdir(self.data_output_folder)
         self.res_out_dir = os.path.join(self.data_output_folder, 'res_fits')

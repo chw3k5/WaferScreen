@@ -1,30 +1,30 @@
 import os
+import time
 from ref import usbvna_address, agilent8722es_address
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.read.s21_metadata import MetaDataDict
-from waferscreen.read.s21_inductor import s21_header, write_s21
+from waferscreen.read.s21_inductor import write_s21
+from waferscreen.measure.flux_sweep_config import ramp_volt_to_uA, ramp_rseries
 from ref import flux_ramp_address, raw_data_dir
 
 
 def ramp_name_parse(basename):
-    res_num_str, current_uA_and_power_str = basename.rstrip('dBm.csv').lstrip("sdata_res_").split('_cur_')
-    current_str, power_str = current_uA_and_power_str.split("uA_")
+    res_num_str, current_uA_and_power_utc_str = basename.rstrip('.csv').lstrip("sdata_res_").split('_cur_')
+    current_str, power_utc_str = current_uA_and_power_utc_str.split("uA_")
+    power_str, utc = power_utc_str.split("dBm_utc")
     if "m" == current_str[0]:
         current_uA = -1.0 * float(current_str[1:])
     else:
         current_uA = float(current_str)
     power_dBm = float(power_str)
     res_num = int(res_num_str)
-    return power_dBm, current_uA, res_num
+    return power_dBm, current_uA, res_num, utc
 
 
-def ramp_name_create(power_dBm, current_uA, res_num):
-    if current_uA >= 0:
-        ind_filename = F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm.csv"
-    else:
-        ind_filename = F"sdata_res_{res_num}_cur_m{int(round(-1 * current_uA))}uA_{power_dBm}dBm.csv"
-    return ind_filename
+def ramp_name_create(power_dBm, current_uA, res_num, utc):
+    return F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm_utc{utc}.csv"
+
 
 
 class AbstractFluxSweep:
@@ -75,10 +75,9 @@ class AbstractFluxSweep:
         self.power_off()
         self.close_connections()
 
-    def ramp_survey(self, **kwargs):
+    def step(self, **kwargs):
         # initialize the data storage tools
-        output_filename = kwargs['path']
-        flux_ramp_voltage = kwargs['flux_ramp_mV']
+        flux_ramp_voltage = kwargs['flux_supply_V']
         metadata_this_sweep = MetaDataDict()
         kwargs_keys = set(kwargs.keys())
         vna_settings_keys = kwargs_keys & self.abstract_vna.programmable_settings
@@ -93,13 +92,38 @@ class AbstractFluxSweep:
         # preform the sweep
         freqs_GHz, s21real, s21imag, sweep_metadata = self.abstract_vna.vna_sweep()
         # write out sdata
+        basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
+                                    current_uA=sweep_metadata['flux_current_uA'],
+                                    res_num=sweep_metadata['res_num'],
+                                    utc=sweep_metadata['utc'])
+        sweep_metadata['path'] = os.path.join(sweep_metadata['dir'], basename)
         metadata_this_sweep.update(sweep_metadata)
-        self.write(output_file=output_filename, freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
+        self.write(output_file=sweep_metadata['path'], freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
                    metadata=metadata_this_sweep)
 
     @staticmethod
     def write(output_file, freqs_ghz, s21_complex, metadata):
         write_s21(output_file, freqs_ghz, s21_complex, metadata)
+
+    def survey_ramp(self, resonator_metadata, voltages, dwell=None):
+        for counter, flux_supply_V in list(enumerate(voltages)):
+            if counter == 0 and dwell is not None:
+                # dwell after the ramp is reset.
+                time.sleep(dwell)
+            resonator_metadata['flux_current_uA'] = ramp_volt_to_uA[flux_ramp_V]
+            resonator_metadata['flux_supply_V'] = flux_supply_V
+            resonator_metadata['ramp_series_resistance_ohms'] = ramp_rseries
+            self.step(**resonator_metadata)
+
+    def survey_power_ramp(self, resonator_metadata, port_powers_dbm):
+        pass
+
+
+    def resonator_ramp_survey(self, resonator_freqs, span_MHz, step_size_MHz):
+        pass
+
+    def find_resonators(self, fmin_GHz, fmax_GHz, step_size_MHz):
+        pass
 
 
 if __name__ == "__main__":
@@ -110,11 +134,11 @@ if __name__ == "__main__":
     counter = 1
     afs = AbstractFluxSweep(rf_chain_letter="b")
     with afs:
-        for fcenter_GHz, fspan_GHz, flux_ramp_mV in [(4, 0.1, 0.011), (8, 0.2, -0.011)]:
-            dynamic_kwargs = {"fcenter_GHz": fcenter_GHz, "fspan_GHz": fspan_GHz, "flux_ramp_mV": flux_ramp_mV,
+        for fcenter_GHz, fspan_GHz, flux_ramp_V in [(4, 0.1, 0.011), (8, 0.2, -0.011)]:
+            dynamic_kwargs = {"fcenter_GHz": fcenter_GHz, "fspan_GHz": fspan_GHz, "flux_ramp_V": flux_ramp_V,
                               "path": os.path.join(raw_data_dir, F"test_output{counter}.txt")}
             static_metadata.update(dynamic_kwargs)
-            afs.ramp_survey(**static_metadata)
+            afs.step(**static_metadata)
             counter += 1
 
 
