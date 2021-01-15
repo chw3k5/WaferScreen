@@ -26,22 +26,11 @@ if getuser() == 'uvwave':
     working_dir = os.path.join("D:\\", "waferscreen")
 else:
     working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
-raw_data_dir = os.path.join(working_dir, 'raw')
-nist_data_dir = os.path.join(raw_data_dir, 'nist')
-princeton_data_dir = os.path.join(raw_data_dir, 'princeton')
-if getpass.getuser() in nist_users:
-    data_dir = nist_data_dir
-else:
-    data_dir = princeton_data_dir
-check_out_dir = os.path.join(data_dir, "check_out")
-pro_data_dir = os.path.join(working_dir, "pro")
-for dir_name in [raw_data_dir, nist_data_dir, princeton_data_dir, check_out_dir, pro_data_dir]:
-    if not os.path.isdir(dir_name):
-        os.mkdir(dir_name)
+
 
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
-runtime_log = os.path.join(raw_data_dir, "runtime_log_waferscreeen.txt")
+runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
 if not os.path.isfile(runtime_log):
     f = open(runtime_log, 'w')
     f.close()

@@ -1,12 +1,13 @@
 import os
 import time
-from ref import usbvna_address, agilent8722es_address
+import numpy as np
+from ref import usbvna_address, agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.read.s21_metadata import MetaDataDict
 from waferscreen.read.s21_inductor import write_s21
-from waferscreen.measure.flux_sweep_config import ramp_volt_to_uA, ramp_rseries
-from ref import flux_ramp_address, raw_data_dir
+import waferscreen.measure.flux_sweep_config as fsc
+import ref
 
 
 def ramp_name_parse(basename):
@@ -26,6 +27,19 @@ def ramp_name_create(power_dBm, current_uA, res_num, utc):
     return F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm_utc{utc}.csv"
 
 
+def dir_name_create(sweep_type="scan", res_id=None):
+    dir_build_list = [str(fsc.location), str(fsc.wafer), str(today_str)]
+    if sweep_type == "scan":
+        dir_build_list.append(str(sweep_type))
+    else:
+        dir_build_list.append(str(res_id))
+    path_str = ""
+    for dir_name in dir_build_list:
+        path_str += os.path.join(fsc.output_base_dir, dir_name)
+        if not os.path.isdir(path_str):
+            os.mkdir(path_str)
+    return path_str
+
 
 class AbstractFluxSweep:
     """
@@ -35,7 +49,7 @@ class AbstractFluxSweep:
      2) fast switching for many smaller sweeps 'on resonance'
     """
     # one connection is shared by all instances of this class
-    flux_ramp_srs_connect = SRS_Connect(address=flux_ramp_address)
+    flux_ramp_srs_connect = SRS_Connect(address=ref.flux_ramp_address)
 
     def __init__(self, rf_chain_letter, vna_address=agilent8722es_address, verbose=True, working_dir=None):
         test_letter = rf_chain_letter.lower().strip()
@@ -48,7 +62,7 @@ class AbstractFluxSweep:
         self.abstract_vna = AbstractVNA(vna_address=vna_address, verbose=verbose)
         self.abstract_vna.vna_init()
         if working_dir is None:
-            self.working_dir = raw_data_dir
+            self.working_dir = ref.working_dir
         else:
             self.working_dir = working_dir
 
@@ -92,11 +106,17 @@ class AbstractFluxSweep:
         # preform the sweep
         freqs_GHz, s21real, s21imag, sweep_metadata = self.abstract_vna.vna_sweep()
         # write out sdata
-        basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
-                                    current_uA=sweep_metadata['flux_current_uA'],
-                                    res_num=sweep_metadata['res_num'],
-                                    utc=sweep_metadata['utc'])
-        sweep_metadata['path'] = os.path.join(sweep_metadata['dir'], basename)
+        if kwargs["export_type"] == "scan":
+            dirname = dir_name_create(sweep_type=kwargs["export_type"])
+            basename = F"scan{'%2.3f' % sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % sweep_metadata['fmax_GHz']}GHz_" + \
+                       F"{sweep_metadata['utc']}.txt"
+        else:
+            basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
+                                        current_uA=sweep_metadata['flux_current_uA'],
+                                        res_num=sweep_metadata['res_num'],
+                                        utc=sweep_metadata['utc'])
+            dirname = dir_name_create(sweep_type=kwargs["export_type"], res_id=sweep_metadata['res_id'])
+        sweep_metadata['path'] = os.path.join(dirname, "raw", basename)
         metadata_this_sweep.update(sweep_metadata)
         self.write(output_file=sweep_metadata['path'], freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
                    metadata=metadata_this_sweep)
@@ -105,25 +125,42 @@ class AbstractFluxSweep:
     def write(output_file, freqs_ghz, s21_complex, metadata):
         write_s21(output_file, freqs_ghz, s21_complex, metadata)
 
-    def survey_ramp(self, resonator_metadata, voltages, dwell=None):
-        for counter, flux_supply_V in list(enumerate(voltages)):
+    def survey_ramp(self, resonator_metadata, dwell=None):
+        for counter, flux_supply_V in list(enumerate(fsc.ramp_volts)):
             if counter == 0 and dwell is not None:
                 # dwell after the ramp is reset.
                 time.sleep(dwell)
-            resonator_metadata['flux_current_uA'] = ramp_volt_to_uA[flux_ramp_V]
+            resonator_metadata['flux_current_uA'] = fsc.ramp_volt_to_uA[flux_ramp_V]
             resonator_metadata['flux_supply_V'] = flux_supply_V
-            resonator_metadata['ramp_series_resistance_ohms'] = ramp_rseries
+            resonator_metadata['ramp_series_resistance_ohms'] = fsc.ramp_rseries
             self.step(**resonator_metadata)
 
-    def survey_power_ramp(self, resonator_metadata, port_powers_dbm):
-        pass
+    def survey_power_ramp(self, resonator_metadata):
+        for port_power_dBm in fsc.power_sweep_dBm:
+            resonator_metadata["port_power_dBm"] = port_power_dBm
+            resonator_metadata["span_GHz"] = resonator_metadata["fcenter_GHz"] / fsc.span_scale_factor
+            resonator_metadata["num_freq_points"] = fsc.num_freq_points
+            resonator_metadata["sweeptype"] = fsc.sweeptype
+            resonator_metadata["if_bw_Hz"] = fsc.if_bw_Hz
+            resonator_metadata["vna_avg"] = fsc.vna_avg
+            self.survey_ramp(resonator_metadata)
 
+    def resonator_ramp_survey(self, resonator_freqs_GHz, scan_name):
+        for res_num, fcenter_GHz in list(enumerate(resonator_freqs_GHz)):
+            resonator_metadata = {"fcenter_GHz": fcenter_GHz, "res_id": F"{res_num}_{scan_name}",
+                                  "export_type": "single_res"}
+            self.survey_power_ramp(resonator_metadata)
 
-    def resonator_ramp_survey(self, resonator_freqs, span_MHz, step_size_MHz):
-        pass
+    def scan_for_resonators(self, fmin_GHz, fmax_GHz, step_size_MHz, group_delay_s=None):
+        resonator_metadata = {'flux_current_uA': 0.0, 'flux_supply_V': 0.0, "export_type": "scan",
+                              'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dBm": fsc.probe_power_dBm,
+                              "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
+                              "span_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz - fmin_GHz) / 2.0}
+        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["span_GHz"] / (step_size_MHz * 1.e-3)))
+        if group_delay_s is not None:
+            resonator_metadata["group_delay_s"] = group_delay_s
+        self.step(**resonator_metadata)
 
-    def find_resonators(self, fmin_GHz, fmax_GHz, step_size_MHz):
-        pass
 
 
 if __name__ == "__main__":
@@ -136,7 +173,7 @@ if __name__ == "__main__":
     with afs:
         for fcenter_GHz, fspan_GHz, flux_ramp_V in [(4, 0.1, 0.011), (8, 0.2, -0.011)]:
             dynamic_kwargs = {"fcenter_GHz": fcenter_GHz, "fspan_GHz": fspan_GHz, "flux_ramp_V": flux_ramp_V,
-                              "path": os.path.join(raw_data_dir, F"test_output{counter}.txt")}
+                              "path": os.path.join(ref.working_dir, F"test_output{counter}.txt")}
             static_metadata.update(dynamic_kwargs)
             afs.step(**static_metadata)
             counter += 1

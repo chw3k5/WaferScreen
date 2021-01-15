@@ -1,4 +1,8 @@
 import numpy as np
+import os
+
+# Output Base Directory
+output_base_dir = os.path.join("D:\\", "waferscreen")
 
 # Test Information
 wafer = 10
