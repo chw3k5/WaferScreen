@@ -130,7 +130,7 @@ class AbstractFluxSweep:
             if counter == 0 and dwell is not None:
                 # dwell after the ramp is reset.
                 time.sleep(dwell)
-            resonator_metadata['flux_current_uA'] = fsc.ramp_volt_to_uA[flux_ramp_V]
+            resonator_metadata['flux_current_uA'] = fsc.ramp_volt_to_uA[flux_supply_V]
             resonator_metadata['flux_supply_V'] = flux_supply_V
             resonator_metadata['ramp_series_resistance_ohms'] = fsc.ramp_rseries
             self.step(**resonator_metadata)
