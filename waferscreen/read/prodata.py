@@ -1,11 +1,10 @@
 from pathlib import Path
 import numpy as np
 from typing import NamedTuple, Optional
-from ref import pro_data_dir
 from waferscreen.read.table_read import num_format
 
 
-def crawl_s21():
+def crawl_s21(pro_data_dir):
     return [str(path) for path in Path(pro_data_dir).rglob('*s21.csv')]
 
 

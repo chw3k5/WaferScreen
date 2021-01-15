@@ -24,8 +24,7 @@ class AbstractVNA:
 
         ''' Automated Settings '''
         # Sets for quick access and comparison for various automated processes
-        self.programmable_settings = {"fcenter_GHz", "fspan_GHz", "num_freq_points",
-                                      "sweeptype", "if_bw_Hz", "port_power_dBm", "vna_avg"}
+        self.programmable_settings = {"fcenter_GHz", "fspan_GHz", "num_freq_points", "sweeptype", "if_bw_Hz", "port_power_dBm", "vna_avg"}
         self.meta_data_types = self.programmable_settings | {"vna_address", "start_time", "end_time", "utc",
                                                              "fmin_GHz", "fmax_GHz"}
         self.auto_init_settings = {"fcenter_GHz", "fspan_GHz", "set_vna_avg", "if_bw_Hz", "port_power_dBm"}
@@ -129,15 +128,15 @@ class AbstractVNA:
         self.vna.set_num_freq_points(num_freq_points)
 
     @timer
-    def set_vna_avg(self):
+    def set_vna_avg(self, vna_avg):
         if self.vna_address == usbvna_address:
-            self.vna.set_avg(count=self.vna_avg)
+            self.vna.set_avg(count=vna_avg)
         else:
-            if self.vna_avg < 2:
+            if vna_avg is None or vna_avg < 2:
                 self.vna.turn_ave_off()
             else:
                 self.vna.turn_ave_on()
-                self.vna.set_ave_factor(self.vna_avg)
+                self.vna.set_ave_factor(vna_avg)
 
     @timer
     def set_fcenter_GHz(self, fcenter_GHz):
@@ -228,7 +227,7 @@ class AbstractVNA:
             fmin = freqs_this_loop[0]
             fmax = freqs_this_loop[-1]
             # change the number of frequency points if needed
-            if points_last_loop is not None and points_last_loop != points_this_loop:
+            if points_last_loop != points_this_loop:
                 self.set_num_freq_points(points_this_loop)
             # change the frequency
             self.set_sweep_range_min_max(fmin_GHz=fmin, fmax_GHz=fmax)

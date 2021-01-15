@@ -1,6 +1,5 @@
 import os
 from waferscreen.read.table_read import floats_table
-from ref import pro_data_dir
 
 
 def get_all_file_paths(directory):
@@ -30,6 +29,7 @@ def rename_data_column(file, old_column_name, new_column_name, delimiter=','):
 
 
 if __name__ == "__main__":
+    pro_data_dir = ""
     for wafer_str, band_str, data_str in reversed([("7", "Band02", "2020-09-10"), ("7", "Band02", "2020-09-08"),
                                                    ("7", "Band01", "2020-09-10"),  ("7", "Band01", "2020-09-08")]):
         dir = os.path.join(pro_data_dir, "s21", wafer_str, band_str, data_str, "flux_ramp", "res_fits")

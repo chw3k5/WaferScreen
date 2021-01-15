@@ -11,7 +11,7 @@ from waferscreen.read.table_read import num_format
 from waferscreen.read.s21_metadata import S21MetadataPrinceton, S21MetadataNist
 from waferscreen.tools.rename import get_all_file_paths
 from waferscreen.tools.band_calc import band_center_to_band_number
-from ref import pro_data_dir, raw_data_dir, today_str
+from ref import today_str, working_dir
 
 
 s21_header = "# Header:freq_ghz,real,imag"
@@ -378,7 +378,7 @@ def induct_nist(verbose=True):
 
 
 def induct_princeton(verbose=True):
-    base = os.path.join(raw_data_dir, "princeton", "SMBK_wafer8")
+    base = os.path.join(working_dir, "princeton", "SMBK_wafer8")
     metadata_path = os.path.join(base, "metadata.txt")
     m21 = S21MetadataPrinceton()
     m21.meta_from_file(metadata_path)
@@ -396,7 +396,7 @@ def induct_princeton(verbose=True):
 def induct_dirs(search_dirs=None, columns=None, verbose=True):
     s21by_path = {}
     if search_dirs is None:
-        search_dirs = [raw_data_dir]
+        search_dirs = [working_dir]
     if columns is None:
         columns = ("freq_Hz", 'real', "imag")
     for path in crawl_raw_s21(search_dirs=search_dirs):

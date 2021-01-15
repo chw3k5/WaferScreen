@@ -33,11 +33,15 @@ def dir_name_create(sweep_type="scan", res_id=None):
         dir_build_list.append(str(sweep_type))
     else:
         dir_build_list.append(str(res_id))
-    path_str = ""
+    path_str = fsc.output_base_dir
     for dir_name in dir_build_list:
-        path_str += os.path.join(fsc.output_base_dir, dir_name)
+        path_str = os.path.join(path_str, dir_name)
         if not os.path.isdir(path_str):
             os.mkdir(path_str)
+    else:
+        raw_dir = os.path.join(path_str, "raw")
+        if not os.path.isdir(raw_dir):
+            os.mkdir(raw_dir)
     return path_str
 
 
@@ -109,7 +113,7 @@ class AbstractFluxSweep:
         if kwargs["export_type"] == "scan":
             dirname = dir_name_create(sweep_type=kwargs["export_type"])
             basename = F"scan{'%2.3f' % sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % sweep_metadata['fmax_GHz']}GHz_" + \
-                       F"{sweep_metadata['utc']}.txt"
+                       F"{sweep_metadata['utc'].replace(':', '-')}.txt"
         else:
             basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
                                         current_uA=sweep_metadata['flux_current_uA'],
@@ -138,7 +142,7 @@ class AbstractFluxSweep:
     def survey_power_ramp(self, resonator_metadata):
         for port_power_dBm in fsc.power_sweep_dBm:
             resonator_metadata["port_power_dBm"] = port_power_dBm
-            resonator_metadata["span_GHz"] = resonator_metadata["fcenter_GHz"] / fsc.span_scale_factor
+            resonator_metadata["fspan_GHz"] = resonator_metadata["fcenter_GHz"] / fsc.span_scale_factor
             resonator_metadata["num_freq_points"] = fsc.num_freq_points
             resonator_metadata["sweeptype"] = fsc.sweeptype
             resonator_metadata["if_bw_Hz"] = fsc.if_bw_Hz
@@ -152,11 +156,13 @@ class AbstractFluxSweep:
             self.survey_power_ramp(resonator_metadata)
 
     def scan_for_resonators(self, fmin_GHz, fmax_GHz, step_size_MHz, group_delay_s=None):
+        if fmin_GHz > fmax_GHz:
+            fmin_GHz, fmax_GHz = fmax_GHz, fmin_GHz
         resonator_metadata = {'flux_current_uA': 0.0, 'flux_supply_V': 0.0, "export_type": "scan",
                               'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dBm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
-                              "span_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz - fmin_GHz) / 2.0}
-        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["span_GHz"] / (step_size_MHz * 1.e-3)))
+                              "fspan_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz + fmin_GHz) / 2.0}
+        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["fspan_GHz"] / (step_size_MHz * 1.e-3)))
         if group_delay_s is not None:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
@@ -165,7 +171,7 @@ class AbstractFluxSweep:
 if __name__ == "__main__":
     afs = AbstractFluxSweep(rf_chain_letter="a")
     with afs:
-        afs.scan_for_resonators(fmin_GHz=4, fmax_GHz=5, step_size_MHz=1)
+        afs.scan_for_resonators(fmin_GHz=4, fmax_GHz=5, step_size_MHz=0.5)
 
 
 
