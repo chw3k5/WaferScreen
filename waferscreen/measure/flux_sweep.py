@@ -162,21 +162,10 @@ class AbstractFluxSweep:
         self.step(**resonator_metadata)
 
 
-
 if __name__ == "__main__":
-    static_vna_settings = {'num_freq_points': 1601, 'sweeptype': 'lin', 'if_bw_Hz': 1000, 'port_power_dBm': -50}
-    static_metadata = {"test output": "True"}
-    static_metadata.update(static_vna_settings)
-
-    counter = 1
-    afs = AbstractFluxSweep(rf_chain_letter="b")
+    afs = AbstractFluxSweep(rf_chain_letter="a")
     with afs:
-        for fcenter_GHz, fspan_GHz, flux_ramp_V in [(4, 0.1, 0.011), (8, 0.2, -0.011)]:
-            dynamic_kwargs = {"fcenter_GHz": fcenter_GHz, "fspan_GHz": fspan_GHz, "flux_ramp_V": flux_ramp_V,
-                              "path": os.path.join(ref.working_dir, F"test_output{counter}.txt")}
-            static_metadata.update(dynamic_kwargs)
-            afs.step(**static_metadata)
-            counter += 1
+        afs.scan_for_resonators(fmin_GHz=4, fmax_GHz=5, step_size_MHz=1)
 
 
 
