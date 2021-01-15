@@ -34,6 +34,8 @@ runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
 if not os.path.isfile(runtime_log):
     f = open(runtime_log, 'w')
     f.close()
+with open(runtime_log, "a") as f:
+    f.write(F"RunStart(utc):{str(datetime.utcnow())}\n")
 
 # data types
 file_extension_to_delimiter = {'csv': ",", 'psv': "|", 'txt': " ", "tsv": '\t'}
@@ -65,3 +67,5 @@ for band in band_params.keys():
     params_dict["span_GHz"] = params_dict["max_GHz"] - params_dict["min_GHz"]
     params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
     params_dict["band_num"] = int(band.lower().replace("band", ""))
+
+google_drive_api_key = "AIzaSyAJBe0g27WNUhsjSBLoLSNlT4WIdDgUJ_U"

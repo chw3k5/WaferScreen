@@ -171,7 +171,9 @@ class AbstractFluxSweep:
 if __name__ == "__main__":
     afs = AbstractFluxSweep(rf_chain_letter="a")
     with afs:
-        afs.scan_for_resonators(fmin_GHz=4, fmax_GHz=5, step_size_MHz=0.5)
+        for stepsize in [1, 0.707, 0.5, 0.2, 0.707, 0.05, 0.02]:
+            afs.scan_for_resonators(fmin_GHz=4.1, fmax_GHz=6.2, step_size_MHz=stepsize)
+
 
 
 
