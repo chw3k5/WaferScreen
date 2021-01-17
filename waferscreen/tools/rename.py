@@ -1,5 +1,5 @@
 import os
-from waferscreen.read.table_read import floats_table
+from waferscreen.analyze.table_read import floats_table
 
 
 def get_all_file_paths(directory):

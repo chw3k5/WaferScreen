@@ -1,6 +1,0 @@
-time,1603928373.66|ifband_hz,1000.0|wafer,8|atten,20.0|volts,0.000|path,1603928373.66-F_4.00_TO_5.00-BW_1000.0-ATTEN_20.0-VOLTS_0.000.CSV|location,princeton
-time,1603928640.88|ifband_hz,100.0|wafer,8|atten,20|volts,0.000|path,1603928640.88-F_4.00_TO_4.20-BW_100.0-ATTEN_20.0-VOLTS_0.000.CSV|location,princeton
-time,1603928908.10|ifband_hz,100.0|wafer,8|atten,20|volts,0.000|path,1603928908.10-F_4.20_TO_4.40-BW_100.0-ATTEN_20.0-VOLTS_0.000.CSV|location,princeton
-time,1603929175.28|ifband_hz,100.0|wafer,8|atten,20|volts,0.000|path,1603929175.28-F_4.40_TO_4.60-BW_100.0-ATTEN_20.0-VOLTS_0.000.CSV|location,princeton
-time,1603929442.63|ifband_hz,100.0|wafer,8|atten,20|volts,0.000|path,1603929442.63-F_4.60_TO_4.80-BW_100.0-ATTEN_20.0-VOLTS_0.000.CSV|location,princeton
-time,1603929709.84|ifband_hz,100.0|wafer,8|atten,20|volts,0.000|path,1603929709.84-F_4.80_TO_5.00-BW_100.0-ATTEN_20.0-VOLTS_0.000.CSV|location,princeton

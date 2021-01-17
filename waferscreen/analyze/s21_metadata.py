@@ -1,6 +1,6 @@
 import os
 from collections import UserDict
-from waferscreen.read.table_read import num_format
+from waferscreen.analyze.table_read import num_format
 from ref import s21_metadata_nist
 
 allowed_meta_data_types = (str, float, int)

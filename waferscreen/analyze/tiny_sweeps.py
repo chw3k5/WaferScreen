@@ -12,7 +12,7 @@ from waferscreen.res.single_fits import fit_resonator
 from waferscreen.res.finder import ResParams, res_params_header, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
 from waferscreen.res.lamb_fit import lambdafit, Phi0
-from waferscreen.read.table_read import ClassyReader, floats_table
+from waferscreen.analyze.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
 from waferscreen.mc.prodata import read_res_params
 
@@ -255,11 +255,7 @@ class TinySweeps:
             # fit the resonator
             popt, pcov = fit_resonator(freqs=sweep_dict['freq'],
                                        s21data=np.array(list(zip(sweep_dict['real'], sweep_dict['imag']))),
-                                       data_format='RI', model=self.fit_model,
-                                       error_est=self.error_est, throw_out=0,
-                                       make_plot=False, plot_dir=pro_data_dir,
-                                       file_prefix="",
-                                       show_plot=False)
+                                       data_format='RI', model=self.fit_model, error_est=self.error_est, throw_out=0)
         except RuntimeError:
             # If the resonator cannot be fitted move it to a folder, so the fitting is not attempted again.
             file_dir = os.path.dirname(file)

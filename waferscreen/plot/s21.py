@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import os
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
-from waferscreen.read.s21_inductor import read_s21
+from waferscreen.analyze.s21_inductor import read_s21
 
 
 def plot_s21(file=None, freqs_GHz=None, s21_complex=None, show_ri=False,

@@ -1,12 +1,12 @@
 import os
 import time
 import numpy as np
-from ref import usbvna_address, agilent8722es_address, today_str
+from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
-from waferscreen.read.s21_metadata import MetaDataDict
-from waferscreen.read.s21_inductor import write_s21, dirname_create
-import waferscreen.measure.flux_sweep_config as fsc
+from waferscreen.analyze.s21_metadata import MetaDataDict
+from waferscreen.analyze.s21_inductor import write_s21, dirname_create
+import waferscreen.inst_control.flux_sweep_config as fsc
 import ref
 
 

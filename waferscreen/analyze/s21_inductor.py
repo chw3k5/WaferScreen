@@ -1,16 +1,13 @@
 import os
-import time
 import copy
-import pathlib
 import numpy as np
 import datetime
 from matplotlib import pyplot as plt
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
-from waferscreen.read.table_read import num_format
-from waferscreen.read.s21_metadata import MetaDataDict
+from waferscreen.analyze.table_read import num_format
+from waferscreen.analyze.s21_metadata import MetaDataDict
 from waferscreen.tools.rename import get_all_file_paths
-from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import today_str, working_dir
 
 
@@ -182,16 +179,6 @@ class InductS21:
         else:
             self.metadata.update(kwargs)
 
-    def calc_metadata(self):
-
-        # self.metadata['band'] = band_center_to_band_number(self.metadata["freq_center_GHz"])
-
-        self.prepare_output_file()
-        self.metadata['raw_path'] = self.metadata['path']
-
-        self.metadata['plot_path'] = self.plot_file
-        self.metadata['path'] = self.output_file
-
     def calc_group_delay(self):
         self.get_mag_phase()
         self.group_delay_slope, self.group_delay_offset = \
@@ -202,6 +189,7 @@ class InductS21:
             self.phase_offset = ((self.group_delay_offset + np.pi) % (2.0 * np.pi)) - np.pi
         else:
             self.phase_offset = self.group_delay = float("nan")
+        self.metadata["group_delay_found_s"] = self.group_delay
         if self.verbose:
             print_str = F"{'%3.3f' % (self.group_delay * 1.0e9)} ns of cable delay, " + \
                         F"{'%3.3f' % (self.max_delay * 1.0e9)} ns is the maximum group delay measurable."
@@ -225,7 +213,9 @@ class InductS21:
             phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay - self.phase_offset))
             self.s21_complex = self.s21_complex * phase_factors
             self.group_delay_removed = True
-            self.metadata["group_delay_removed"] = F"utc:{datetime.datetime.utcnow()}"
+            self.metadata["group_delay_removed"] = group_delay
+            self.metadata["group_delay_removed_on"] = F"utc:{datetime.datetime.utcnow()}"
+
 
     def prepare_output_filenames(self):
         output_dir = os.path.join(self.parent_dirname, "pro")

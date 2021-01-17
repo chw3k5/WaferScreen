@@ -7,7 +7,6 @@ import scipy.special as specfunc
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from ref import pro_data_dir
 
 
 def rebound_starting_vals(bounds, starting_vals):
@@ -36,8 +35,7 @@ def renormalize_smat(smat, z0, z0_new):
     return smat_new
 
 
-def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_est='prop', throw_out=0,
-                  make_plot=True, plot_dir=pro_data_dir, file_prefix="", show_plot=False):
+def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_est='prop', throw_out=0):
     """
     Function which returns fit parameters to a resonator model
     freqs are the measured frequencies, s21data is the S21 data

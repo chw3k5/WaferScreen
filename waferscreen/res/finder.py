@@ -171,9 +171,7 @@ class ResFinder:
                                    int(min(res_index + n_samples + 1, len(self.s21) - 1))]
             # now fit the resonance
             popt, pcov = fit_res.fit_resonator(fit_freqs, fit_s21data, data_format='COM', model=self.fit_model,
-                                               error_est=self.error_est, throw_out=self.throw_out,
-                                               make_plot=self.fit_guess_plots, plot_dir=self.resonator_output_folder,
-                                               file_prefix=self.plot_prefix, show_plot=show_plot)
+                                               error_est=self.error_est, throw_out=self.throw_out)
 
             self.res_params.append(package_res_results(popt=popt, pcov=pcov, verbose=self.verbose))
         self.write_results()
