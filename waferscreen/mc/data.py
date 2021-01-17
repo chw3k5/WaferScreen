@@ -1,38 +1,43 @@
 import os
-from ref import pro_data_dir, raw_data_dir
-from waferscreen.read.s21_inductor import InductS21
+from ref import output_dirs
+from waferscreen.read.s21_inductor import InductS21, read_s21
 from waferscreen.read.s21_metadata import S21MetadataPrinceton, S21MetadataNist
-from waferscreen.read.prodata import read_pro_s21, crawl_raw_s21, crawl_s21
+from waferscreen.read.prodata import crawl_s21
+
+
+def get_subdirs(rootdir, matching_str):
+    folder_list = []
+    for root, subdirs, files in os.walk(rootdir):
+        for subdir in subdirs:
+            if subdir == matching_str:
+                folder_list.append(os.path.join(root, subdir))
+    return folder_list
 
 
 class DataManager:
     def __init__(self, user_input_group_delay=None, verbose=True):
         self.user_input_group_delay = user_input_group_delay
         self.verbose = verbose
-        self.raw_search_dirs = [os.path.join(raw_data_dir, dirname) for dirname in ["nist", "princeton"]]
-        self.meta_data_paths = [os.path.join(raw_data_dir, dirname1, dirname2, filename)
-                                for dirname1, dirname2, filename in [("princeton", "SMBK_wafer8", "meta_data.txt")]]
-        self.raw_s21_meta = MetaS21()
+        self.raw_search_dirs = output_dirs
+        self.raw_scan_files = None
 
     def from_scratch(self):
         self.raw_process_all()
 
     def raw_process_all(self):
-        for raw_path in crawl_raw_s21(search_dirs=self.raw_search_dirs):
-            self.raw_process(raw_path)
-
-    def raw_get_meta_data(self):
-        for meta_data_path in self.meta_data_paths:
-            self.raw_s21_meta.meta_from_file(meta_data_path)
+        self.raw_scan_files = []
+        for rootdir in output_dirs:
+            raw_dirs = get_subdirs(rootdir=rootdir, matching_str='raw')
+            for raw_dir in raw_dirs:
+                self.raw_scan_files.extend([os.path.join(raw_dir, path) for path in os.listdir(raw_dir)
+                                            if path[:4] == 'scan'])
+        for raw_scan_path in self.raw_scan_files:
+            self.raw_process(path=raw_scan_path)
 
     def raw_process(self, path):
-        if not self.raw_s21_meta.paths:
-            self.raw_get_meta_data()
-        inducts21 = InductS21(path, columns=None, verbose=self.verbose)
+        inducts21 = InductS21(path, verbose=self.verbose)
         inducts21.induct()
         inducts21.remove_group_delay(user_input_group_delay=self.user_input_group_delay)
-        inducts21.add_meta_data(**self.raw_s21_meta.file_to_meta[path])
-        inducts21.calc_meta_data()
         inducts21.write()
         inducts21.plot()
 
@@ -43,4 +48,4 @@ class DataProcessing(DataManager):
 
 if __name__ == "__main__":
     dm = DataManager(user_input_group_delay=None)
-    dm.from_scratch()
+    dm.raw_process_all()

@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 import os
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
-from waferscreen.read.prodata import read_pro_s21
+from waferscreen.read.s21_inductor import read_s21
 
 
 def plot_s21(file=None, freqs_GHz=None, s21_complex=None, show_ri=False,
@@ -11,11 +11,13 @@ def plot_s21(file=None, freqs_GHz=None, s21_complex=None, show_ri=False,
     legend_dict = {}
     data_dict = {}
     if file is not None and s21_complex is None and freqs_GHz is None and meta_data is None:
-        data_dict["freq"], s21_complex, meta_data = read_pro_s21(path=file)
+        s21_dict, meta_data = read_s21(path=file)
+        data_dict['freq'] = s21_dict["freq_ghz"]
+        data_dict["real"], data_dict["imag"] = s21_dict["real"], s21_dict["imag"]
     else:
         data_dict["freq"] = freqs_GHz
+        data_dict["real"], data_dict["imag"] = s21_complex.real, s21_complex.imag
     # Math
-    data_dict["real"], data_dict["imag"] = s21_complex.real, s21_complex.imag
     data_dict["mag"] = 20.0 * np.log10(np.sqrt(np.square(data_dict['real']) + np.square(data_dict['imag'])))
     data_dict['phase'] = np.arctan2(data_dict['imag'], data_dict['real'])
 

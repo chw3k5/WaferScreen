@@ -3,12 +3,12 @@ import time
 import copy
 import pathlib
 import numpy as np
+import datetime
 from matplotlib import pyplot as plt
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
-from waferscreen.read.prodata import read_pro_s21
 from waferscreen.read.table_read import num_format
-from waferscreen.read.s21_metadata import S21MetadataPrinceton, S21MetadataNist
+from waferscreen.read.s21_metadata import MetaDataDict
 from waferscreen.tools.rename import get_all_file_paths
 from waferscreen.tools.band_calc import band_center_to_band_number
 from ref import today_str, working_dir
@@ -26,7 +26,60 @@ def write_s21(output_file, freqs_ghz, s21_complex, metadata):
             imag = s21_value.imag
             f.write(F"{freq},{real},{imag}\n")
             
-            
+
+def read_s21(path):
+    with open(path, "r") as f:
+        raw_lines = f.readlines()
+    metadata = MetaDataDict()
+    header = ["freq_ghz", "real", "imag"]
+    # get the metadata and header
+    line_index = 0
+    while raw_lines[line_index][0] == "#":
+        try:
+            context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":")
+        except ValueError:
+            pass
+        else:
+            context_type = context_type.rstrip().lower()
+            if context_type == "header":
+                header = [column_name.strip().lower() for column_name in context_data.split(",")]
+            elif context_type == "metadata":
+                for key_value_pair in context_data.split("|"):
+                    raw_key, raw_value = key_value_pair.split(",")
+                    metadata[raw_key] = raw_value
+        line_index += 1
+    else:
+        s21_data = raw_lines[line_index:]
+
+    s21_assembly_dict = {column_name: [] for column_name in header}
+    for raw_s21_line in s21_data:
+        [s21_assembly_dict[column_name].append(float(raw_cell_value))
+         for column_name, raw_cell_value in zip(header, raw_s21_line.split(","))]
+    return {column_name: np.array(s21_assembly_dict[column_name]) for column_name in s21_assembly_dict.keys()}, metadata
+
+
+def dir_name_create(sweep_type="scan", res_id=None):
+    dir_build_list = [str(fsc.location), str(fsc.wafer), str(today_str)]
+    if sweep_type == "scan":
+        dir_build_list.append(str(sweep_type))
+    else:
+        dir_build_list.append(str(res_id))
+    path_str = fsc.output_base_dir
+    for dir_name in dir_build_list:
+        path_str = os.path.join(path_str, dir_name)
+        if not os.path.isdir(path_str):
+            os.mkdir(path_str)
+    else:
+        raw_dir = os.path.join(path_str, "raw")
+        if not os.path.isdir(raw_dir):
+            os.mkdir(raw_dir)
+    return path_str
+
+
+def dir_name_parse(dirname):
+    return location, wafer, data_str, process_level
+
+
 def ri_to_magphase(r, i):
     s21_mag = 20 * np.log10(np.sqrt((r ** 2.0) + (i ** 2.0)))
     s21_phase = np.arctan2(i, r)
@@ -67,26 +120,12 @@ def s21_subplot(ax, plot_data, x_data_str, y_data_str, y_label_str="", x_label_s
 
 
 class InductS21:
-    def __init__(self, path, columns=None, verbose=True):
+    def __init__(self, path, verbose=True):
         self.path = path
+        self.local_dirname, self.basename = os.path.split(self.path)
+        self.parent_dirname, self.process_level_dirname = os.path.split(self.local_dirname)
+
         self.verbose = verbose
-        if columns is None:
-            self.columns = ("freq_Hz", 'real', "imag")
-        else:
-            self.columns = columns
-        _, self.freq_unit = self.columns[0].lower().split("_")
-        if self.freq_unit == "ghz":
-            self.convert_to_GHz = 1.0
-        elif self.freq_unit == "mhz":
-            self.convert_to_GHz = 1.0e-3
-        elif self.freq_unit == "khz":
-            self.convert_to_GHz = 1.0e-6
-        elif self.freq_unit == "hz":
-            self.convert_to_GHz = 1.0e-9
-        elif self.freq_unit == "thz":
-            self.convert_to_GHz = 1.0e+3
-        else:
-            raise KeyError("Frequency unit: " + str(self.freq_unit) + " not recognized.")
 
         self.group_delay_removed = False
         # Initialized variables used in methods
@@ -101,7 +140,7 @@ class InductS21:
         self.s21_mag = None
         self.s21_phase = None
         self.s21_phase_raw_unwrapped = None
-        self.metadata = {}
+        self.metadata = None
         self.group_delay = None
         self.phase_offset = None
         self.group_delay_slope = None
@@ -113,7 +152,8 @@ class InductS21:
 
     def simple_induct(self, metadata_dict=None):
         self.remove_group_delay()
-        self.add_metadata(**metadata_dict)
+        if metadata_dict is not None:
+            self.add_metadata(**metadata_dict)
         self.calc_metadata()
         self.write()
         self.plot()
@@ -124,29 +164,10 @@ class InductS21:
         Converts to standard format of frequency in GHz,
         and S21 in as a real and imaginary column.
         """
-        with open(self.path, 'r') as f:
-            raw_data = f.readlines()
-
-        split_data = [striped_line.split(",") for striped_line in [raw_line.strip() for raw_line in raw_data]
-                      if striped_line != ""]
-        data = [[num_format(single_number) for single_number in data_row] for data_row in split_data]
-        # find the first row with a number the expected 2 column format
-        for data_index, data_line in list(enumerate(data)):
-            try:
-                freq, s21_a, s21_b = data_line
-                if all((isinstance(freq, float), isinstance(s21_a, float), isinstance(s21_b, float))):
-                    s21_start_index = data_index
-                    break
-            except ValueError:
-                pass
-        else:
-            raise KeyError("The file:" + str(self.path) + " does not have the S21 data in the expected 3 column format")
-        s21_data = data[s21_start_index:]
-        data_matrix = np.array(s21_data)
-        self.freqs_GHz = data_matrix[:, 0] * self.convert_to_GHz
+        s21_dict, self.metadata = read_s21(path=self.path)
+        self.freqs_GHz = s21_dict["freq_ghz"]
+        real, imag = s21_dict["real"], s21_dict["imag"]
         self.radians_per_second = self.freqs_GHz * 1.0e9 * 2.0 * np.pi
-        real = data_matrix[:, 1]
-        imag = data_matrix[:, 2]
         self.s21_complex_raw = real + (1j * imag)
         self.s21_complex = copy.deepcopy(self.s21_complex_raw)
         self.freq_step = np.mean(self.freqs_GHz[1:] - self.freqs_GHz[:-1]) * 1.0e9
@@ -171,15 +192,9 @@ class InductS21:
             self.metadata.update(kwargs)
 
     def calc_metadata(self):
-        if self.freqs_GHz is not None:
-            self.metadata["freq_min_GHz"] = np.min(self.freqs_GHz)
-            self.metadata["freq_max_GHz"] = np.max(self.freqs_GHz)
-            self.metadata["freq_center_GHz"] = (self.metadata["freq_max_GHz"] + self.metadata["freq_min_GHz"]) / 2.0
-            self.metadata["freq_span_GHz"] = self.metadata["freq_max_GHz"] - self.metadata["freq_min_GHz"]
-            self.metadata["freq_step"] = self.freq_step
-            self.metadata['band'] = band_center_to_band_number(self.metadata["freq_center_GHz"])
-        if "time" in self.metadata.keys():
-            self.metadata["datetime"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.metadata["time"]))
+
+        # self.metadata['band'] = band_center_to_band_number(self.metadata["freq_center_GHz"])
+
         self.prepare_output_file()
         self.metadata['raw_path'] = self.metadata['path']
         self.metadata['plot_path'] = self.plot_file
@@ -187,7 +202,8 @@ class InductS21:
 
     def calc_group_delay(self):
         self.get_mag_phase()
-        self.group_delay_slope, self.group_delay_offset = np.polyfit(self.radians_per_second, self.s21_phase_unwrapped, deg=1)
+        self.group_delay_slope, self.group_delay_offset = \
+            np.polyfit(self.radians_per_second, self.s21_phase_unwrapped, deg=1)
         group_delay = self.group_delay_slope * -1.0
         if group_delay < self.max_delay:
             self.group_delay = group_delay
@@ -201,20 +217,23 @@ class InductS21:
             print(print_str)
 
     def remove_group_delay(self, user_input_group_delay=None):
-        # get the calculate the group delay if no user input
-        if user_input_group_delay is None:
-            if self.group_delay is None:
-                self.calc_group_delay()
-            if self.group_delay == float("nan"):
-                raise ValueError("Calculated group delay was greater than the allowed resolution. If the group delay " +
-                                 "is known, input it thought the 'user_input_group_delay' variable.")
-            group_delay = self.group_delay
-        else:
-            group_delay = user_input_group_delay
-        # remove group delay
-        phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay - self.phase_offset))
-        self.s21_complex = self.s21_complex * phase_factors
-        self.group_delay_removed = True
+        if "group_delay_removed" not in self.metadata.keys():
+            # get the calculate the group delay if no user input
+            if user_input_group_delay is None:
+                if self.group_delay is None:
+                    self.calc_group_delay()
+                if self.group_delay == float("nan"):
+                    raise ValueError("Calculated group delay was greater than the allowed resolution.\n" +\
+                                     "If the group delay " +
+                                     "is known, input it thought the 'user_input_group_delay' variable.")
+                group_delay = self.group_delay
+            else:
+                group_delay = user_input_group_delay
+            # remove group delay
+            phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay - self.phase_offset))
+            self.s21_complex = self.s21_complex * phase_factors
+            self.group_delay_removed = True
+            self.metadata["group_delay_removed"] = F"utc:{datetime.datetime.utcnow()}"
 
     def prepare_output_file(self):
         # output the file in the standard directory structure
@@ -250,6 +269,7 @@ class InductS21:
         if not self.group_delay_removed:
             self.remove_group_delay()
         # write the output S21 file
+        self.prepare_output_file()
         write_s21(output_file=self.output_file, freqs_ghz=self.freqs_GHz, 
                   s21_complex=self.s21_complex, metadata=self.metadata)
 
