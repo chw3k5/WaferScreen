@@ -73,7 +73,7 @@ def histogram_res_sweep(freq_ghz, res_params, plot_file_name=None):
 if __name__ == '__main__':
     import os
     from ref import pro_data_dir
-    from waferscreen.read.prodata import read_res_params, read_pro_s21
+    from waferscreen.mc.prodata import read_res_params
 
     path = os.path.join(pro_data_dir, "princton_s21_fits.csv")
     plot_path = path.replace(".csv", ".pdf")

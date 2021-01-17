@@ -5,7 +5,7 @@ from ref import usbvna_address, agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.read.s21_metadata import MetaDataDict
-from waferscreen.read.s21_inductor import write_s21
+from waferscreen.read.s21_inductor import write_s21, dirname_create
 import waferscreen.measure.flux_sweep_config as fsc
 import ref
 
@@ -27,22 +27,13 @@ def ramp_name_create(power_dBm, current_uA, res_num, utc):
     return F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm_utc{utc}.csv"
 
 
-def dir_name_create(sweep_type="scan", res_id=None):
-    dir_build_list = [str(fsc.location), str(fsc.wafer), str(today_str)]
-    if sweep_type == "scan":
-        dir_build_list.append(str(sweep_type))
-    else:
-        dir_build_list.append(str(res_id))
-    path_str = fsc.output_base_dir
-    for dir_name in dir_build_list:
-        path_str = os.path.join(path_str, dir_name)
-        if not os.path.isdir(path_str):
-            os.mkdir(path_str)
-    else:
-        raw_dir = os.path.join(path_str, "raw")
-        if not os.path.isdir(raw_dir):
-            os.mkdir(raw_dir)
-    return path_str
+def dirname_create_raw(sweep_type="scan", res_id=None):
+    path_str = dirname_create(output_base_dir=fsc.output_base_dir, location=fsc.location,
+                              wafer=fsc.wafer, date_str=today_str, sweep_type=sweep_type, res_id=res_id)
+    raw_dir = os.path.join(path_str, "raw")
+    if not os.path.isdir(raw_dir):
+        os.mkdir(raw_dir)
+    return raw_dir
 
 
 class AbstractFluxSweep:
@@ -111,7 +102,7 @@ class AbstractFluxSweep:
         freqs_GHz, s21real, s21imag, sweep_metadata = self.abstract_vna.vna_sweep()
         # write out sdata
         if kwargs["export_type"] == "scan":
-            dirname = dir_name_create(sweep_type=kwargs["export_type"])
+            dirname = dirname_create_raw(sweep_type=kwargs["export_type"])
             basename = F"scan{'%2.3f' % sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % sweep_metadata['fmax_GHz']}GHz_" + \
                        F"{sweep_metadata['utc'].replace(':', '-')}.txt"
         else:
@@ -119,8 +110,8 @@ class AbstractFluxSweep:
                                         current_uA=sweep_metadata['flux_current_uA'],
                                         res_num=sweep_metadata['res_num'],
                                         utc=sweep_metadata['utc'])
-            dirname = dir_name_create(sweep_type=kwargs["export_type"], res_id=sweep_metadata['res_id'])
-        sweep_metadata['path'] = os.path.join(dirname, "raw", basename)
+            dirname = dirname_create_raw(sweep_type=kwargs["export_type"], res_id=sweep_metadata['res_id'])
+        sweep_metadata['path'] = os.path.join(dirname, basename)
         metadata_this_sweep.update(sweep_metadata)
         self.write(output_file=sweep_metadata['path'], freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
                    metadata=metadata_this_sweep)

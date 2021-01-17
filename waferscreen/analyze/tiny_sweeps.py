@@ -14,7 +14,7 @@ from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
 from waferscreen.res.lamb_fit import lambdafit, Phi0
 from waferscreen.read.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
-from waferscreen.read.prodata import read_res_params
+from waferscreen.mc.prodata import read_res_params
 
 
 colors = ['firebrick', 'dodgerblue', 'darkorchid', 'darkgoldenrod', 'forestgreen', 'saddlebrown']

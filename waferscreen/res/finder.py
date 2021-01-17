@@ -1,12 +1,11 @@
 import os
 import shutil
-from typing import NamedTuple, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 from ref import raw_data_dir, pro_data_dir, s21_file_extensions
 import waferscreen.res.single_fits as fit_res
-from waferscreen.read.prodata import read_pro_s21, ResParams, res_params_header
+from waferscreen.mc.prodata import read_pro_s21, ResParams, res_params_header
 
 
 """

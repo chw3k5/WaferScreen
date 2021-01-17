@@ -1,4 +1,4 @@
-from waferscreen.read.prodata import crawl_s21, read_pro_s21, ProS21
+from waferscreen.mc.prodata import crawl_s21
 from waferscreen.res.finder import ResFinder
 from waferscreen.plot.s21 import plot_21
 

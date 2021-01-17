@@ -36,7 +36,7 @@ def read_s21(path):
     line_index = 0
     while raw_lines[line_index][0] == "#":
         try:
-            context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":")
+            context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":", 1)
         except ValueError:
             pass
         else:
@@ -46,11 +46,10 @@ def read_s21(path):
             elif context_type == "metadata":
                 for key_value_pair in context_data.split("|"):
                     raw_key, raw_value = key_value_pair.split(",")
-                    metadata[raw_key] = raw_value
+                    metadata[raw_key] = num_format(raw_value.strip())
         line_index += 1
     else:
         s21_data = raw_lines[line_index:]
-
     s21_assembly_dict = {column_name: [] for column_name in header}
     for raw_s21_line in s21_data:
         [s21_assembly_dict[column_name].append(float(raw_cell_value))
@@ -58,26 +57,18 @@ def read_s21(path):
     return {column_name: np.array(s21_assembly_dict[column_name]) for column_name in s21_assembly_dict.keys()}, metadata
 
 
-def dir_name_create(sweep_type="scan", res_id=None):
-    dir_build_list = [str(fsc.location), str(fsc.wafer), str(today_str)]
+def dirname_create(output_basedir, location, wafer, date_str, sweep_type="scan", res_id=None):
+    dir_build_list = [str(location), str(wafer), str(date_str)]
     if sweep_type == "scan":
         dir_build_list.append(str(sweep_type))
     else:
         dir_build_list.append(str(res_id))
-    path_str = fsc.output_base_dir
+    path_str = output_basedir
     for dir_name in dir_build_list:
         path_str = os.path.join(path_str, dir_name)
         if not os.path.isdir(path_str):
             os.mkdir(path_str)
-    else:
-        raw_dir = os.path.join(path_str, "raw")
-        if not os.path.isdir(raw_dir):
-            os.mkdir(raw_dir)
     return path_str
-
-
-def dir_name_parse(dirname):
-    return location, wafer, data_str, process_level
 
 
 def ri_to_magphase(r, i):
@@ -197,6 +188,7 @@ class InductS21:
 
         self.prepare_output_file()
         self.metadata['raw_path'] = self.metadata['path']
+
         self.metadata['plot_path'] = self.plot_file
         self.metadata['path'] = self.output_file
 
@@ -235,41 +227,19 @@ class InductS21:
             self.group_delay_removed = True
             self.metadata["group_delay_removed"] = F"utc:{datetime.datetime.utcnow()}"
 
-    def prepare_output_file(self):
-        # output the file in the standard directory structure
-        if "location" in self.metadata.keys():
-            location = self.metadata["location"]
-        else:
-            location = "null"
-        if "wafer" in self.metadata.keys():
-            wafer = str(self.metadata["wafer"])
-        else:
-            wafer = "null"
-        if "datetime" in self.metadata.keys():
-            day_str, _time_of_day_str = self.metadata["datetime"].split(" ")
-        else:
-            day_str = "0000-00-00"
-        if "band" in self.metadata.keys():
-            band = F"Band{'%02i' % (self.metadata['band'])}"
-        else:
-            band = "null"
-        self.output_file = pro_data_dir
-        for directory in [location, wafer, band, day_str]:
-            self.output_file = os.path.join(self.output_file, directory)
-            if not os.path.exists(self.output_file):
-                os.mkdir(self.output_file)
-        else:
-            basename = os.path.basename(self.path)
-            prefix, _extension = basename.rsplit(".", 1)
-            self.output_file = os.path.join(self.output_file, prefix + "_s21.csv")
-            self.plot_file, _ = self.output_file.rsplit(".", 1)
-            self.plot_file += '.pdf'
+    def prepare_output_filenames(self):
+        output_dir = os.path.join(self.parent_dirname, "pro")
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
+        prefix, _extension = self.basename.rsplit(".", 1)
+        self.output_file = os.path.join(output_dir, prefix + "_phase.csv")
+        self.plot_file = os.path.join(output_dir, prefix + "_phase.pdf")
 
     def write(self):
         if not self.group_delay_removed:
             self.remove_group_delay()
         # write the output S21 file
-        self.prepare_output_file()
+        self.prepare_output_filenames()
         write_s21(output_file=self.output_file, freqs_ghz=self.freqs_GHz, 
                   s21_complex=self.s21_complex, metadata=self.metadata)
 
@@ -373,7 +343,7 @@ class InductS21:
         # Display
         if save:
             if self.output_file is None:
-                self.prepare_output_file()
+                self.prepare_output_filenames()
             plt.draw()
             plt.savefig(self.plot_file)
             print("Saved Plot to:", self.plot_file)
@@ -381,20 +351,6 @@ class InductS21:
             plt.show()
         plt.clf()
         return
-
-
-def crawl_raw_s21(search_dirs=None):
-    if search_dirs is None:
-        search_dirs = [raw_data_dir]
-    found_paths = []
-    for search_dir in search_dirs:
-        found_paths.extend([str(path) for path in pathlib.Path(search_dir).rglob('*.CSV')])
-    return found_paths
-
-
-def induct_nist(verbose=True):
-    s21by_path = {}
-    return s21by_path
 
 
 def induct_princeton(verbose=True):
@@ -424,11 +380,6 @@ def induct_dirs(search_dirs=None, columns=None, verbose=True):
         s21by_path[path].simple_induct(metadata_dict=None)
     return s21by_path
 
-
-def induct_all(verbose=True):
-    s21by_path = induct_princeton(verbose=verbose)
-    s21by_path.update(induct_nist(verbose=verbose))
-    return s21by_path
 
 
 if __name__ == "__main__":
