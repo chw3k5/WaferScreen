@@ -92,10 +92,11 @@ def extract_plot_val(plot_dict, val_string, list_index=0, keys=None):
     if keys is None:
         keys = plot_dict.keys()
     if val_string in keys:
-        if isinstance(plot_dict[val_string], list):
-            val = plot_dict[val_string][list_index]
+        thing = plot_dict[val_string]
+        if isinstance(thing, list):
+            val = thing[list_index]
         else:
-            val = plot_dict[val_string]
+            val = thing
     else:
         val = default_plot_dict[val_string]
     return val

@@ -70,7 +70,7 @@ def get_subdirs(rootdir, matching_str):
     return folder_list
 
 
-def get_pro_s21(process_type, export_type="scan"):
+def get_pro_s21(process_type, export_type="scan", extensions={"txt", "csv"}):
     len_pro_type = len(process_type)
     len_export_type = len(export_type)
     pro_data_folders = []
@@ -78,9 +78,10 @@ def get_pro_s21(process_type, export_type="scan"):
     files_to_return = []
     for pro_data_folder in pro_data_folders:
         for basename in os.listdir(pro_data_folder):
-            filename, _extension = basename.rsplit(".", 1)
+            filename, extension = basename.rsplit(".", 1)
             if max(len_pro_type, len_export_type) < len(filename):
-                if filename[-len_pro_type:] == process_type and filename[:len_export_type] == export_type:
+                if filename[-len_pro_type:] == process_type and filename[:len_export_type] == export_type and \
+                        extension.lower() in extensions:
                     files_to_return.append(os.path.join(pro_data_folder, basename))
     return files_to_return
 
@@ -119,10 +120,10 @@ class DataManager:
         for scan_file in self.phase_corrected_scan_files:
             res_pipe = ResPipe(s21_path=scan_file, verbose=self.verbose)
             res_pipe.read()
-            res_pipe.jake_res_finder()
+            res_pipe.baseline_subtraction()
 
 
 if __name__ == "__main__":
     dm = DataManager(user_input_group_delay=None)
-    dm.raw_process_all()
+    # dm.raw_process_all()
     dm.find_scans_resonators()

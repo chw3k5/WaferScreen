@@ -2,7 +2,7 @@ from waferscreen.scripts import sweep_to_find_resonances, check_out, band_sweeps
 from waferscreen.scripts import acquire_tiny_sweeps, analyze_tiny_sweeps
 from waferscreen.analyze.tiny_sweeps import TinySweeps
 from ref import today_str
-from waferscreen.plot.s21 import plot_21
+from waferscreen.plot.s21_plots import plot_21
 
 
 sweep_file = "D:\\waferscreen\\output\\s21\\8\\Band01\\2020-10-04\\8_Band01_2020-10-04_run1.csv"

@@ -2,7 +2,7 @@ import os
 import numpy as np
 from scipy.signal import savgol_filter
 from ref import raw_data_dir, today_str, check_out_dir, band_params
-from waferscreen.plot.s21 import plot_21
+from waferscreen.plot.s21_plots import plot_21
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.res.finder import ResFinder
 from waferscreen.analyze.tiny_sweeps import TinySweeps

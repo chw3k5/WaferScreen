@@ -1,4 +1,4 @@
-from waferscreen.plot.s21 import plot_21
+from waferscreen.plot.s21_plots import plot_21
 from waferscreen.scripts import check_out, band_sweeps, acquire_tiny_sweeps
 from waferscreen.analyze.tiny_sweeps import TinySweeps
 import time

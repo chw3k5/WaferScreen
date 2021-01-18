@@ -1,23 +1,71 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
-from waferscreen.analyze.s21_inductor import read_s21, write_s21
-from waferscreen.analyze.s21_metadata import MetaDataDict
+from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
+from waferscreen.plot.s21_plots import plot_filter
+import waferscreen.analyze.res_pipeline_config as rpc
+from waferscreen.analyze.mariscotti import mariscotti
 
 
 class ResPipe:
     def __init__(self, s21_path, verbose=True):
         self.path = s21_path
         self.verbose = True
-        self.unprocessed_freq_GHz, self.unprocessed_reals21, self.unprocessed_imags21 = None, None, None
         self.meta_data = None
+        self.unprocessed_freq_GHz, self.unprocessed_reals21, self.unprocessed_imags21 = None, None, None
+        self.lowpass_filter_reals21, self.lowpass_filter_imags21 = None, None
+        self.highpass_filter_reals21, self.highpass_filter_imags21 = None, None
+        self.highpass_filter_mags21, self.lowpass_filter_mags21 = None, None
 
     def read(self):
         data_dict, self.meta_data = read_s21(path=self.path)
         self.unprocessed_freq_GHz = data_dict["freq_ghz"]
         self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"],  data_dict["imag"]
 
-    def gain_correct(self):
-        pass
+    def savgol_filter_mag(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
+        mag, phase = ri_to_magphase(r=reals21, i=imags21)
+        if window_length % 2 == 0:
+            # window length needs to be an odd int
+            window_length += 1
+        self.lowpass_filter_mags21 = savgol_filter(x=mag, window_length=window_length, polyorder=polyorder)
+        self.highpass_filter_mags21 = mag - self.lowpass_filter_mags21
+        self.lowpass_filter_reals21, self.lowpass_filter_imags21 = \
+            magphase_to_realimag(mag=self.lowpass_filter_mags21, phase=phase)
+        self.highpass_filter_reals21, self.highpass_filter_imags21 = \
+            magphase_to_realimag(mag=self.highpass_filter_mags21, phase=phase)
+        if plot:
+            self.plot_filter()
+
+    def savgol_filter_ri(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
+        self.savgol_filter(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                           window_length=window_length, polyorder=2, plot=True)
+        if reals21 is None or imags21 is None:
+            reals21, imags21 = self.unprocessed_reals21, self.unprocessed_imags21
+        if window_length % 2 == 0:
+            # window length needs to be an odd int
+            window_length += 1
+        self.lowpass_filter_reals21 = savgol_filter(x=reals21, window_length=window_length, polyorder=polyorder)
+        self.lowpass_filter_imags21 = savgol_filter(x=imags21, window_length=window_length, polyorder=polyorder)
+        self.highpass_filter_reals21 = reals21 - self.lowpass_filter_reals21
+        self.highpass_filter_imags21 = imags21 - self.lowpass_filter_imags21
+        if plot:
+            self.plot_filter()
+
+    def plot_filter(self):
+        plot_filter(freqs_GHz=self.unprocessed_freq_GHz,
+                    original_s21=self.unprocessed_reals21 + 1j * self.unprocessed_imags21,
+                    lowpass_s21=self.lowpass_filter_reals21 + 1j * self.lowpass_filter_imags21,
+                    highpass_s21=self.highpass_filter_reals21 + 1j * self.highpass_filter_imags21)
+
+    def baseline_subtraction(self):
+        f_step_GHz = self.unprocessed_freq_GHz[1] - self.unprocessed_freq_GHz[0]
+        window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
+        self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                               window_length=window_length, polyorder=2, plot=False)
+
+        output = mariscotti(y=self.highpass_filter_mags21[700:1200], nsmooth=5, err=None, error_factor=1.0e0, find_peaks=False,
+                            pk_gsd=True, show_plot=True, verbose=self.verbose)
+        print()
 
     def jake_res_finder(self, edge_search_depth=50,
                               smoothing_scale_kHz=25,

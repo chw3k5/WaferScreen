@@ -3,7 +3,7 @@ from datetime import datetime
 import numpy as np
 from waferscreen.inst_control import Keysight_USB_VNA
 from waferscreen.inst_control.aly8722ES import aly8722ES
-from waferscreen.plot.s21 import plot_s21
+from waferscreen.plot.s21_plots import plot_s21
 from waferscreen.tools.timer import timer 
 from ref import usbvna_address, agilent8722es_address
 
