@@ -5,6 +5,7 @@ from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magp
 from waferscreen.plot.s21_plots import plot_filter
 import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.analyze.mariscotti import mariscotti
+from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 
 
 class ResPipe:
@@ -23,6 +24,7 @@ class ResPipe:
         self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"],  data_dict["imag"]
 
     def savgol_filter_mag(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
+        self.filter_reset()
         mag, phase = ri_to_magphase(r=reals21, i=imags21)
         if window_length % 2 == 0:
             # window length needs to be an odd int
@@ -36,9 +38,13 @@ class ResPipe:
         if plot:
             self.plot_filter()
 
+    def filter_reset(self):
+        self.lowpass_filter_reals21, self.lowpass_filter_imags21 = None, None
+        self.highpass_filter_reals21, self.highpass_filter_imags21 = None, None
+        self.highpass_filter_mags21, self.lowpass_filter_mags21 = None, None
+
     def savgol_filter_ri(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
-        self.savgol_filter(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                           window_length=window_length, polyorder=2, plot=True)
+        self.filter_reset()
         if reals21 is None or imags21 is None:
             reals21, imags21 = self.unprocessed_reals21, self.unprocessed_imags21
         if window_length % 2 == 0:
@@ -51,6 +57,31 @@ class ResPipe:
         if plot:
             self.plot_filter()
 
+    def cosine_filter_mag(self, reals21=None, imags21=None, smoothing_scale=5.0e6, plot=False):
+        self.filter_reset()
+        mag, phase = ri_to_magphase(r=reals21, i=imags21)
+        self.lowpass_filter_mags21 = \
+            fr_interactive.lowpass_cosine(y=mag,
+                                          tau=(self.unprocessed_freq_GHz[1] - self.unprocessed_freq_GHz[0]) * 1.0e9,
+                                          f_3db=1.0 / smoothing_scale,
+                                          width=0.1 * (1.0 / smoothing_scale),
+                                          padd_data=True)
+        # this filter needs odd lengths of data
+        mag = mag[:len(self.lowpass_filter_mags21)]
+        phase = phase[:len(self.lowpass_filter_mags21)]
+        self.unprocessed_freq_GHz = self.unprocessed_freq_GHz[:len(self.lowpass_filter_mags21)]
+        self.unprocessed_reals21 = self.unprocessed_reals21[:len(self.lowpass_filter_mags21)]
+        self.unprocessed_imags21 = self.unprocessed_imags21[:len(self.lowpass_filter_mags21)]
+        self.highpass_filter_mags21 = mag - self.lowpass_filter_mags21
+        self.lowpass_filter_reals21, self.lowpass_filter_imags21 = \
+            magphase_to_realimag(mag=self.lowpass_filter_mags21, phase=phase)
+        self.highpass_filter_reals21, self.highpass_filter_imags21 = \
+            magphase_to_realimag(mag=self.highpass_filter_mags21, phase=phase)
+        if plot:
+            self.plot_filter()
+        return mag, phase
+
+
     def plot_filter(self):
         plot_filter(freqs_GHz=self.unprocessed_freq_GHz,
                     original_s21=self.unprocessed_reals21 + 1j * self.unprocessed_imags21,
@@ -59,13 +90,22 @@ class ResPipe:
 
     def baseline_subtraction(self):
         f_step_GHz = self.unprocessed_freq_GHz[1] - self.unprocessed_freq_GHz[0]
-        window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
-        self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                               window_length=window_length, polyorder=2, plot=False)
+        # window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
+        # self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+        #                        window_length=window_length, polyorder=2, plot=False)
+        mag, phase = self.cosine_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                                            smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9, plot=False)
+        i_thresh = fr_interactive.interactive_threshold_plot(chan_freqs=self.unprocessed_freq_GHz * 1.0e3,
+                                                             data=self.highpass_filter_mags21,
+                                                             peak_threshold=1.5)
 
-        output = mariscotti(y=self.highpass_filter_mags21[700:1200], nsmooth=5, err=None, error_factor=1.0e0, find_peaks=False,
-                            pk_gsd=True, show_plot=True, verbose=self.verbose)
-        print()
+        for minima_index, data_index_minima in list(enumerate(i_thresh.local_minima)):
+            minima_dict = i_thresh.minima_as_windows[minima_index]
+            minima_value = mag[data_index_minima]
+
+
+
+
 
     def jake_res_finder(self, edge_search_depth=50,
                               smoothing_scale_kHz=25,
