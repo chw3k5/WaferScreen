@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
+from scipy.interpolate import interp1d
 from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
 from waferscreen.plot.s21_plots import plot_filter
 import waferscreen.analyze.res_pipeline_config as rpc
@@ -29,7 +30,18 @@ class ResPipe:
         if window_length % 2 == 0:
             # window length needs to be an odd int
             window_length += 1
-        self.lowpass_filter_mags21 = savgol_filter(x=mag, window_length=window_length, polyorder=polyorder)
+        self.filter_update_mag(mag=mag, phase=phase,
+                               lowpass_filter_mags21=savgol_filter(x=mag, window_length=window_length, polyorder=polyorder),
+                               plot=plot)
+        return mag, phase
+
+    def filter_reset(self):
+        self.lowpass_filter_reals21, self.lowpass_filter_imags21 = None, None
+        self.highpass_filter_reals21, self.highpass_filter_imags21 = None, None
+        self.highpass_filter_mags21, self.lowpass_filter_mags21 = None, None
+
+    def filter_update_mag(self, mag, phase, lowpass_filter_mags21, plot=False):
+        self.lowpass_filter_mags21 = lowpass_filter_mags21
         self.highpass_filter_mags21 = mag - self.lowpass_filter_mags21
         self.lowpass_filter_reals21, self.lowpass_filter_imags21 = \
             magphase_to_realimag(mag=self.lowpass_filter_mags21, phase=phase)
@@ -37,11 +49,6 @@ class ResPipe:
             magphase_to_realimag(mag=self.highpass_filter_mags21, phase=phase)
         if plot:
             self.plot_filter()
-
-    def filter_reset(self):
-        self.lowpass_filter_reals21, self.lowpass_filter_imags21 = None, None
-        self.highpass_filter_reals21, self.highpass_filter_imags21 = None, None
-        self.highpass_filter_mags21, self.lowpass_filter_mags21 = None, None
 
     def savgol_filter_ri(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
         self.filter_reset()
@@ -81,27 +88,50 @@ class ResPipe:
             self.plot_filter()
         return mag, phase
 
-
     def plot_filter(self):
         plot_filter(freqs_GHz=self.unprocessed_freq_GHz,
                     original_s21=self.unprocessed_reals21 + 1j * self.unprocessed_imags21,
                     lowpass_s21=self.lowpass_filter_reals21 + 1j * self.lowpass_filter_imags21,
                     highpass_s21=self.highpass_filter_reals21 + 1j * self.highpass_filter_imags21)
 
-    def baseline_subtraction(self):
+    def baseline_subtraction(self, cosine_filter=False, window_padding=3):
+        # initial filtering in magnitude space
         f_step_GHz = self.unprocessed_freq_GHz[1] - self.unprocessed_freq_GHz[0]
-        # window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
-        # self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-        #                        window_length=window_length, polyorder=2, plot=False)
-        mag, phase = self.cosine_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                                            smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9, plot=False)
-        i_thresh = fr_interactive.interactive_threshold_plot(chan_freqs=self.unprocessed_freq_GHz * 1.0e3,
-                                                             data=self.highpass_filter_mags21,
-                                                             peak_threshold=1.5)
-
+        window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
+        if cosine_filter:
+            mag, phase = self.cosine_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                                                smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9, plot=False)
+        else:
+            mag, phase = self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                                                window_length=window_length, polyorder=2, plot=True)
+        # interaction threshold plotting, return local minima and window information about size of the resonators
+        i_thresh = fr_interactive.interactive_threshold_plot(f_Hz=self.unprocessed_freq_GHz * 1.0e9,
+                                                             s21_mag=self.highpass_filter_mags21,
+                                                             peak_threshold_dB=0.5,
+                                                             spacing_threshold_Hz=rpc.resonator_spacing_threshold_Hz,
+                                                             window_padding=window_padding)
+        self.highpass_filter_mags21[self.highpass_filter_mags21 > -1.0 * i_thresh.peak_threshold_dB] = 0
+        res_indexes = []
+        baseline_indexes = []
         for minima_index, data_index_minima in list(enumerate(i_thresh.local_minima)):
-            minima_dict = i_thresh.minima_as_windows[minima_index]
-            minima_value = mag[data_index_minima]
+            single_window = i_thresh.minima_as_windows[minima_index]
+            baseline_indexes.extend(list(range(single_window.left_max, single_window.left_pad)))
+            res_indexes.extend(list(range(single_window.left_pad, single_window.right_pad)))
+            baseline_indexes.extend(list(range(single_window.right_pad, single_window.right_max)))
+
+        baseline_mag_values = mag[baseline_indexes]
+        f = interp1d(x=baseline_indexes, y=baseline_mag_values, kind='cubic')
+        synthetic_baseline = f(range(len(self.unprocessed_freq_GHz)))
+        self.filter_update_mag(mag=mag, phase=phase,
+                               lowpass_filter_mags21=synthetic_baseline,
+                               plot=True)
+        synthetic_baseline_smoothed = savgol_filter(x=synthetic_baseline,
+                                                    window_length=window_length + 1, polyorder=3)
+        self.filter_update_mag(mag=mag, phase=phase,
+                               lowpass_filter_mags21=synthetic_baseline_smoothed,
+                               plot=True)
+        print()
+
 
 
 
