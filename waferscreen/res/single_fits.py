@@ -1,11 +1,8 @@
-#!/usr/bin/python
-import os
 import numpy as np
 import math
 import cmath
 import scipy.special as specfunc
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
 
@@ -35,7 +32,7 @@ def renormalize_smat(smat, z0, z0_new):
     return smat_new
 
 
-def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_est='prop', throw_out=0):
+def fit_resonator(freqs_GHz, s21_complex, model='simple_res', error_est='prop'):
     """
     Function which returns fit parameters to a resonator model
     freqs are the measured frequencies, s21data is the S21 data
@@ -44,30 +41,11 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
     throw out tosses out the first and last N points
     """
 
-    # trim down freqs and data so that only the part you want to fit is used
-    fit_freqs = []
-    fit_params = []
-    for i in range(0, len(freqs)):
-        if (i >= throw_out) and (
-                i < len(freqs) - throw_out):  # if not within throw_out points of the edges of the measurement
-            fit_freqs.append(freqs[i])
-            if data_format == 'RI':  # real and imaginary
-                fit_params.append(np.array([s21data[i, 0], s21data[i, 1]]))
-            elif data_format == 'LM':  # log magnitude (dB) and phase (deg)
-                s21R = 10 ** (s21data[i, 0] / 20.0) * math.cos(math.pi / 180.0 * s21data[i, 1])
-                s21I = 10 ** (s21data[i, 0] / 20.0) * math.sin(math.pi / 180.0 * s21data[i, 1])
-                fit_params.append(np.array([s21R, s21I]))
-            elif data_format == 'COM':  # complex
-                fit_params.append(np.array([s21data[i].real, s21data[i].imag]))
-            else:
-                raise KeyError('Data Format not recognized.')
-    fit_freqs = np.array(fit_freqs)
-    fit_params = np.array(fit_params)
-
     # guess Amag and Aphase by looking at ends of data
-    amplitude_est_range = np.min((10, int(np.round(len(fit_freqs * 0.5)))))  # number of data points on each end used to estimate A
-    amplitude_ave_low = np.mean(fit_params[0:amplitude_est_range, 0] + 1j * fit_params[0:amplitude_est_range, 1])
-    amplitude_ave_high = np.mean(fit_params[-amplitude_est_range:, 0] + 1j * fit_params[-amplitude_est_range, 1])
+    # number of data points on each end used to estimate A
+    amplitude_est_range = np.min((10, int(np.round(len(freqs_GHz * 0.5)))))
+    amplitude_ave_low = np.mean(s21_complex)
+    amplitude_ave_high = np.mean(s21_complex[-amplitude_est_range:, 0] + 1j * s21_complex[-amplitude_est_range, 1])
 
     Aave = 0.5 * (amplitude_ave_low + amplitude_ave_high)
     Amag_guess = np.abs(Aave)  # average of low and high magnitudes
@@ -75,7 +53,7 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
 
     # guess Aslope and tau by looking at difference in A_high and A_low
     delta_guess_index = int(round(amplitude_est_range / 2.0))
-    delta_freq = fit_freqs[len(fit_freqs) - delta_guess_index] - fit_freqs[delta_guess_index]
+    delta_freq = freqs_GHz[len(freqs_GHz) - delta_guess_index] - freqs_GHz[delta_guess_index]
     Aslope_guess = (np.abs(amplitude_ave_high) - np.abs(amplitude_ave_low)) / delta_freq
 
     phase_high_guess = np.arctan2(amplitude_ave_high.imag, amplitude_ave_high.real)  # in radians
@@ -90,11 +68,11 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
 
     # now make array of |s21|^2, remove baseline gain and slope
     guess_s21 = []
-    f_mid = (fit_freqs[len(fit_freqs) - 1] + fit_freqs[0]) / 2.0
-    for i in range(0, len(fit_freqs)):
-        raw_s21 = fit_params[i, 0] ** 2 + fit_params[i, 1] ** 2
+    f_mid = (freqs_GHz[len(freqs_GHz) - 1] + freqs_GHz[0]) / 2.0
+    for i in range(0, len(freqs_GHz)):
+        raw_s21 = s21_complex[i, 0] ** 2 + s21_complex[i, 1] ** 2
         guess_s21.append(raw_s21 / ((Amag_guess + Aslope_guess * (
-                    fit_freqs[i] - f_mid)) ** 2))  # normalize |s21|^2 using guesses for Amag and Aslope
+                    freqs_GHz[i] - f_mid)) ** 2))  # normalize |s21|^2 using guesses for Amag and Aslope
 
     # smooth s21 trace
     window_size, poly_order = 25, 3
@@ -105,11 +83,11 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
     # guess f0
     s21_min = 1e15
     f0_guess = -1
-    for i in range(0, len(fit_freqs)):  # find freq of minimum transmission
-        fit_vec = fit_params[i]
+    for i in range(0, len(freqs_GHz)):  # find freq of minimum transmission
+        fit_vec = s21_complex[i]
         if guess_s21_filt[i] < s21_min:
             s21_min = guess_s21_filt[i]
-            f0_guess = fit_freqs[i]
+            f0_guess = freqs_GHz[i]
     if f0_guess == -1:  # if this somehow fails, choose f_mid
         f0_guess = f_mid
 
@@ -119,14 +97,14 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
     s21_search = 0.5 * (1 + s21_min)  # = |s21|^2 at (1-(f/f0)^2) == Qt^-1
     # now find first point to have |S21|^2 < s21_search
     i = 0
-    while guess_s21_filt[i] > s21_search and i < len(fit_freqs) - 1:
+    while guess_s21_filt[i] > s21_search and i < len(freqs_GHz) - 1:
         i += 1
-    f_lower = fit_freqs[i]
+    f_lower = freqs_GHz[i]
     # now find first point to have |S21|^2 < 0.5 * |A|^2 from above
-    i = len(fit_freqs) - 1
+    i = len(freqs_GHz) - 1
     while guess_s21_filt[i] > s21_search and i >= 0:
         i -= 1
-    f_upper = fit_freqs[i]
+    f_upper = freqs_GHz[i]
     if f_lower < f0_guess and f_upper > f0_guess:
         Qt_lower = 1.0 / (1 - (f_lower / f0_guess) ** 2)
         Qt_upper = -1.0 / (1 - (f_upper / f0_guess) ** 2)
@@ -137,44 +115,44 @@ def fit_resonator(freqs, s21data, data_format='RI', model='simple_res', error_es
         Qt_upper = -1.0 / (1 - (f_upper / f_mid_guess) ** 2)
         Qt = 0.5 * (Qt_lower + Qt_upper)
     else:  # guess
-        Qt = f0_guess / (fit_freqs[len(fit_freqs) - 1] - fit_freqs[0])
+        Qt = f0_guess / (freqs_GHz[len(freqs_GHz) - 1] - freqs_GHz[0])
         print("Error in Estimating Qtotal")
     if Qt < 1:
         Qt = 1
     if math.isnan(Qt):
-        Qt = f0_guess / (fit_freqs[len(fit_freqs) - 1] - fit_freqs[0])
+        Qt = f0_guess / (freqs_GHz[len(freqs_GHz) - 1] - freqs_GHz[0])
     Qi_guess = Qt / np.sqrt(s21_min)
     Qc_guess = 1.0 / (1.0 / Qt - 1.0 / Qi_guess)
     if math.isnan(Qi_guess):
-        Qi_guess = f0_guess / (fit_freqs[len(fit_freqs) - 1] - fit_freqs[0])
-        Qc_guess = f0_guess / (fit_freqs[len(fit_freqs) - 1] - fit_freqs[0])
+        Qi_guess = f0_guess / (freqs_GHz[len(freqs_GHz) - 1] - freqs_GHz[0])
+        Qc_guess = f0_guess / (freqs_GHz[len(freqs_GHz) - 1] - freqs_GHz[0])
 
     print('Qi     : %.0f' % Qi_guess)
     print('Qc     : %.0f' % Qc_guess)
 
     # use curve fit to for these params
-    popt, pcov = single_res_fit(model=model, fit_freqs=fit_freqs,
-                                fit_params=fit_params, error_est=error_est,
+    popt, pcov = single_res_fit(model=model, freqs_GHz=freqs_GHz,
+                                s21_complex=s21_complex, error_est=error_est,
                                 Amag_guess=Amag_guess, Aphase_guess=Aphase_guess,
                                 f0_guess=f0_guess, Qi_guess=Qi_guess, Qc_guess=Qc_guess,
                                 Aslope_guess=Aslope_guess, tau_guess=tau_guess)
     return popt, pcov
 
 
-def est_error(fit_freqs, fit_params, error_est='prop'):
+def est_error(freqs_GHz, s21_complex, error_est='prop'):
     # estimate errors according to method est_errors
     error_params = []
     if error_est == 'prop':  # estimate errors are proportional to |S| or |Y|
         print('Using Proportional Errors')
         e11_min = 0.0
-        for i in range(0, len(fit_freqs)):
-            fit_vec = fit_params[i]
+        for i in range(0, len(freqs_GHz)):
+            fit_vec = s21_complex[i]
             e1 = np.sqrt(fit_vec[0] ** 2 + fit_vec[1] ** 2) + e11_min
             error_vec = np.array([e1, e1])
             error_params.append(error_vec)
     elif error_est == 'flat':  # estimate errors are constant
         print('Using Flat Errors')
-        for i in range(0, len(fit_freqs)):
+        for i in range(0, len(freqs_GHz)):
             error_vec = np.array([1.0, 1.0])
             error_params.append(error_vec)
     else:
@@ -182,68 +160,68 @@ def est_error(fit_freqs, fit_params, error_est='prop'):
     return np.array(error_params)
 
 
-def single_res_fit(model, fit_freqs, fit_params, error_est,
+def single_res_fit(model, freqs_GHz, s21_complex, error_est,
                    Amag_guess, Aphase_guess, f0_guess, Qi_guess, Qc_guess,
                    Aslope_guess=None, tau_guess=None):
     # use curve fit to for these params
-    error_params = est_error(fit_freqs, fit_params, error_est=error_est)
+    error_params = est_error(freqs_GHz, s21_complex, error_est=error_est)
     # unravel fit parameters and errors to 1D vector
     error_params = np.array(error_params)
-    fit_params = fit_params.ravel()
+    s21_complex = s21_complex.ravel()
     error_params = error_params.ravel()
     # perform fit using optimize.curve_fit
     if model == 'simple_res':  # (Amag, Aphase, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -10, fit_freqs[0], 0, 0), (np.inf, 360.0, 10, fit_freqs[-1], np.inf, np.inf))
+        bounds = ((0, -360.0, -10, freqs_GHz[0], 0, 0), (np.inf, 360.0, 10, freqs_GHz[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_simple_res, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
+        popt, pcov = curve_fit(fit_simple_res, freqs_GHz, s21_complex, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_gain_slope':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -10, -10, fit_freqs[0], 0, 0), (np.inf, 360.0, 10, 10, fit_freqs[-1], np.inf, np.inf))
+        bounds = ((0, -360.0, -10, -10, freqs_GHz[0], 0, 0), (np.inf, 360.0, 10, 10, freqs_GHz[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_simple_res_gain_slope, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
+        popt, pcov = curve_fit(fit_simple_res_gain_slope, freqs_GHz, s21_complex, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_nonlinear_phase':  # (Amag, Aphase, Pphase, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -10, -10, fit_freqs[0], 0, 0), (np.inf, 360.0, 10, 10, fit_freqs[-1], np.inf, np.inf))
+        bounds = ((0, -360.0, -10, -10, freqs_GHz[0], 0, 0), (np.inf, 360.0, 10, 10, freqs_GHz[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_simple_res_nonlinear_phase, fit_freqs, fit_params, p0=starting_vals,
+        popt, pcov = curve_fit(fit_simple_res_nonlinear_phase, freqs_GHz, s21_complex, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_nonlinear_phase_gain_slope':  # (Amag, Aphase, Aslope, Pphase, tau, f0, Qi, Qc)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, 0, f0_guess, Qi_guess, Qc_guess]
-        bounds = ((0, -360.0, -100, -10, -10, fit_freqs[0], 0, 0),
-                  (np.inf, 360.0, 100, 10, 10, fit_freqs[-1], np.inf, np.inf))
+        bounds = ((0, -360.0, -100, -10, -10, freqs_GHz[0], 0, 0),
+                  (np.inf, 360.0, 100, 10, 10, freqs_GHz[-1], np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_simple_res_nonlinear_phase_gain_slope, fit_freqs, fit_params, p0=starting_vals,
+        popt, pcov = curve_fit(fit_simple_res_nonlinear_phase_gain_slope, freqs_GHz, s21_complex, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     elif model == 'tline_res':  # (Amag, Aphase, tau, f0, Qi, Qc, Z0ratio)
         starting_vals = [Amag_guess, Aphase_guess, 0, f0_guess, Qi_guess, Qc_guess, 1]
         bounds = (
-        (0, -360.0, -10, fit_freqs[0], 0, 0, 0.99), (np.inf, 360.0, 10, fit_freqs[-1], np.inf, np.inf, 1.01))
+        (0, -360.0, -10, freqs_GHz[0], 0, 0, 0.99), (np.inf, 360.0, 10, freqs_GHz[-1], np.inf, np.inf, 1.01))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_tline_res, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
+        popt, pcov = curve_fit(fit_tline_res, freqs_GHz, s21_complex, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'tline_res_gain_slope':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc, Z0ratio)
         starting_vals = [Amag_guess, Aphase_guess, 0, 0, f0_guess, Qi_guess, Qc_guess, 1]
-        bounds = ((0, -360.0, -10, -10, fit_freqs[0], 0, 0, 0.99),
-                  (np.inf, 360.0, 10, 10, fit_freqs[-1], np.inf, np.inf, 1.01))
+        bounds = ((0, -360.0, -10, -10, freqs_GHz[0], 0, 0, 0.99),
+                  (np.inf, 360.0, 10, 10, freqs_GHz[-1], np.inf, np.inf, 1.01))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_tline_res_gain_slope, fit_freqs, fit_params, p0=starting_vals, sigma=error_params,
+        popt, pcov = curve_fit(fit_tline_res_gain_slope, freqs_GHz, s21_complex, p0=starting_vals, sigma=error_params,
                                bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_gain_slope_renorm':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc, Z0new_real, Z0new_imag)
         starting_vals = [Amag_guess, Aphase_guess, Aslope_guess, tau_guess, f0_guess, Qi_guess, Qc_guess, 50, 0]
-        bounds = ((0, -360.0, -100, -100, fit_freqs[0], 0, 0, 0, -np.inf),
-                  (np.inf, 360.0, 100, 100, fit_freqs[-1], np.inf, np.inf, np.inf, np.inf))
+        bounds = ((0, -360.0, -100, -100, freqs_GHz[0], 0, 0, 0, -np.inf),
+                  (np.inf, 360.0, 100, 100, freqs_GHz[-1], np.inf, np.inf, np.inf, np.inf))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_simple_res_gain_slope_renorm, fit_freqs, fit_params, p0=starting_vals,
+        popt, pcov = curve_fit(fit_simple_res_gain_slope_renorm, freqs_GHz, s21_complex, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     elif model == 'simple_res_gain_slope_complex':  # (Amag, Aphase, Aslope, tau, f0, Qi, Qc, Zratio)
         starting_vals = [Amag_guess, Aphase_guess, Aslope_guess, tau_guess, f0_guess, Qi_guess, Qc_guess, 0]
         bounds = (
-        (0, -360.0, -1000, -100, fit_freqs.min(), 0, 0, -5.0), (np.inf, 360.0, 1000, 100, fit_freqs.max(), np.inf, np.inf, 5.0))
+        (0, -360.0, -1000, -100, freqs_GHz.min(), 0, 0, -5.0), (np.inf, 360.0, 1000, 100, freqs_GHz.max(), np.inf, np.inf, 5.0))
         starting_vals = rebound_starting_vals(bounds, starting_vals)
-        popt, pcov = curve_fit(fit_simple_res_gain_slope_complex, fit_freqs, fit_params, p0=starting_vals,
+        popt, pcov = curve_fit(fit_simple_res_gain_slope_complex, freqs_GHz, s21_complex, p0=starting_vals,
                                sigma=error_params, bounds=bounds)  # , max_nfev = 10000)
     else:
         raise KeyError('Fit model : ' + str(model) + ' not recognized')
@@ -418,15 +396,15 @@ def fit_resonator_mb_tls(temps, f0s, f0errors, Qi, Qierrors, temp_range=[0, np.i
     for now just fit TLS to deltaFr
     """
     fit_temps = []
-    fit_params = []
+    s21_complex = []
     error_params = []
     for i in range(0, len(temps)):
         if temps[i] >= temp_range[0] and temps[i] <= temp_range[1]:
             fit_temps.append(temps[i])
-            fit_params.append(f0s[i])
+            s21_complex.append(f0s[i])
             error_params.append(f0errors[i])
     fit_temps = np.array(fit_temps)
-    fit_params = np.array(fit_params)
+    s21_complex = np.array(s21_complex)
     error_params = np.array(error_params)
 
     starting_vals = [f0s[0], 1e-6]  # f0(T=0), FdeltaTLS
@@ -434,7 +412,7 @@ def fit_resonator_mb_tls(temps, f0s, f0errors, Qi, Qierrors, temp_range=[0, np.i
     print("FtanD Guess  : " + str(1e-6))
     bounds = ((0, 0), (np.inf, np.inf))
     starting_vals = rebound_starting_vals(bounds, starting_vals)
-    popt, pcov = curve_fit(fit_mb_tls, fit_temps, fit_params, p0=starting_vals, sigma=error_params, bounds=bounds,
+    popt, pcov = curve_fit(fit_mb_tls, fit_temps, s21_complex, p0=starting_vals, sigma=error_params, bounds=bounds,
                            absolute_sigma=True)
 
     return popt, pcov

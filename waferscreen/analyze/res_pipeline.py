@@ -1,13 +1,64 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import NamedTuple, Optional
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
 from waferscreen.plot.s21_plots import plot_filter
 import waferscreen.analyze.res_pipeline_config as rpc
+from waferscreen.res.single_fits import single_res_fit
 from waferscreen.analyze.mariscotti import mariscotti
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
+import copy
 
+
+def read_res_params(path):
+    # open resonant frequencies file
+    with open(path, 'r') as f:
+        lines = f.readlines()
+    header = lines[0].strip().split(",")
+    res_params = []
+    for line in lines[1:]:
+        datavec = line.split(",")
+        res_params.append(ResParams(**{column_name: float(value) for column_name, value in zip(header, datavec)}))
+    return res_params
+
+
+primary_res_params = ["Amag", "Aphase", "Aslope", "tau", "f0", "Qi", "Qc", "Zratio"]
+res_params_header = ""
+for param_type in primary_res_params:
+    res_params_header += param_type + "," + param_type + "_error,"
+res_params_header = res_params_header[:-1]
+
+
+class ResParams(NamedTuple):
+    Amag: float
+    Aphase: float
+    Aslope: float
+    tau: float
+    f0: float
+    Qi: float
+    Qc: float
+    Zratio: float
+    Amag_error: Optional[float] = None
+    Aphase_error: Optional[float] = None
+    Aslope_error: Optional[float] = None
+    tau_error: Optional[float] = None
+    f0_error: Optional[float] = None
+    Qi_error: Optional[float] = None
+    Qc_error: Optional[float] = None
+    Zratio_error: Optional[float] = None
+
+    def __str__(self):
+        output_string = ""
+        for attr in primary_res_params:
+            error_value = str(self.__getattribute__(attr + "_error"))
+            if error_value is None:
+                error_str = ""
+            else:
+                error_str = str(error_value)
+            output_string += str(self.__getattribute__(attr)) + "," + error_str + ","
+        return output_string[:-1]
 
 class ResPipe:
     def __init__(self, s21_path, verbose=True):
@@ -15,14 +66,18 @@ class ResPipe:
         self.verbose = True
         self.meta_data = None
         self.unprocessed_freq_GHz, self.unprocessed_reals21, self.unprocessed_imags21 = None, None, None
+        self.unprocessed_mags21, self.unprocessed_phases21 = None, None
         self.lowpass_filter_reals21, self.lowpass_filter_imags21 = None, None
         self.highpass_filter_reals21, self.highpass_filter_imags21 = None, None
         self.highpass_filter_mags21, self.lowpass_filter_mags21 = None, None
+        self.found_res = None
 
     def read(self):
         data_dict, self.meta_data = read_s21(path=self.path)
         self.unprocessed_freq_GHz = data_dict["freq_ghz"]
         self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"],  data_dict["imag"]
+        self.unprocessed_mags21, self.unprocessed_phases21 = ri_to_magphase(r=self.unprocessed_reals21,
+                                                                            i=self.unprocessed_imags21)
 
     def savgol_filter_mag(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
         self.filter_reset()
@@ -94,22 +149,25 @@ class ResPipe:
                     lowpass_s21=self.lowpass_filter_reals21 + 1j * self.lowpass_filter_imags21,
                     highpass_s21=self.highpass_filter_reals21 + 1j * self.highpass_filter_imags21)
 
-    def baseline_subtraction(self, cosine_filter=False, window_padding=3):
+    def baseline_subtraction(self, cosine_filter=False, window_pad_factor=3, fitter_pad_factor=5,
+                             show_filter_plots=False):
         # initial filtering in magnitude space
         f_step_GHz = self.unprocessed_freq_GHz[1] - self.unprocessed_freq_GHz[0]
         window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
         if cosine_filter:
             mag, phase = self.cosine_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                                                smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9, plot=False)
+                                                smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9,
+                                                plot=show_filter_plots)
         else:
             mag, phase = self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                                                window_length=window_length, polyorder=2, plot=True)
+                                                window_length=window_length, polyorder=2, plot=show_filter_plots)
         # interaction threshold plotting, return local minima and window information about size of the resonators
         i_thresh = fr_interactive.interactive_threshold_plot(f_Hz=self.unprocessed_freq_GHz * 1.0e9,
                                                              s21_mag=self.highpass_filter_mags21,
                                                              peak_threshold_dB=0.5,
                                                              spacing_threshold_Hz=rpc.resonator_spacing_threshold_Hz,
-                                                             window_padding=window_padding)
+                                                             window_pad_factor=window_pad_factor,
+                                                             fitter_pad_factor=fitter_pad_factor)
         self.highpass_filter_mags21[self.highpass_filter_mags21 > -1.0 * i_thresh.peak_threshold_dB] = 0
         res_indexes = []
         baseline_indexes = []
@@ -124,13 +182,140 @@ class ResPipe:
         synthetic_baseline = f(range(len(self.unprocessed_freq_GHz)))
         self.filter_update_mag(mag=mag, phase=phase,
                                lowpass_filter_mags21=synthetic_baseline,
-                               plot=True)
+                               plot=show_filter_plots)
+        not_smoothed_mag = copy.copy(self.highpass_filter_mags21)
         synthetic_baseline_smoothed = savgol_filter(x=synthetic_baseline,
                                                     window_length=window_length + 1, polyorder=3)
         self.filter_update_mag(mag=mag, phase=phase,
                                lowpass_filter_mags21=synthetic_baseline_smoothed,
-                               plot=True)
-        print()
+                               plot=show_filter_plots)
+        self.found_res = []
+        for single_window in i_thresh.minima_as_windows:
+            fitter_slice = slice(single_window.left_fitter_pad, single_window.right_fitter_pad)
+            f_GHz_single_res = self.unprocessed_freq_GHz[fitter_slice]
+            s21_mag_single_res = self.unprocessed_mags21[fitter_slice]
+            s21_mag_single_res_highpass = self.highpass_filter_mags21[fitter_slice]
+            fcenter_guess = self.unprocessed_freq_GHz[single_window.minima]
+            Amag_guess = 0.0 - self.highpass_filter_reals21[single_window.minima]
+
+            leglines = []
+            leglabels = []
+
+            # unprocessed
+            unprocessed_color = "black"
+            unprocessed_linewidth = 3
+            plt.plot(f_GHz_single_res, s21_mag_single_res - s21_mag_single_res[0], color="black",
+                     linewidth=unprocessed_linewidth)
+            leglines.append(plt.Line2D(range(10), range(10), color=unprocessed_color, ls="-",
+                                       linewidth=unprocessed_linewidth))
+            leglabels.append(F"unprocessed")
+
+            # window baseline substraction
+            window_bl_color = "dodgerblue"
+            window_bl_linewidth = 2
+            plt.plot(f_GHz_single_res, not_smoothed_mag[fitter_slice], color=window_bl_color,
+                     linewidth=window_bl_linewidth)
+            leglines.append(plt.Line2D(range(10), range(10), color=window_bl_color, ls="-",
+                                       linewidth=window_bl_linewidth))
+            leglabels.append(F"Highpass Window")
+
+            # window baseline substraction and smooth
+            window_bl_smooth_color = "chartreuse"
+            window_bl_smooth_linewidth = 1
+            plt.plot(f_GHz_single_res, s21_mag_single_res_highpass, color=window_bl_smooth_color,
+                     linewidth=window_bl_smooth_linewidth)
+            leglines.append(plt.Line2D(range(10), range(10), color=window_bl_smooth_color, ls="-",
+                                       linewidth=window_bl_smooth_linewidth))
+            leglabels.append(F"Highpass Window Smoothed")
+
+            # Zero Line for reference
+            zero_line_color = "darkgoldenrod"
+            zero_line_smooth_linewidth = 1
+            zero_line_ls = "dashed"
+            plt.plot((f_GHz_single_res[0], f_GHz_single_res[-1]), (0, 0), color=zero_line_color,
+                     linewidth=zero_line_smooth_linewidth, ls=zero_line_ls)
+            leglines.append(plt.Line2D(range(10), range(10), color=zero_line_color, ls=zero_line_ls,
+                                       linewidth=zero_line_smooth_linewidth))
+            leglabels.append(F"Zero dB line")
+
+            # show minima
+            window_bound_color = "darkorchid"
+            window_bound_linewidth = 1
+            window_bound_ls = "None"
+            window_bound_alpha = 0.65
+            window_bound_marker = 'o'
+            window_bound_markersize = 10
+            plt.plot(self.unprocessed_freq_GHz[single_window.minima],
+                     self.highpass_filter_mags21[single_window.minima],
+                     color=window_bound_color,
+                     linewidth=window_bound_linewidth, ls=window_bound_ls, marker=window_bound_marker,
+                     markersize=window_bound_markersize,
+                     markerfacecolor=window_bound_color, alpha=window_bound_alpha)
+            leglines.append(plt.Line2D(range(10), range(10), color=window_bound_color, ls=window_bound_ls,
+                                       linewidth=window_bound_linewidth, marker=window_bound_marker,
+                                       markersize=window_bound_markersize,
+                                       markerfacecolor=window_bound_color, alpha=window_bound_alpha))
+            leglabels.append(F"Found Minima")
+
+            # show the calculated window boundries
+            window_bound_color = "firebrick"
+            window_bound_linewidth = 1
+            window_bound_ls = "None"
+            window_bound_alpha = 0.8
+            window_bound_marker = '*'
+            window_bound_markersize = 10
+            plt.plot((self.unprocessed_freq_GHz[single_window.left_window],
+                      self.unprocessed_freq_GHz[single_window.right_window]),
+                     (self.highpass_filter_mags21[single_window.left_window],
+                      self.highpass_filter_mags21[single_window.right_window]),
+                     color=window_bound_color,
+                     linewidth=window_bound_linewidth, ls=window_bound_ls, marker=window_bound_marker,
+                     markersize=window_bound_markersize,
+                     markerfacecolor=window_bound_color, alpha=window_bound_alpha)
+            leglines.append(plt.Line2D(range(10), range(10), color=window_bound_color, ls=window_bound_ls,
+                                       linewidth=window_bound_linewidth, marker=window_bound_marker,
+                                       markersize=window_bound_markersize,
+                                       markerfacecolor=window_bound_color, alpha=window_bound_alpha))
+            leglabels.append(F"Window from Threshold")
+
+            # show the calculated window boundries
+            window_bound_color = "Navy"
+            window_bound_linewidth = 1
+            window_bound_ls = "None"
+            window_bound_alpha = 1.0
+            window_bound_marker = 'x'
+            window_bound_markersize = 10
+            plt.plot((self.unprocessed_freq_GHz[single_window.left_pad],
+                      self.unprocessed_freq_GHz[single_window.right_pad]),
+                     (self.highpass_filter_mags21[single_window.left_pad],
+                      self.highpass_filter_mags21[single_window.right_pad]),
+                     color=window_bound_color,
+                     linewidth=window_bound_linewidth, ls=window_bound_ls, marker=window_bound_marker,
+                     markersize=window_bound_markersize,
+                     markerfacecolor=window_bound_color, alpha=window_bound_alpha)
+            leglines.append(plt.Line2D(range(10), range(10), color=window_bound_color, ls=window_bound_ls,
+                                       linewidth=window_bound_linewidth, marker=window_bound_marker,
+                                       markersize=window_bound_markersize,
+                                       markerfacecolor=window_bound_color, alpha=window_bound_alpha))
+            leglabels.append(F"Baseline Bounds")
+
+            plt.xlabel(F"Frequency (GHz)")
+            plt.ylabel(F"dB")
+            plt.legend(leglines,
+                       leglabels, loc=0,
+                       numpoints=3, handlelength=5,
+                       fontsize=8)
+            plt.show()
+            self.found_res.append("")
+
+
+    def fit_resonators(self, model, f_GHz_single_res, s21_complex_single_res, error_est, guess_res_params):
+        g = guess_res_params
+        single_res_fit(model=model, freqs_GHz=f_GHz_single_res,
+                       s21_complex=s21_complex_single_res, error_est=error_est,
+                       Amag_guess=g.Amag_guess, Aphase_guess=g.Aphase_guess,
+                       f0_guess=g.f0_guess, Qi_guess=g.Qi_guess, Qc_guess=g.Qc_guess,
+                       Aslope_guess=g.Aslope_guess, tau_guess=g.tau_guess)
 
 
 
