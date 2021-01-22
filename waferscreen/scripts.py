@@ -5,7 +5,7 @@ from ref import raw_data_dir, today_str, check_out_dir, band_params
 from waferscreen.plot.s21_plots import plot_21
 from waferscreen.measure.res_sweep import VnaMeas
 from waferscreen.res.finder import ResFinder
-from waferscreen.analyze.tiny_sweeps import TinySweeps
+from waferscreen.tiny_sweeps import TinySweeps
 from waferscreen.tools.band_calc import calc_band_edges
 
 
