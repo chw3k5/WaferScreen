@@ -375,15 +375,7 @@ def fit_simple_res_gain_slope_complex(freqs_GHz, base_amplitude_abs, a_phase_rad
     return s21data
 
 
-def simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope, tau_ns, f0, Qi, Qc, Zratio):
-    A = base_amplitude_abs * (1 + base_amplitude_slope * (freq_GHz - f0)) * (
-                math.cos(a_phase_rad) + 1j * math.sin(a_phase_rad))  # complex gain factor A
-    phase_delay = np.exp(-1j * (freq_GHz - f0) * 2.0 * math.pi * tau_ns)  # tau_ns in ns, freq_GHz in GHz
-    # shunt resonator model
-    s11_temp = (Zratio / Qc - 1j / Qc) / (1 - (freq_GHz / f0) ** 2 + 1j / Qi + 1j / Qc)
-    s21_temp = (1 - (freq_GHz / f0) ** 2 + 1j / Qi) / (1 - (freq_GHz / f0) ** 2 - Zratio / Qc + 1j / Qi + 1j / Qc)
-    s21 = A * phase_delay * s21_temp
-    return s21
+
 
 
 def fit_resonator_mb_tls(temps, f0s, f0errors, Qi, Qierrors, temp_range=[0, np.inf]):

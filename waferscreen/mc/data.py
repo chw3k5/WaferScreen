@@ -65,7 +65,9 @@ class DataManager:
         for scan_file in self.phase_corrected_scan_files:
             res_pipe = ResPipe(s21_path=scan_file, verbose=self.verbose)
             res_pipe.read()
-            res_pipe.baseline_subtraction()
+            res_pipe.find_window(cosine_filter=False,
+                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=True, debug_mode=False)
+            res_pipe.analyze_resonators()
 
 
 if __name__ == "__main__":

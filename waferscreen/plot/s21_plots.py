@@ -4,6 +4,7 @@ from ref import today_str
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.analyze.s21_io import read_s21, write_s21, dirname_create, ri_to_magphase, plot_bands
+from waferscreen.analyze.res_fit_jake import fit_simple_res_gain_slope_complex
 
 
 def s21_subplot(ax, plot_data, x_data_str, y_data_str, y_label_str="", x_label_str="", leg_label_str="", title_str='',
@@ -130,6 +131,190 @@ def plot_filter(freqs_GHz, original_s21, lowpass_s21, highpass_s21, output_filen
         ax_handle.set_xlabel("Frequency (GHz)")
         ax_handle.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=0, numpoints=3, handlelength=5, fontsize=16)
 
+    # Display
+    if output_filename is not None:
+        plt.draw()
+        plt.savefig(output_filename)
+        print("Saved Plot to:", output_filename)
+    else:
+        plt.show()
+
+
+def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_single_res=None,
+                 s21_mag_single_res_highpass=None,
+                 params_guess=None, params_fit=None,
+                 minima_pair=None, fwhm_pair=None, window_pair=None, fitter_pair=None, output_filename=None):
+    leglines = []
+    leglabels = []
+
+    # unprocessed (yet still phase corrected, group delay removed, data)
+    if s21_mag_single_res is not None:
+        unprocessed_color = "black"
+        unprocessed_linewidth = 5
+        plt.plot(f_GHz_single_res, s21_mag_single_res - s21_mag_single_res[0], color="black",
+                 linewidth=unprocessed_linewidth)
+        leglines.append(plt.Line2D(range(10), range(10), color=unprocessed_color, ls="-",
+                                   linewidth=unprocessed_linewidth))
+        leglabels.append(F"unprocessed")
+
+    # window baseline subtraction
+    if not_smoothed_mag_single_res is not None:
+        window_bl_color = "dodgerblue"
+        window_bl_linewidth = 4
+        plt.plot(f_GHz_single_res, not_smoothed_mag_single_res, color=window_bl_color,
+                 linewidth=window_bl_linewidth)
+        leglines.append(plt.Line2D(range(10), range(10), color=window_bl_color, ls="-",
+                                   linewidth=window_bl_linewidth))
+        leglabels.append(F"Highpass Window")
+
+    # window baseline substraction and smooth
+    if s21_mag_single_res_highpass is not None:
+        window_bl_smooth_color = "chartreuse"
+        window_bl_smooth_linewidth = 3
+        plt.plot(f_GHz_single_res, s21_mag_single_res_highpass, color=window_bl_smooth_color,
+                 linewidth=window_bl_smooth_linewidth)
+        leglines.append(plt.Line2D(range(10), range(10), color=window_bl_smooth_color, ls="-",
+                                   linewidth=window_bl_smooth_linewidth))
+        leglabels.append(F"Highpass Window Smoothed")
+
+    # guess mag-phase
+    if params_guess is not None:
+        guess_fit_out = fit_simple_res_gain_slope_complex(f_GHz_single_res, params_guess.base_amplitude_abs,
+                                                          params_guess.a_phase_rad, params_guess.base_amplitude_slope,
+                                                          params_guess.tau_ns, params_guess.f0,
+                                                          params_guess.Qi, params_guess.Qc, params_guess.Zratio)
+        guess_complex = np.array([guess_fit_out[2 * n] + 1j * guess_fit_out[(2 * n) + 1]
+                                  for n in range(len(f_GHz_single_res))])
+        guess_mag, guess_phase = ri_to_magphase(r=guess_complex.real, i=guess_complex.imag)
+        guess_mag_color = "firebrick"
+        guess_mag_linewidth = 2
+        plt.plot(f_GHz_single_res, guess_mag, color=guess_mag_color,
+                 linewidth=guess_mag_linewidth)
+        leglines.append(plt.Line2D(range(10), range(10), color=guess_mag_color, ls="-",
+                                   linewidth=guess_mag_linewidth))
+        leglabels.append(F"Initial Fit")
+
+    # Final Fit mag-phase
+    if params_fit is not None:
+        final_fit_out = fit_simple_res_gain_slope_complex(f_GHz_single_res, params_fit.base_amplitude_abs,
+                                                          params_fit.a_phase_rad, params_fit.base_amplitude_slope,
+                                                          params_fit.tau_ns, params_fit.f0,
+                                                          params_fit.Qi, params_fit.Qc, params_fit.Zratio)
+        final_complex = np.array([final_fit_out[2 * n] + 1j * final_fit_out[(2 * n) + 1]
+                                  for n in range(len(f_GHz_single_res))])
+        final_mag, final_phase = ri_to_magphase(r=final_complex.real, i=final_complex.imag)
+        final_mag_color = "black"
+        final_mag_linewidth = 5
+        final_mag_ls = 'dotted'
+        plt.plot(f_GHz_single_res, final_mag, color=final_mag_color,
+                 linewidth=final_mag_linewidth, ls=final_mag_ls)
+        leglines.append(plt.Line2D(range(10), range(10), color=final_mag_color, ls=final_mag_ls,
+                                   linewidth=final_mag_linewidth))
+        leglabels.append(F"Final Fit")
+
+    # Zero Line for reference
+    zero_line_color = "darkgoldenrod"
+    zero_line_smooth_linewidth = 1
+    zero_line_ls = "dashed"
+    plt.plot((f_GHz_single_res[0], f_GHz_single_res[-1]), (0, 0), color=zero_line_color,
+             linewidth=zero_line_smooth_linewidth, ls=zero_line_ls)
+    leglines.append(plt.Line2D(range(10), range(10), color=zero_line_color, ls=zero_line_ls,
+                               linewidth=zero_line_smooth_linewidth))
+    leglabels.append(F"Zero dB line")
+
+    # show minima
+    if minima_pair is not None:
+        f_GHz_min = minima_pair[0]
+        mag_min = minima_pair[1]
+        window_bound_color \
+            = "darkorchid"
+        window_bound_linewidth = 1
+        window_bound_ls = "None"
+        window_bound_alpha = 0.65
+        window_bound_marker = 'o'
+        window_bound_markersize = 10
+        plt.plot(f_GHz_min, mag_min,
+                 color=window_bound_color,
+                 linewidth=window_bound_linewidth, ls=window_bound_ls, marker=window_bound_marker,
+                 markersize=window_bound_markersize, markerfacecolor=window_bound_color, alpha=window_bound_alpha)
+        leglines.append(plt.Line2D(range(10), range(10), color=window_bound_color, ls=window_bound_ls,
+                                   linewidth=window_bound_linewidth, marker=window_bound_marker,
+                                   markersize=window_bound_markersize,
+                                   markerfacecolor=window_bound_color, alpha=window_bound_alpha))
+        leglabels.append(F"Found Minima")
+
+    # show the calculated FWHM
+    if fwhm_pair is not None:
+        f_GHz_fwhm = fwhm_pair[0]
+        mag_fwhm = fwhm_pair[1]
+        fwhm_color = "forestgreen"
+        fwhm_linewidth = 1
+        fwhm_ls = "None"
+        fwhm_alpha = 0.8
+        fwhm_marker = 'D'
+        fwhm_markersize = 10
+        plt.plot(f_GHz_fwhm, mag_fwhm,
+                 color=fwhm_color, linewidth=fwhm_linewidth, ls=fwhm_ls, marker=fwhm_marker,
+                 markersize=fwhm_markersize, markerfacecolor=fwhm_color, alpha=fwhm_alpha)
+        leglines.append(plt.Line2D(range(10), range(10), color=fwhm_color, ls=fwhm_ls,
+                                   linewidth=fwhm_linewidth, marker=fwhm_marker,
+                                   markersize=fwhm_markersize,
+                                   markerfacecolor=fwhm_color, alpha=fwhm_alpha))
+        leglabels.append(F"FWHM")
+
+    # show the calculated windows from the thresholding
+    if window_pair is not None:
+        f_GHz_window_pair = window_pair[0]
+        mag_window_pair = window_pair[1]
+        window_bound_color = "firebrick"
+        window_bound_linewidth = 1
+        window_bound_ls = "None"
+        window_bound_alpha = 0.8
+        window_bound_marker = '*'
+        window_bound_markersize = 10
+        plt.plot(f_GHz_window_pair, mag_window_pair,
+                 color=window_bound_color,
+                 linewidth=window_bound_linewidth, ls=window_bound_ls, marker=window_bound_marker,
+                 markersize=window_bound_markersize,
+                 markerfacecolor=window_bound_color, alpha=window_bound_alpha)
+        leglines.append(plt.Line2D(range(10), range(10), color=window_bound_color, ls=window_bound_ls,
+                                   linewidth=window_bound_linewidth, marker=window_bound_marker,
+                                   markersize=window_bound_markersize,
+                                   markerfacecolor=window_bound_color, alpha=window_bound_alpha))
+        leglabels.append(F"Window from Threshold")
+
+    # show the calculated fitter boundaries
+    if fitter_pair is not None:
+        f_GHz_fitter = fitter_pair[0]
+        mag_fitter = fitter_pair[1]
+        fitter_bound_color = "Navy"
+        fitter_bound_linewidth = 1
+        fitter_bound_ls = "None"
+        fitter_bound_alpha = 1.0
+        fitter_bound_marker = 'x'
+        fitter_bound_markersize = 10
+        plt.plot(f_GHz_fitter, mag_fitter,
+                 color=fitter_bound_color, linewidth=fitter_bound_linewidth,
+                 ls=fitter_bound_ls, marker=fitter_bound_marker,
+                 markersize=fitter_bound_markersize,markerfacecolor=fitter_bound_color, alpha=fitter_bound_alpha)
+        leglines.append(plt.Line2D(range(10), range(10), color=fitter_bound_color, ls=fitter_bound_ls,
+                                   linewidth=fitter_bound_linewidth, marker=fitter_bound_marker,
+                                   markersize=fitter_bound_markersize,
+                                   markerfacecolor=fitter_bound_color, alpha=fitter_bound_alpha))
+        leglabels.append(F"Baseline Bounds")
+
+    # Whole plot options:
+    plt.xlabel(F"Frequency (GHz)")
+    plt.ylabel(F"dB")
+    format_str = '%i'
+    if params_fit is not None:
+        title_str = F"Qi: {format_str % params_fit.Qi}({format_str % params_fit.Qi_error})   "
+        title_str += F"Qc: {format_str % params_fit.Qc}({format_str % params_fit.Qc_error})"
+        plt.title(title_str)
+    plt.legend(leglines,
+               leglabels, loc=0,
+               numpoints=3, handlelength=5,
+               fontsize=8)
     # Display
     if output_filename is not None:
         plt.draw()
