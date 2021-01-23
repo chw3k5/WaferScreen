@@ -14,8 +14,13 @@ power_sweep_dBm = [-20, -30]  # dBm
 span_scale_factor = 400.0  # span_GHz = f_center_GHz / span_scale_factor
 num_freq_points = 401
 sweeptype = 'lin'
-if_bw_Hz = 100
+if_bw_Hz = 1000
 vna_avg = None
+
+# Scan configuration (A Scan searches the entire RF band)
+scan_f_min_GHz = 3.8
+scan_f_max_GHz = 6.2
+scan_stepsize_kHz = 20
 
 
 # Flux Ramp parameters

@@ -5,7 +5,7 @@ from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.analyze.s21_metadata import MetaDataDict
-from waferscreen.analyze.s21_inductor import write_s21, dirname_create
+from waferscreen.analyze.s21_io import write_s21, dirname_create
 import waferscreen.inst_control.flux_sweep_config as fsc
 import ref
 
@@ -28,7 +28,7 @@ def ramp_name_create(power_dBm, current_uA, res_num, utc):
 
 
 def dirname_create_raw(sweep_type="scan", res_id=None):
-    path_str = dirname_create(output_base_dir=fsc.output_base_dir, location=fsc.location,
+    path_str = dirname_create(output_basedir=fsc.output_base_dir, location=fsc.location,
                               wafer=fsc.wafer, date_str=today_str, sweep_type=sweep_type, res_id=res_id)
     raw_dir = os.path.join(path_str, "raw")
     if not os.path.isdir(raw_dir):
@@ -146,14 +146,19 @@ class AbstractFluxSweep:
                                   "export_type": "single_res"}
             self.survey_power_ramp(resonator_metadata)
 
-    def scan_for_resonators(self, fmin_GHz, fmax_GHz, step_size_MHz, group_delay_s=None):
+    def scan_for_resonators(self, fmin_GHz, fmax_GHz, group_delay_s=None, **kwargs):
         if fmin_GHz > fmax_GHz:
             fmin_GHz, fmax_GHz = fmax_GHz, fmin_GHz
+        scan_stepsize_GHz = fsc.scan_stepsize_kHz * 1.e-6
+        # set the default values from the config file
         resonator_metadata = {'flux_current_uA': 0.0, 'flux_supply_V': 0.0, "export_type": "scan",
                               'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dBm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
                               "fspan_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz + fmin_GHz) / 2.0}
-        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["fspan_GHz"] / (step_size_MHz * 1.e-3)))
+        # overwrite the defult values with what ever was sent by the use
+        for user_key in kwargs.keys():
+            resonator_metadata[user_key] = kwargs[user_key]
+        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["fspan_GHz"] / scan_stepsize_GHz))
         if group_delay_s is not None:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
@@ -162,8 +167,8 @@ class AbstractFluxSweep:
 if __name__ == "__main__":
     afs = AbstractFluxSweep(rf_chain_letter="a")
     with afs:
-        for stepsize in [1, 0.707, 0.5, 0.2, 0.707, 0.05, 0.02]:
-            afs.scan_for_resonators(fmin_GHz=4.1, fmax_GHz=6.2, step_size_MHz=stepsize)
+        for if_bw_Hz in [300, 100]:
+            afs.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz, if_bw_Hz=if_bw_Hz)
 
 
 

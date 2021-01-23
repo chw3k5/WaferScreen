@@ -437,11 +437,11 @@ class InteractiveThresholdPlot(object):
                         value_left_minima = self.s21_mag[data_index_minima_left_test]
                         value_right_minima = self.s21_mag[data_index_minima_right_test]
                         if value_left_minima < value_right_minima:
-                            index_location_to_remove = counter
-                            index_location_to_keep = counter + 1
-                        else:
                             index_location_to_remove = counter + 1
                             index_location_to_keep = counter
+                        else:
+                            index_location_to_remove = counter
+                            index_location_to_keep = counter + 1
                         # data for the print statement
                         data_index_kept = minima_this_region[index_location_to_keep]
                         data_index_removed = minima_this_region[index_location_to_remove]
