@@ -1,7 +1,5 @@
-import os
 from collections import UserDict
 from waferscreen.analyze.table_read import num_format
-from ref import s21_metadata_nist
 
 allowed_meta_data_types = (str, float, int)
 raw_filename_key = "output_filename"
@@ -50,74 +48,3 @@ class MetaDataDict(UserDict):
                 return_str += formatted_datum
         # add prefix, get rid of the last comma ","
         return "# Metadata:" + return_str[:-1]
-
-
-class S21MetadataPrinceton:
-    def __init__(self):
-        self.file_to_meta = {}
-        self.paths = []
-
-    def meta_from_file(self, path):
-        with open(path, mode='r') as f:
-            raw_file = f.readlines()
-        for raw_line in raw_file:
-            meta_data_this_line = {}
-            key_value_phrases = raw_line.split("|")
-            for key_value_phrase in key_value_phrases:
-                key_str, value_str = key_value_phrase.split(",")
-                meta_data_this_line[key_str.strip()] = num_format(value_str.strip())
-            else:
-                if "path" in meta_data_this_line.keys():
-                    local_test_path = os.path.join(os.path.dirname(path), meta_data_this_line["path"])
-                    if os.path.isfile(local_test_path):
-                        meta_data_this_line["path"] = local_test_path
-                    self.file_to_meta[meta_data_this_line["path"]] = meta_data_this_line
-                else:
-                    raise KeyError("No path. All S21 meta data requires a unique path to the S21 file.")
-        self.paths.append(path)
-
-
-class S21MetadataNist:
-    def __init__(self):
-        self.metadata_by_path = None
-
-    def read(self, delimiter_major=",", delimiter_minor="|"):
-        self.metadata_by_path = {}
-        with open(s21_metadata_nist, "r") as f:
-            for single_metadata_line in f:
-                metadata_this_line = MetaDataDict()
-                for key_value_phrase in single_metadata_line.split(delimiter_major):
-                    raw_key, raw_value = key_value_phrase.split(delimiter_minor)
-                    # normally would do more formatting to these stings,
-                    # but in this case the MetaDataDict class does that for us does that
-                    metadata_this_line[raw_key] = raw_value
-                if raw_filename_key in metadata_this_line.keys():
-                    raw_path = metadata_this_line[raw_filename_key]
-                    self.metadata_by_path[raw_path] = metadata_this_line
-                else:
-                    raise KeyError(F"Required unique filename key, {raw_filename_key},\n" +
-                                   "was not found")
-
-
-    def hack_read(self, delimiter_major=",", delimiter_minor="="):
-        self.metadata_by_path = {}
-        with open(s21_metadata_nist, "r") as f:
-            for single_metadata_line in f:
-                metadata_this_line = {}
-                for key_value_phrase in single_metadata_line.split(delimiter_major):
-                    raw_key, raw_value = key_value_phrase.split(delimiter_minor)
-                    metadata_this_line[raw_key.strip().lower()] = num_format(raw_value)
-                if raw_filename_key in metadata_this_line.keys():
-                    raw_path = metadata_this_line[raw_filename_key]
-                    self.metadata_by_path[raw_path] = metadata_this_line
-
-
-if __name__ == "__main__":
-    s21_mdn = S21MetadataNist()
-    s21_mdn.hack_read(delimiter_minor="=")
-
-
-
-
-
-

@@ -1,7 +1,6 @@
 from scipy.signal import savgol_filter
 from scipy.optimize import curve_fit
 import numpy as np
-from waferscreen.res.single_fits import fit_simple_res_gain_slope_complex
 from waferscreen.analyze.res_io import ResParams
 
 
@@ -46,7 +45,7 @@ def rebound_starting_vals(bounds, starting_vals):
     return new_starting_vals
 
 
-def package_res_results(popt, pcov, verbose=False):
+def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=False):
     fit_base_amplitude_abs = popt[0]
     fit_a_phase_rad = popt[1]
     fit_base_amplitude_slope = popt[2]
@@ -66,7 +65,12 @@ def package_res_results(popt, pcov, verbose=False):
     error_Zratio = np.sqrt(pcov[7, 7])
 
     if verbose:
-        print('Fit Result')
+        res_number_str = "\n"
+        if res_number is not None:
+            res_number_str += F"Resonator Number: {res_number}  "
+        if parent_file is not None:
+            res_number_str += F"Parent File: {parent_file}"
+        print(res_number_str)
         print('base_amplitude_abs   : %.4f +/- %.6f' % (fit_base_amplitude_abs, error_base_amplitude_abs))
         print('a_phase_rad          : %.4f +/- %.6f Radians' % (fit_a_phase_rad, error_a_phase_rad))
         print('base_amplitude_slope : %.3f +/- %.3f GHz' % (fit_base_amplitude_slope, error_base_amplitude_slope))
@@ -75,7 +79,6 @@ def package_res_results(popt, pcov, verbose=False):
         print('Qi            : %.0f +/- %.0f' % (fit_Qi, error_Qi))
         print('Qc            : %.0f +/- %.0f' % (fit_Qc, error_Qc))
         print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_Zratio, error_Zratio))
-        print('')
 
     single_res_params = ResParams(base_amplitude_abs=fit_base_amplitude_abs,
                                   base_amplitude_abs_error=error_base_amplitude_abs,
@@ -86,7 +89,8 @@ def package_res_results(popt, pcov, verbose=False):
                                   f0=fit_f0, f0_error=error_f0,
                                   Qi=fit_Qi, Qi_error=error_Qi,
                                   Qc=fit_Qc, Qc_error=error_Qc,
-                                  Zratio=fit_Zratio, Zratio_error=error_Zratio)
+                                  Zratio=fit_Zratio, Zratio_error=error_Zratio,
+                                  res_number=res_number, parent_file=parent_file)
     return single_res_params
 
 

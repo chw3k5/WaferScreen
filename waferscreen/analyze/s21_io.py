@@ -5,13 +5,19 @@ from waferscreen.analyze.s21_metadata import MetaDataDict
 from waferscreen.analyze.table_read import num_format
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
+from waferscreen.analyze.res_io import res_params_header, ResParams
 
 s21_header = "# Header:freq_ghz,real,imag"
 
 
-def write_s21(output_file, freqs_ghz, s21_complex, metadata):
+def write_s21(output_file, freqs_ghz, s21_complex, metadata=None, fitted_resonators_parameters=None):
     with open(output_file, 'w') as f:
-        f.write(F"{metadata}\n")
+        if metadata is not None:
+            f.write(F"{metadata}\n")
+        if fitted_resonators_parameters is not None:
+            f.write(F"{res_params_header}\n")
+            for res_param in fitted_resonators_parameters:
+                f.write(F"{res_param}\n")
         f.write(F"{s21_header}\n")
         for freq, s21_value in list(zip(freqs_ghz, s21_complex)):
             real = s21_value.real
@@ -19,34 +25,54 @@ def write_s21(output_file, freqs_ghz, s21_complex, metadata):
             f.write(F"{freq},{real},{imag}\n")
 
 
-def read_s21(path):
+def read_s21(path, return_res_params=False):
     with open(path, "r") as f:
         raw_lines = f.readlines()
     metadata = MetaDataDict()
-    header = ["freq_ghz", "real", "imag"]
-    # get the metadata and header
+    header = ["freq_ghz", "real", "imag"]  # this is only used if a the expected header is absent
+    # get the metadata and header and other ancillary data types
     line_index = 0
-    while raw_lines[line_index][0] == "#":
-        try:
-            context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":", 1)
-        except ValueError:
-            pass
-        else:
-            context_type = context_type.rstrip().lower()
-            if context_type == "header":
-                header = [column_name.strip().lower() for column_name in context_data.split(",")]
-            elif context_type == "metadata":
-                for key_value_pair in context_data.split("|"):
-                    raw_key, raw_value = key_value_pair.split(",")
-                    metadata[raw_key] = num_format(raw_value.strip())
-        line_index += 1
-    else:
-        s21_data = raw_lines[line_index:]
+    res_fits_trigger = False
+    res_fits_header = None
+    res_fits = None
+    for line_index, raw_line in list(enumerate(raw_lines)):
+        if raw_lines[line_index][0] == "#":
+            try:
+                context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":", 1)
+            except ValueError:
+                pass
+            else:
+                context_type = context_type.rstrip().lower()
+                if context_type == "header":
+                    header = [column_name.strip().lower() for column_name in context_data.split(",")]
+                    res_fits_trigger = False
+                    # the rest of the data is columns of S21 data
+                    break
+                elif context_type == "metadata":
+                    for key_value_pair in context_data.split("|"):
+                        raw_key, raw_value = key_value_pair.split(",")
+                        metadata[raw_key] = num_format(raw_value.strip())
+                    res_fits_trigger = False
+                elif context_type == "resfits":
+                    res_fits_trigger = True
+                    res_fits = []
+                    res_fits_header = [column_name.strip().lower() for column_name in context_data.split(",")]
+        elif res_fits_trigger:
+            res_fits_dict = {column_name: num_format(row_value)
+                             for column_name, row_value in zip(res_fits_header, raw_line.split(","))}
+            res_fits.append(ResParams(**res_fits_dict))
+    # Process the S21 data
+    s21_data = raw_lines[line_index + 1:]
     s21_assembly_dict = {column_name: [] for column_name in header}
     for raw_s21_line in s21_data:
         [s21_assembly_dict[column_name].append(float(raw_cell_value))
          for column_name, raw_cell_value in zip(header, raw_s21_line.split(","))]
-    return {column_name: np.array(s21_assembly_dict[column_name]) for column_name in s21_assembly_dict.keys()}, metadata
+    formatted_s21_dict = {column_name: np.array(s21_assembly_dict[column_name])
+                          for column_name in s21_assembly_dict.keys()}
+    if return_res_params:
+        return formatted_s21_dict, metadata, res_fits
+    else:
+        return formatted_s21_dict, metadata
 
 
 def dirname_create(output_basedir, location, wafer, date_str, sweep_type="scan", res_id=None):

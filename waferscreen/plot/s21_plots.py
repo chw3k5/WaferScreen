@@ -322,6 +322,7 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
         print("Saved Plot to:", output_filename)
     else:
         plt.show()
+    plt.clf()
 
 
 if __name__ == "__main__":

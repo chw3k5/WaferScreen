@@ -13,11 +13,11 @@ def read_res_params(path):
     return res_params
 
 
-primary_res_params = ["base_amplitude_abs", "a_phase_rad", "base_amplitude_slope", "tau_ns", "f0", "Qi", "Qc", "Zratio"]
-res_params_header = ""
+primary_res_params = ["f0", "Qi", "Qc", "base_amplitude_abs", "a_phase_rad", "base_amplitude_slope", "tau_ns", "Zratio"]
+res_params_header = "# Resfits:res_number,"
 for param_type in primary_res_params:
     res_params_header += param_type + "," + param_type + "_error,"
-res_params_header = res_params_header[:-1]
+res_params_header += "parent_file"
 
 
 class ResParams(NamedTuple):
@@ -37,9 +37,11 @@ class ResParams(NamedTuple):
     Qi_error: Optional[float] = None
     Qc_error: Optional[float] = None
     Zratio_error: Optional[float] = None
+    parent_file: Optional[str] = None
+    res_number: Optional[int] = None
 
     def __str__(self):
-        output_string = ""
+        output_string = F"{self.res_number},"
         for attr in primary_res_params:
             error_value = str(self.__getattribute__(attr + "_error"))
             if error_value is None:
@@ -47,4 +49,5 @@ class ResParams(NamedTuple):
             else:
                 error_str = str(error_value)
             output_string += str(self.__getattribute__(attr)) + "," + error_str + ","
-        return output_string[:-1]
+        output_string += F"{self.parent_file}"
+        return output_string

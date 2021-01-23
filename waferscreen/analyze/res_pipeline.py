@@ -1,4 +1,6 @@
 import numpy as np
+import os
+from shutil import rmtree
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
@@ -13,6 +15,7 @@ import copy
 
 halfway_in_log_mag = 10.0 * np.log10(0.5)  # when 3 dB is not accurate enough
 
+
 def fwhm(goal_depth, f_Hz_single_res, s21_mag_singe_res):
     f_fwhm_Hz_now = f_fwhm_Hz_last = f_fwhm_mag_now = f_fwhm_mag_last = None
     for single_f_Hz, single_linear_mag in zip(f_Hz_single_res, s21_mag_singe_res):
@@ -23,10 +26,11 @@ def fwhm(goal_depth, f_Hz_single_res, s21_mag_singe_res):
         else:
             f_fwhm_Hz_last = single_f_Hz
             f_fwhm_mag_last = single_linear_mag
-    else:
-        if any([f_fwhm_Hz_now is None, f_fwhm_Hz_last is None, f_fwhm_mag_now is None, f_fwhm_mag_last is None]):
-            raise UnboundLocalError(F"the FWHM function needs a keast two data point, to not error,\n" +
-                                    F"but it needs a lot more to work well.\n")
+    if any([f_fwhm_Hz_now is None, f_fwhm_Hz_last is None, f_fwhm_mag_now is None, f_fwhm_mag_last is None]):
+        if f_fwhm_Hz_now is not None and f_fwhm_mag_now is not None:
+            return f_fwhm_Hz_now
+        raise UnboundLocalError(F"the FWHM function needs at least one data point to not error,\n" +
+                                F"but it needs a lot more to work well.\n")
     slope = (f_fwhm_Hz_now - f_fwhm_Hz_last) / (f_fwhm_mag_now - f_fwhm_mag_last)
     f_fwhm_Hz = ((goal_depth - f_fwhm_mag_last) * slope) + f_fwhm_Hz_last
     return f_fwhm_Hz
@@ -35,8 +39,11 @@ def fwhm(goal_depth, f_Hz_single_res, s21_mag_singe_res):
 class ResPipe:
     def __init__(self, s21_path, verbose=True):
         self.path = s21_path
-        self.verbose = True
-        self.meta_data = None
+        self.dirname, self.basename = os.path.split(self.path)
+        self.basename_prefix, self.file_extension = self.basename.rsplit(".", 1)
+
+        self.verbose = verbose
+        self.metadata = None
         self.unprocessed_freq_GHz, self.unprocessed_reals21, self.unprocessed_imags21 = None, None, None
         self.unprocessed_freq_Hz = None
         self.unprocessed_mags21, self.unprocessed_phases21 = None, None
@@ -49,12 +56,25 @@ class ResPipe:
         self.fitted_resonators_parameters = None
 
     def read(self):
-        data_dict, self.meta_data = read_s21(path=self.path)
+        data_dict, self.metadata = read_s21(path=self.path)
         self.unprocessed_freq_GHz = data_dict["freq_ghz"]
         self.unprocessed_freq_Hz = self.unprocessed_freq_GHz * 1.0e9
         self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"],  data_dict["imag"]
         self.unprocessed_mags21, self.unprocessed_phases21 = ri_to_magphase(r=self.unprocessed_reals21,
                                                                             i=self.unprocessed_imags21)
+
+    def write(self, output_file, freqs_ghz, s21_complex):
+        write_s21(output_file, freqs_ghz, s21_complex, metadata=self.metadata,
+                  fitted_resonators_parameters=self.fitted_resonators_parameters)
+
+    def generate_output_filename(self, processing_steps):
+        output_prefix = str(self.basename_prefix)
+        for process_step in processing_steps:
+            output_prefix += F"_{process_step.lower().strip()}"
+        outputfile_basename_prefix = os.path.join(self.dirname, output_prefix)
+        plot_filename = outputfile_basename_prefix + ".pdf"
+        data_filename = outputfile_basename_prefix + "." + self.file_extension
+        return data_filename, plot_filename
 
     def savgol_filter_mag(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
         self.filter_reset()
@@ -63,7 +83,8 @@ class ResPipe:
             # window length needs to be an odd int
             window_length += 1
         self.filter_update_mag(mag=mag, phase=phase,
-                               lowpass_filter_mags21=savgol_filter(x=mag, window_length=window_length, polyorder=polyorder),
+                               lowpass_filter_mags21=savgol_filter(x=mag, window_length=window_length,
+                                                                   polyorder=polyorder),
                                plot=plot)
         return mag, phase
 
@@ -172,10 +193,20 @@ class ResPipe:
         self.highpass_linear_mag = np.sqrt((self.highpass_filter_reals21 ** 2.0) + (self.highpass_filter_imags21 ** 2.0))
 
         self.minima_as_windows = i_thresh.minima_as_windows
+        self.metadata["window_pad_factor"] = window_pad_factor
+        self.metadata["fitter_pad_factor"] = fitter_pad_factor
+        self.metadata["peak_threshold_dB"] = i_thresh.peak_threshold_dB
 
-    def analyze_resonators(self):
+    def analyze_resonators(self, save_res_plots=False):
+        res_plot_dir = os.path.join(self.dirname, self.basename_prefix)
+        if save_res_plots:
+            if os.path.exists(res_plot_dir):
+                rmtree(res_plot_dir)
+            os.mkdir(res_plot_dir)
+
+
         self.fitted_resonators_parameters = []
-        for single_window in self.minima_as_windows:
+        for res_number, single_window in zip(range(1, len(self.minima_as_windows) + 1), self.minima_as_windows):
             # get slices of data ready
             fitter_slice = slice(single_window.left_fitter_pad, single_window.right_fitter_pad)
             left_baseline_slice = slice(single_window.left_fitter_pad, single_window.left_window)
@@ -236,26 +267,36 @@ class ResPipe:
                                                             base_amplitude_slope_guess=params_guess.base_amplitude_slope,
                                                             tau_ns_guess=params_guess.tau_ns,
                                                             Zratio_guess=params_guess.Zratio)
-            params_fit = package_res_results(popt=popt, pcov=pcov, verbose=self.verbose)
+            params_fit = package_res_results(popt=popt, pcov=pcov, res_number=res_number,
+                                             parent_file=self.path,
+                                             verbose=self.verbose)
             self.fitted_resonators_parameters.append(params_fit)
-
-            plot_res_fit(f_GHz_single_res=f_GHz_single_res,
-                         s21_mag_single_res=s21_mag_single_res,
-                         not_smoothed_mag_single_res=self.not_smoothed_mag[fitter_slice],
-                         s21_mag_single_res_highpass=s21_mag_single_res_highpass,
-                         params_guess=params_guess, params_fit=params_fit,
-                         minima_pair=(self.unprocessed_freq_GHz[single_window.minima],
-                                      self.highpass_filter_mags21[single_window.minima]),
-                         fwhm_pair=((f_fwhm_left_Hz * 1.0e-9, f_fwhm_right_Hz * 1.0e-9), (goal_depth, goal_depth)),
-                         window_pair=((self.unprocessed_freq_GHz[single_window.left_window],
-                                       self.unprocessed_freq_GHz[single_window.right_window]),
-                                      (self.highpass_filter_mags21[single_window.left_window],
-                                       self.highpass_filter_mags21[single_window.right_window])),
-                         fitter_pair=((self.unprocessed_freq_GHz[single_window.left_pad],
-                                       self.unprocessed_freq_GHz[single_window.right_pad]),
-                                      (self.highpass_filter_mags21[single_window.left_pad],
-                                       self.highpass_filter_mags21[single_window.right_pad])),
-                         output_filename=None)
+            if save_res_plots:
+                plot_res_fit(f_GHz_single_res=f_GHz_single_res,
+                             s21_mag_single_res=s21_mag_single_res,
+                             not_smoothed_mag_single_res=self.not_smoothed_mag[fitter_slice],
+                             s21_mag_single_res_highpass=s21_mag_single_res_highpass,
+                             params_guess=params_guess, params_fit=params_fit,
+                             minima_pair=(self.unprocessed_freq_GHz[single_window.minima],
+                                          self.highpass_filter_mags21[single_window.minima]),
+                             fwhm_pair=((f_fwhm_left_Hz * 1.0e-9, f_fwhm_right_Hz * 1.0e-9), (goal_depth, goal_depth)),
+                             window_pair=((self.unprocessed_freq_GHz[single_window.left_window],
+                                           self.unprocessed_freq_GHz[single_window.right_window]),
+                                          (self.highpass_filter_mags21[single_window.left_window],
+                                           self.highpass_filter_mags21[single_window.right_window])),
+                             fitter_pair=((self.unprocessed_freq_GHz[single_window.left_pad],
+                                           self.unprocessed_freq_GHz[single_window.right_pad]),
+                                          (self.highpass_filter_mags21[single_window.left_pad],
+                                           self.highpass_filter_mags21[single_window.right_pad])),
+                             output_filename=os.path.join(res_plot_dir, F"{'%04i' % res_number}.pdf"))
+        self.metadata["baseline_removed"] = True
+        self.metadata["baseline_technique"] = "windows function based on the a threshold, then smoothed"
+        self.metadata["smoothing_scale_GHz"] = rpc.baseline_smoothing_window_GHz
+        self.metadata["resonator_spacing_threshold_Hz"] = rpc.resonator_spacing_threshold_Hz
+        data_filename, plot_filename = self.generate_output_filename(processing_steps=["windowBaselineSmoothedRemoved"])
+        output_s21complex = self.highpass_filter_reals21 + 1j * self.highpass_filter_reals21
+        self.write(output_file=data_filename, freqs_ghz=self.unprocessed_freq_GHz,
+                   s21_complex=output_s21complex)
 
     def fit_resonators_jake(self):
         frs = jake_res_finder(unprocessed_freq_GHz=self.unprocessed_freq_GHz,

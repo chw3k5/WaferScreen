@@ -1,6 +1,4 @@
 import os
-import numpy as np
-from typing import NamedTuple, Optional
 from ref import output_dirs
 from waferscreen.analyze.s21_inductor import InductS21
 from waferscreen.analyze.res_pipeline import ResPipe
@@ -66,8 +64,8 @@ class DataManager:
             res_pipe = ResPipe(s21_path=scan_file, verbose=self.verbose)
             res_pipe.read()
             res_pipe.find_window(cosine_filter=False,
-                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=True, debug_mode=False)
-            res_pipe.analyze_resonators()
+                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=False, debug_mode=False)
+            res_pipe.analyze_resonators(save_res_plots=False)
 
 
 if __name__ == "__main__":

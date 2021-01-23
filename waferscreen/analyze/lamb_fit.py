@@ -4,7 +4,7 @@ import scipy.optimize as op
 from scipy.optimize import fsolve
 import matplotlib.pyplot as pl
 
-# Note: lambda is a reserved word, so I use lamb instead
+# Note: lambda is a reserved word, so lamb is used instead
 
 Phi0 = 2.068e-15  # magnetic flux quantum
 
