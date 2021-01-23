@@ -7,7 +7,7 @@ from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.analyze.res_io import res_params_header, ResParams
 
-s21_header = "# Header:freq_ghz,real,imag"
+s21_header = "# Header:,freq_ghz,real,imag"
 
 
 def write_s21(output_file, freqs_ghz, s21_complex, metadata=None, fitted_resonators_parameters=None):
@@ -38,7 +38,7 @@ def read_s21(path, return_res_params=False):
     for line_index, raw_line in list(enumerate(raw_lines)):
         if raw_lines[line_index][0] == "#":
             try:
-                context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":", 1)
+                context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":,", 1)
             except ValueError:
                 pass
             else:
@@ -49,8 +49,8 @@ def read_s21(path, return_res_params=False):
                     # the rest of the data is columns of S21 data
                     break
                 elif context_type == "metadata":
-                    for key_value_pair in context_data.split("|"):
-                        raw_key, raw_value = key_value_pair.split(",")
+                    for key_value_pair in context_data.split(","):
+                        raw_key, raw_value = key_value_pair.split("|")
                         metadata[raw_key] = num_format(raw_value.strip())
                     res_fits_trigger = False
                 elif context_type == "resfits":

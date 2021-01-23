@@ -198,7 +198,7 @@ class ResPipe:
         self.metadata["peak_threshold_dB"] = i_thresh.peak_threshold_dB
 
     def analyze_resonators(self, save_res_plots=False):
-        res_plot_dir = os.path.join(self.dirname, self.basename_prefix)
+        res_plot_dir = os.path.join(self.dirname, F"resonatorplots_{self.basename_prefix}")
         if save_res_plots:
             if os.path.exists(res_plot_dir):
                 rmtree(res_plot_dir)

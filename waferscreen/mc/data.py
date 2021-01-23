@@ -65,10 +65,10 @@ class DataManager:
             res_pipe.read()
             res_pipe.find_window(cosine_filter=False,
                                  window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=False, debug_mode=False)
-            res_pipe.analyze_resonators(save_res_plots=False)
+            res_pipe.analyze_resonators(save_res_plots=True)
 
 
 if __name__ == "__main__":
     dm = DataManager(user_input_group_delay=None)
-    # dm.raw_process_all()
+    dm.raw_process_all()
     dm.find_scans_resonators()

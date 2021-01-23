@@ -40,11 +40,11 @@ class MetaDataDict(UserDict):
     def __str__(self):
         return_str = ""
         for key in sorted(self.keys()):
-            formatted_datum = F"{key},{self.data[key]}|"
+            formatted_datum = F"{key}|{self.data[key]},"
             # put utc first, the rest in alphabetical order
             if key in metadata_primary_types:
                 return_str = formatted_datum + return_str
             else:
                 return_str += formatted_datum
         # add prefix, get rid of the last comma ","
-        return "# Metadata:" + return_str[:-1]
+        return "# Metadata:," + return_str[:-1]

@@ -43,7 +43,6 @@ class InductS21:
         self.remove_group_delay()
         if metadata_dict is not None:
             self.add_metadata(**metadata_dict)
-        self.calc_metadata()
         self.write()
         self.plot()
 

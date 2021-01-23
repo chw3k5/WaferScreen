@@ -104,7 +104,7 @@ class AbstractFluxSweep:
         if kwargs["export_type"] == "scan":
             dirname = dirname_create_raw(sweep_type=kwargs["export_type"])
             basename = F"scan{'%2.3f' % sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % sweep_metadata['fmax_GHz']}GHz_" + \
-                       F"{sweep_metadata['utc'].replace(':', '-')}.txt"
+                       F"{sweep_metadata['utc'].replace(':', '-')}.csv"
         else:
             basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
                                         current_uA=sweep_metadata['flux_current_uA'],

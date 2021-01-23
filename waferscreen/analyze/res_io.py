@@ -14,7 +14,7 @@ def read_res_params(path):
 
 
 primary_res_params = ["f0", "Qi", "Qc", "base_amplitude_abs", "a_phase_rad", "base_amplitude_slope", "tau_ns", "Zratio"]
-res_params_header = "# Resfits:res_number,"
+res_params_header = "# Resfits:,res_number,"
 for param_type in primary_res_params:
     res_params_header += param_type + "," + param_type + "_error,"
 res_params_header += "parent_file"

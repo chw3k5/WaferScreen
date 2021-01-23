@@ -1,5 +1,6 @@
-# Metadata:utc,2021-01-15 20:51:52.829176|path,D:\waferscreen\nist\10\2021-01-15\scan\raw\scan4.100GHz-6.200GHz_2021-01-15 20-51-52.829176.txt|end_time,1610743912|export_type,scan|fcenter_ghz,6|flux_current_ua,0|flux_supply_v,0|fmax_ghz,6|fmin_ghz,4|fspan_ghz,0|if_bw_hz,100|num_freq_points,105666|port_power_dbm,-20|ramp_series_resistance_ohms,10000|start_time,1610742577|sweeptype,lin|vna_address,GPIB1::19::INSTR
-# Header:freq_ghz,real,imag
+# Metadata:,utc|2021-01-15 20:51:52.829176,path|D:\waferscreen\nist\10\2021-01-15\scan\raw\scan4.100GHz-6.200GHz_2021-01-15 20-51-52.829176.txt,end_time|1610743912,export_type|scan,fcenter_ghz|6,flux_current_ua|0,flux_supply_v|0,fmax_ghz|6,fmin_ghz|4,fspan_ghz|0,if_bw_hz|100,num_freq_points|105666,port_power_dbm|-20,ramp_series_resistance_ohms|10000,start_time|1610742577,sweeptype|lin,vna_address|GPIB1::19::INSTR
+# Test line to be ingnored. 
+# Header:,freq_ghz,real,imag
 4.1,0.300354,0.6834106
 4.100019874130506,0.3019409,0.6830444
 4.100039748261013,0.3057251,0.680481
