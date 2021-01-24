@@ -1,16 +1,16 @@
 import numpy as np
 import os
 from shutil import rmtree
+import copy
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
 from waferscreen.plot.s21_plots import plot_filter, plot_res_fit
-
 import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.analyze.res_io import ResParams
 from waferscreen.analyze.res_fit_jake import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
-import copy
+import ref
 
 
 halfway_in_log_mag = 10.0 * np.log10(0.5)  # when 3 dB is not accurate enough
@@ -54,6 +54,9 @@ class ResPipe:
         self.highpass_phase = None  # phase does not really change with the current processing
         self.minima_as_windows = None
         self.fitted_resonators_parameters = None
+
+        self.is_even_bands = None
+        self.fitted_resonators_parameters_by_band = None
 
     def read(self):
         data_dict, self.metadata = read_s21(path=self.path)
@@ -288,7 +291,7 @@ class ResPipe:
                                            self.unprocessed_freq_GHz[single_window.right_pad]),
                                           (self.highpass_filter_mags21[single_window.left_pad],
                                            self.highpass_filter_mags21[single_window.right_pad])),
-                             output_filename=os.path.join(res_plot_dir, F"{'%04i' % res_number}.pdf"))
+                             output_filename=os.path.join(res_plot_dir, F"{'%04i' % res_number}.png"))
         self.metadata["baseline_removed"] = True
         self.metadata["baseline_technique"] = "windows function based on the a threshold, then smoothed"
         self.metadata["smoothing_scale_GHz"] = rpc.baseline_smoothing_window_GHz
@@ -312,3 +315,91 @@ class ResPipe:
                               baseline_order=3,
                               verbose=self.verbose)
         return frs
+
+    def scan_to_band(self):
+        f_centers_GHz = np.array(fit_params.f0 for fit_params in self.fitted_resonators_parameters)
+        res_nums = np.array([fit_params.res_nums for fit_params in self.fitted_resonators_parameters])
+        # find the connected groups
+        connected_groups = []
+        current_group = [self.fitted_resonators_parameters[0]]
+        for f_index in range(len(f_centers_GHz) - 1):
+            f_left_GHz = f_centers_GHz[f_index]
+            f_right_GHz = f_centers_GHz[f_index + 1 ]
+            if 0.1 < f_right_GHz - f_left_GHz:
+                connected_groups.append(current_group)
+            current_group = [self.fitted_resonators_parameters[f_index + 1]]
+        else:
+            if current_group:
+                connected_groups.append(current_group)
+
+        # make bins based on the band limits
+        res_nums_per_band = {}
+        for band_name_str in ref.band_names:
+            min_GHz = ref.band_params[band_name_str]["min_GHz"]
+            max_GHz = ref.band_params[band_name_str]["max_GHz"]
+            # there is a dead space between bands, resonators in that space are not counted
+            res_nums_per_band[band_name_str] = set(res_nums[min_GHz <= f_centers_GHz <= max_GHz])
+
+        # Expecting every other band to be mostly populated
+        even_res_nums = set()
+        even_band_nums = []
+        even_band_names = []
+        odd_res_nums = set()
+        odd_band_nums = []
+        odd_band_names = []
+        for band_number, band_name_str in list(enumerate(ref.band_names)):
+            if band_number % 2 == 0:
+                [even_res_nums.add(res_num) for res_num in res_nums_per_band[band_name_str]]
+                even_band_names.append(band_name_str)
+                even_band_nums.append(band_number)
+            else:
+                [odd_res_nums.add(res_num) for res_num in res_nums_per_band[band_name_str]]
+                odd_band_nums.append(band_name_str)
+                odd_band_names.append(band_number)
+        if len(odd_res_nums) < len(even_res_nums):
+            self.is_even_bands = True
+            band_names = even_band_names
+            band_nums = even_band_nums
+        else:
+            self.is_even_bands = False
+            band_names = odd_band_names
+            band_nums = odd_band_nums
+
+        # find the overlap between the connected groups of resonators and the resonators that are in known bands.
+        self.fitted_resonators_parameters_by_band = {}
+        for resonator_group in connected_groups:
+            res_nums_this_group = set(fit_params.res_nums for fit_params in resonator_group)
+            for band_name, band_num in zip(band_names, band_nums):
+                res_nums_this_band = res_nums_per_band[band_name]
+                if res_nums_this_band & res_nums_this_group:
+                    if band_name not in self.fitted_resonators_parameters_by_band.keys():
+                        self.fitted_resonators_parameters_by_band = []
+                    self.fitted_resonators_parameters_by_band[band_name].extend(resonator_group)
+                    break
+
+
+
+
+
+
+
+
+
+
+
+# Simons Observatory Frequency Band definitions
+band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4.147},
+               "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
+               "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
+               "Band03": {"min_GHz": 4.419, "max_GHz": 4.581},
+               "Band04": {"min_GHz": 4.584, "max_GHz": 4.714},
+               "Band05": {"min_GHz": 4.718, "max_GHz": 4.848},
+               "Band06": {"min_GHz": 4.852, "max_GHz": 4.981},
+               "Band07": {"min_GHz": 5.019, "max_GHz": 5.147},
+               "Band08": {"min_GHz": 5.152, "max_GHz": 5.280},
+               "Band09": {"min_GHz": 5.286, "max_GHz": 5.413},
+               "Band10": {"min_GHz": 5.421, "max_GHz": 5.581},
+               "Band11": {"min_GHz": 5.585, "max_GHz": 5.714},
+               "Band12": {"min_GHz": 5.718, "max_GHz": 5.848},
+               "Band13": {"min_GHz": 5.851, "max_GHz": 5.981},
+               }

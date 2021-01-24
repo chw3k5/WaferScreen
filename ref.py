@@ -48,6 +48,8 @@ c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
 
 # Simons Observatory Frequency Band definitions
+band_names = ["Band00", "Band01", "Band02", "Band03", "Band04", "Band05", "Band06",
+              "Band07", "Band08", "Band09", "Band10", "Band11", "Band12", "Band13"]
 band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4.147},
                "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
                "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
