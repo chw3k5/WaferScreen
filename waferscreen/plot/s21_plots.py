@@ -1,10 +1,11 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from ref import today_str
-from waferscreen.plot.quick_plots import ls, len_ls
+from waferscreen.plot.quick_plots import ls, len_ls, colors
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.analyze.s21_io import read_s21, ri_to_magphase, plot_bands
 from waferscreen.analyze.res_fit_jake import fit_simple_res_gain_slope_complex
+from ref import band_params
 
 
 def s21_subplot(ax, plot_data, x_data_str, y_data_str, y_label_str="", x_label_str="", leg_label_str="", title_str='',
@@ -80,14 +81,14 @@ def plot_s21(file=None, freqs_GHz=None, s21_complex=None, show_ri=False,
     ax1.legend(legend_dict['leg_lines'], legend_dict['leg_labels'], loc=0, numpoints=3, handlelength=5, fontsize=16)
     ax1.set_ylim((ymin, ymax))
     if show:
-        plt.show()
+        plt.show(block=True)
     if save and file is not None:
         plt.draw()
         plot_file_name, _ = file.rsplit(".", 1)
         plot_file_name += '.pdf'
         plt.savefig(plot_file_name)
         print("Saved Plot to:", plot_file_name)
-    plt.clf()
+    plt.close(fig)
     return
 
 
@@ -137,13 +138,16 @@ def plot_filter(freqs_GHz, original_s21, lowpass_s21, highpass_s21, output_filen
         plt.savefig(output_filename)
         print("Saved Plot to:", output_filename)
     else:
-        plt.show()
+        plt.show(block=True)
+    plt.clf()
+    plt.close(fig)
 
 
 def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_single_res=None,
                  s21_mag_single_res_highpass=None,
                  params_guess=None, params_fit=None,
                  minima_pair=None, fwhm_pair=None, window_pair=None, fitter_pair=None, output_filename=None):
+    fig = plt.figure(figsize=(8, 8))
     leglines = []
     leglabels = []
 
@@ -322,15 +326,58 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
         plt.savefig(output_filename)
         print("Saved Plot to:", output_filename)
     else:
-        plt.show()
+        plt.show(block=True)
     plt.clf()
+    plt.close(fig)
 
 
-if __name__ == "__main__":
-    # file = os.path.join(s21_dir, "so", "7_Band01_2020-09-08_run9.csv")
-    # file = os.path.join(output_dir, "s21", "8", "Band03", "2020-09-28", "8_Band03_2020-09-28_run4.csv")
-    # file = os.path.join("D:\\", 'waferscreen', 's21', 'check_out', 'Input1_Trace0.15K_2020-09-01_run14.csv')
-    plot_s21(file="D:\\waferscreen\\s21\\check_out\\InputB_1coldAmp_2warm_Trace300K_2020-10-09_run2.csv", show=True, save=True, show_bands=True)
+def band_plot(freqs_GHz, mags, fitted_resonators_parameters_by_band, output_filename=None):
 
-    # make_s21_folder(os.path.join("D:\\", 'waferscreen', 's21', 'check_out'))
+
+    fig = plt.figure(figsize=(20, 8))
+    ax1 = fig.add_subplot(111)
+    ax1.plot(freqs_GHz, mags, color="black", ls='solid', linewidth=1)
+    # found resonators
+    color_count = 0
+    for band_name in fitted_resonators_parameters_by_band:
+        color = colors[color_count]
+        band_dict = band_params[band_name]
+        min_GHz = band_dict["min_GHz"]
+        max_GHz = band_dict["max_GHz"]
+        boolean_array = np.logical_and(min_GHz <= freqs_GHz, freqs_GHz <= max_GHz)
+        ax1.plot(freqs_GHz[boolean_array], mags[boolean_array], color=color, ls='solid', linewidth=2)
+        color_count += 1
+
+    ymin, ymax = ax1.get_ylim()
+    text_y = (0.2 * (ymax - ymin)) + ymin
+    color_count = 0
+    # band bounds
+    for band_name in fitted_resonators_parameters_by_band:
+        color = colors[color_count]
+        band_dict = band_params[band_name]
+        fitted_params_this_band = fitted_resonators_parameters_by_band[band_name]
+        in_band_res = [res_param for res_param in fitted_params_this_band
+                       if band_dict["max_GHz"] >= res_param.fcenter_ghz >= band_dict["min_GHz"]]
+
+        ax1.plot((band_dict["min_GHz"], band_dict["min_GHz"]), (ymin, ymax), color="black", ls="dotted")
+        ax1.plot((band_dict["max_GHz"], band_dict["max_GHz"]), (ymin, ymax), color="black", ls="dashed")
+        text_x = (0.1 * (band_dict["max_GHz"] - band_dict["min_GHz"])) + band_dict["min_GHz"]
+        ax1.text(text_x, text_y, F'{band_name}\n {len(fitted_params_this_band)} found,\n {len(in_band_res)} inband',
+                 color='black', bbox={'facecolor': color, 'alpha': 0.5, 'pad': 10})
+        color_count += 1
+
+    # Whole plot details
+    ax1.set_xlabel('Frequency (GHz)')
+    ax1.set_ylabel("S21 (dB)")
+
+    # Display
+    if output_filename is not None:
+        plt.draw()
+        plt.savefig(output_filename)
+        print("Saved Plot to:", output_filename)
+    else:
+        plt.show(block=True)
+    plt.clf()
+    plt.close()
+
 

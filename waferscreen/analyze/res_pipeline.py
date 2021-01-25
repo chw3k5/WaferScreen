@@ -5,7 +5,7 @@ import copy
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
-from waferscreen.plot.s21_plots import plot_filter, plot_res_fit
+from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
 import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.analyze.res_io import ResParams
 from waferscreen.analyze.res_fit_jake import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
@@ -299,7 +299,7 @@ class ResPipe:
         self.metadata["smoothing_scale_GHz"] = rpc.baseline_smoothing_window_GHz
         self.metadata["resonator_spacing_threshold_Hz"] = rpc.resonator_spacing_threshold_Hz
         data_filename, plot_filename = self.generate_output_filename(processing_steps=["windowBaselineSmoothedRemoved"])
-        output_s21complex = self.highpass_filter_reals21 + 1j * self.highpass_filter_reals21
+        output_s21complex = self.highpass_filter_reals21 + 1j * self.highpass_filter_imags21
         self.write(output_file=data_filename, freqs_ghz=self.unprocessed_freq_GHz,
                    s21_complex=output_s21complex)
 
@@ -329,7 +329,8 @@ class ResPipe:
             f_right_GHz = f_centers_GHz[f_index + 1]
             if 0.1 < f_right_GHz - f_left_GHz:
                 connected_groups.append(current_group)
-            current_group = [self.fitted_resonators_parameters[f_index + 1]]
+                current_group = []
+            current_group.append(self.fitted_resonators_parameters[f_index + 1])
         else:
             if current_group:
                 connected_groups.append(current_group)
@@ -377,9 +378,15 @@ class ResPipe:
                 res_nums_this_band = res_nums_per_band[band_name]
                 if res_nums_this_band & res_nums_this_group:
                     if band_name not in self.fitted_resonators_parameters_by_band.keys():
-                        self.fitted_resonators_parameters_by_band = []
+                        self.fitted_resonators_parameters_by_band[band_name] = []
                     self.fitted_resonators_parameters_by_band[band_name].extend(resonator_group)
                     break
 
+    def report_scan_of_bands(self):
+        if not os.path.exists(self.report_dir):
+            os.mkdir(self.report_dir)
+        band_plot(freqs_GHz=self.unprocessed_freq_GHz, mags=self.unprocessed_mags21,
+                  fitted_resonators_parameters_by_band=self.fitted_resonators_parameters_by_band,
+                  output_filename=os.path.join(self.report_dir, "band_report.pdf"))
 
 

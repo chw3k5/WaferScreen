@@ -76,8 +76,8 @@ def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=F
         print('base_amplitude_slope : %.3f +/- %.3f GHz' % (fit_base_amplitude_slope, error_base_amplitude_slope))
         print('tau_ns        : %.3f +/- %.3f ns' % (fit_tau_ns, error_tau_ns))
         print('fcenter       : %.6f +/- %.8f GHz' % (fit_fcenter_GHz, error_fcenter_GHz))
-        print('q_i            : %.0f +/- %.0f' % (fit_q_i, error_q_i))
-        print('q_c            : %.0f +/- %.0f' % (fit_q_c, error_q_c))
+        print('q_i           : %.0f +/- %.0f' % (fit_q_i, error_q_i))
+        print('q_c           : %.0f +/- %.0f' % (fit_q_c, error_q_c))
         print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_impedance_ratio, error_impedance_ratio))
 
     single_res_params = ResParams(base_amplitude_abs=fit_base_amplitude_abs,
