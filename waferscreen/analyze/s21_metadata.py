@@ -1,10 +1,19 @@
 from collections import UserDict
-from waferscreen.analyze.table_read import num_format
 
 allowed_meta_data_types = (str, float, int)
 raw_filename_key = "output_filename"
 metadata_primary_types = {"utc", "path"}
 forbidden_characters = {"|", ","}
+
+
+def num_format(a_string):
+    try:
+        return int(a_string)
+    except ValueError:
+        try:
+            return float(a_string)
+        except ValueError:
+            return a_string.strip()
 
 
 def metadata_key_format(key):
@@ -57,4 +66,4 @@ class MetaDataDict(UserDict):
             else:
                 return_str += formatted_datum
         # add prefix, get rid of the last comma ","
-        return "# Metadata:," + return_str[:-1]
+        return "# Metadata:" + return_str[:-1]

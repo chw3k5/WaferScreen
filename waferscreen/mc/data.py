@@ -78,8 +78,8 @@ class DataManager:
             res_pipe = ResPipe(s21_path=scan_file, verbose=self.verbose)
             res_pipe.read()
             res_pipe.find_window(cosine_filter=False,
-                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=True, debug_mode=False)
-            res_pipe.analyze_resonators(save_res_plots=True)
+                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=False, debug_mode=True)
+            res_pipe.analyze_resonators(save_res_plots=False)
 
     def load_scans_resonators(self):
         self.windowbaselinesmoothedremoved_scan_files = get_pro_s21_scans(process_type="windowbaselinesmoothedremoved")
@@ -88,10 +88,12 @@ class DataManager:
             res_pipe.read()
             res_pipe.scan_to_band()
             res_pipe.report_scan_of_bands()
+            res_pipe.make_res_seeds()
+            # res_pipe.make_band_seeds()
 
 
 if __name__ == "__main__":
     dm = DataManager(user_input_group_delay=None)
-    dm.raw_process_all()
-    dm.find_scans_resonators()
+    # dm.raw_process_all()
+    # dm.find_scans_resonators()
     dm.load_scans_resonators()

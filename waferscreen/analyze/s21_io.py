@@ -1,16 +1,15 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from waferscreen.analyze.s21_metadata import MetaDataDict
-from waferscreen.analyze.table_read import num_format
+from waferscreen.analyze.s21_metadata import MetaDataDict, num_format
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.analyze.res_io import res_params_header, ResParams
 
-s21_header = "# Header:,freq_ghz,real,imag"
+s21_header = "# Header:freq_ghz,real,imag"
 
 
-def write_s21(output_file, freqs_ghz, s21_complex, metadata=None, fitted_resonators_parameters=None):
+def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None, fitted_resonators_parameters=None):
     with open(output_file, 'w') as f:
         if metadata is not None:
             f.write(F"{metadata}\n")
@@ -18,11 +17,12 @@ def write_s21(output_file, freqs_ghz, s21_complex, metadata=None, fitted_resonat
             f.write(F"{res_params_header}\n")
             for res_param in fitted_resonators_parameters:
                 f.write(F"{res_param}\n")
-        f.write(F"{s21_header}\n")
-        for freq, s21_value in list(zip(freqs_ghz, s21_complex)):
-            real = s21_value.real
-            imag = s21_value.imag
-            f.write(F"{freq},{real},{imag}\n")
+        if freqs_ghz is not None and s21_complex is not None:
+            f.write(F"{s21_header}\n")
+            for freq, s21_value in list(zip(freqs_ghz, s21_complex)):
+                real = s21_value.real
+                imag = s21_value.imag
+                f.write(F"{freq},{real},{imag}\n")
 
 
 def read_s21(path, return_res_params=False):
@@ -35,17 +35,18 @@ def read_s21(path, return_res_params=False):
     res_fits_trigger = False
     res_fits_header = None
     res_fits = None
+    found_s21_header_data = False
     for line_index, raw_line in list(enumerate(raw_lines)):
         if raw_lines[line_index][0] == "#":
             try:
-                context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":,", 1)
+                context_type, context_data = raw_lines[line_index].replace("#", "", 1).lstrip().split(":", 1)
             except ValueError:
                 pass
             else:
                 context_type = context_type.rstrip().lower()
                 if context_type == "header":
                     header = [column_name.strip().lower() for column_name in context_data.split(",")]
-                    res_fits_trigger = False
+                    found_s21_header_data = True
                     # the rest of the data is columns of S21 data
                     break
                 elif context_type == "metadata":
@@ -62,13 +63,16 @@ def read_s21(path, return_res_params=False):
                              for column_name, row_value in zip(res_fits_header, raw_line.split(","))}
             res_fits.append(ResParams(**res_fits_dict))
     # Process the S21 data
-    s21_data = raw_lines[line_index + 1:]
-    s21_assembly_dict = {column_name: [] for column_name in header}
-    for raw_s21_line in s21_data:
-        [s21_assembly_dict[column_name].append(float(raw_cell_value))
-         for column_name, raw_cell_value in zip(header, raw_s21_line.split(","))]
-    formatted_s21_dict = {column_name: np.array(s21_assembly_dict[column_name])
-                          for column_name in s21_assembly_dict.keys()}
+    if found_s21_header_data:
+        s21_data = raw_lines[line_index + 1:]
+        s21_assembly_dict = {column_name: [] for column_name in header}
+        for raw_s21_line in s21_data:
+            [s21_assembly_dict[column_name].append(float(raw_cell_value))
+             for column_name, raw_cell_value in zip(header, raw_s21_line.split(","))]
+        formatted_s21_dict = {column_name: np.array(s21_assembly_dict[column_name])
+                              for column_name in s21_assembly_dict.keys()}
+    else:
+        formatted_s21_dict = None
     if return_res_params:
         return formatted_s21_dict, metadata, res_fits
     else:

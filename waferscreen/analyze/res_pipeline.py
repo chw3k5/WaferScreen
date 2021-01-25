@@ -12,7 +12,6 @@ from waferscreen.analyze.res_fit_jake import wrap_simple_res_gain_slope_complex,
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 import ref
 
-
 halfway_in_log_mag = 10.0 * np.log10(0.5)  # when 3 dB is not accurate enough
 
 
@@ -65,7 +64,7 @@ class ResPipe:
         data_dict, self.metadata, self.fitted_resonators_parameters = read_s21(path=self.path, return_res_params=True)
         self.unprocessed_freq_GHz = data_dict["freq_ghz"]
         self.unprocessed_freq_Hz = self.unprocessed_freq_GHz * 1.0e9
-        self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"],  data_dict["imag"]
+        self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"], data_dict["imag"]
         self.unprocessed_mags21, self.unprocessed_phases21 = ri_to_magphase(r=self.unprocessed_reals21,
                                                                             i=self.unprocessed_imags21)
 
@@ -196,7 +195,8 @@ class ResPipe:
                                lowpass_filter_mags21=self.synthetic_baseline_smoothed,
                                plot=show_filter_plots)
         self.highpass_phase = phase
-        self.highpass_linear_mag = np.sqrt((self.highpass_filter_reals21 ** 2.0) + (self.highpass_filter_imags21 ** 2.0))
+        self.highpass_linear_mag = np.sqrt(
+            (self.highpass_filter_reals21 ** 2.0) + (self.highpass_filter_imags21 ** 2.0))
 
         self.minima_as_windows = i_thresh.minima_as_windows
         self.metadata["window_pad_factor"] = window_pad_factor
@@ -229,7 +229,6 @@ class ResPipe:
             minima_mag_single_res_highpass = self.highpass_filter_mags21[single_window.minima]
             # Guess the initial fit parameters
 
-
             fcenter_guess_GHz = self.unprocessed_freq_GHz[single_window.minima]
             fcenter_guess_Hz = self.unprocessed_freq_Hz[single_window.minima]
             base_amplitude_abs_guess = 1.0  # This the expected value for a highpass in magnitude space
@@ -255,7 +254,7 @@ class ResPipe:
 
             # base amplitude slope
             base_amplitude_slope_guess = (np.mean(self.highpass_linear_mag[single_window.left_fitter_pad])
-                            - np.mean(self.highpass_linear_mag[single_window.right_fitter_pad])) \
+                                          - np.mean(self.highpass_linear_mag[single_window.right_fitter_pad])) \
                                          / (delta_freq_GHz * 2.0 * np.pi)
             params_guess = ResParams(base_amplitude_abs=base_amplitude_abs_guess, a_phase_rad=a_phase_rad_guess,
                                      base_amplitude_slope=base_amplitude_slope_guess, tau_ns=tau_ns_guess,
@@ -389,4 +388,52 @@ class ResPipe:
                   fitted_resonators_parameters_by_band=self.fitted_resonators_parameters_by_band,
                   output_filename=os.path.join(self.report_dir, "band_report.pdf"))
 
+    def prep_seed_dirs(self, seed_type):
+        date_str_path, _ = self.dirname.rsplit("pro", 1)
+        single_res_dir = os.path.join(date_str_path, 'raw', seed_type)
+        if not os.path.exists(single_res_dir):
+            os.mkdir(single_res_dir)
+        scan_basename_dir = os.path.join(single_res_dir, self.basename_prefix)
+        if not os.path.exists(scan_basename_dir):
+            os.mkdir(scan_basename_dir)
+        job_file_name = os.path.join(ref.working_dir, F"{self.metadata['rf_chain']}_chain_job.csv")
+        return scan_basename_dir, job_file_name
 
+    def make_res_seeds(self):
+        job_type = 'single_res'
+        scan_basename_dir, job_file_name = self.prep_seed_dirs(seed_type=job_type)
+        with open(job_file_name, 'w') as f:
+            f.write(F"{job_type}\n")
+            for band_str in sorted(self.fitted_resonators_parameters_by_band.keys()):
+                for res_fit in self.fitted_resonators_parameters_by_band[band_str]:
+                    seed_metadata = copy.deepcopy(self.metadata)
+                    seed_metadata["so_band"] = band_str
+                    seed_metadata["seed_base"] = self.basename_prefix
+                    seed_metadata["seed_base_path"] = self.path
+                    seed_metadata["res_number"] = res_fit.res_number
+                    # make the correct output file in the 'raw' directory
+                    res_dir = os.path.join(scan_basename_dir, F"{'%04i' % res_fit.res_number}")
+                    if not os.path.exists(res_dir):
+                        os.mkdir(res_dir)
+                    seed_filename = os.path.join(res_dir, "seed.csv")
+                    write_s21(output_file=seed_filename, freqs_ghz=[], s21_complex=[], metadata=seed_metadata,
+                              fitted_resonators_parameters=[res_fit])
+                    f.write(F"{seed_filename}\n")
+
+    def make_band_seeds(self):
+        scan_basename_dir, job_file_name = self.prep_seed_dirs(seed_type='bands')
+        with open(job_file_name, 'w') as f:
+            f.write('band\n')
+            for band_str in sorted(self.fitted_resonators_parameters_by_band.keys()):
+                seed_metadata = copy.deepcopy(self.metadata)
+                seed_metadata["so_band"] = band_str
+                seed_metadata["seed_base"] = self.basename_prefix
+                seed_metadata["seed_base_path"] = self.path
+                # make the correct output file in the 'raw' directory
+                band_dir = os.path.join(scan_basename_dir, band_str)
+                if not os.path.exists(band_dir):
+                    os.mkdir(band_dir)
+                seed_filename = os.path.join(band_dir, "seed.csv")
+                write_s21(output_file=seed_filename, metadata=seed_metadata,
+                          fitted_resonators_parameters=self.fitted_resonators_parameters_by_band[band_str])
+                f.write(F"{seed_filename}\n")
