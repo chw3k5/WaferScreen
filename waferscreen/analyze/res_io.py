@@ -13,7 +13,7 @@ def read_res_params(path):
     return res_params
 
 
-primary_res_params = ["f0", "Qi", "Qc", "base_amplitude_abs", "a_phase_rad", "base_amplitude_slope", "tau_ns", "Zratio"]
+primary_res_params = ["fcenter_ghz", "q_i", "q_c", "base_amplitude_abs", "a_phase_rad", "base_amplitude_slope", "tau_ns", "impedance_ratio"]
 res_params_header = "# Resfits:,res_number,"
 for param_type in primary_res_params:
     res_params_header += param_type + "," + param_type + "_error,"
@@ -25,18 +25,18 @@ class ResParams(NamedTuple):
     a_phase_rad: float
     base_amplitude_slope: float
     tau_ns: float
-    f0: float
-    Qi: float
-    Qc: float
-    Zratio: float
+    fcenter_ghz: float
+    q_i: float
+    q_c: float
+    impedance_ratio: float
     base_amplitude_abs_error: Optional[float] = None
     a_phase_rad_error: Optional[float] = None
     base_amplitude_slope_error: Optional[float] = None
     tau_ns_error: Optional[float] = None
-    f0_error: Optional[float] = None
-    Qi_error: Optional[float] = None
-    Qc_error: Optional[float] = None
-    Zratio_error: Optional[float] = None
+    fcenter_ghz_error: Optional[float] = None
+    q_i_error: Optional[float] = None
+    q_c_error: Optional[float] = None
+    impedance_ratio_error: Optional[float] = None
     parent_file: Optional[str] = None
     res_number: Optional[int] = None
 

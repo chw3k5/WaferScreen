@@ -12,8 +12,8 @@ class InductS21:
     def __init__(self, path, verbose=True):
         self.path = path
         self.local_dirname, self.basename = os.path.split(self.path)
-        self.parent_dirname, self.process_level_dirname = os.path.split(self.local_dirname)
-
+        self.raw_or_pro_dir, self.process_level_dirname = os.path.split(self.local_dirname)
+        self.parent_dirname, self.raw_or_pro_dir = os.path.split(self.raw_or_pro_dir)
         self.verbose = verbose
 
         self.group_delay_removed = False
@@ -116,12 +116,14 @@ class InductS21:
             self.metadata["group_delay_removed"] = group_delay
             self.metadata["group_delay_removed_on"] = F"utc:{datetime.datetime.utcnow()}"
 
-
     def prepare_output_filenames(self):
-        output_dir = os.path.join(self.parent_dirname, "pro")
+        pro_dir = os.path.join(self.parent_dirname, "pro")
+        if not os.path.exists(pro_dir):
+            os.mkdir(pro_dir)
+        prefix, _extension = self.basename.rsplit(".", 1)
+        output_dir = os.path.join(pro_dir, prefix)
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
-        prefix, _extension = self.basename.rsplit(".", 1)
         self.output_file = os.path.join(output_dir, prefix + "_phase.csv")
         self.plot_file = os.path.join(output_dir, prefix + "_phase.pdf")
 

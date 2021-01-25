@@ -75,10 +75,14 @@ def read_s21(path, return_res_params=False):
         return formatted_s21_dict, metadata
 
 
-def dirname_create(output_basedir, location, wafer, date_str, sweep_type="scan", res_id=None):
+def dirname_create(output_basedir, location, wafer, date_str, is_raw=True, sweep_type="scan", res_id=None):
     dir_build_list = [str(location), str(wafer), str(date_str)]
+    if is_raw:
+        dir_build_list.append("raw")
+    else:
+        dir_build_list.append("pro")
     if sweep_type == "scan":
-        dir_build_list.append(str(sweep_type))
+        dir_build_list.append("scans")
     else:
         dir_build_list.append(str(res_id))
     path_str = output_basedir

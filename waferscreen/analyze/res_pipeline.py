@@ -42,6 +42,9 @@ class ResPipe:
         self.dirname, self.basename = os.path.split(self.path)
         self.basename_prefix, self.file_extension = self.basename.rsplit(".", 1)
 
+        self.res_plot_dir = os.path.join(self.dirname, F"resonator_plots")
+        self.report_dir = os.path.join(self.dirname, F"report")
+
         self.verbose = verbose
         self.metadata = None
         self.unprocessed_freq_GHz, self.unprocessed_reals21, self.unprocessed_imags21 = None, None, None
@@ -59,7 +62,7 @@ class ResPipe:
         self.fitted_resonators_parameters_by_band = None
 
     def read(self):
-        data_dict, self.metadata = read_s21(path=self.path)
+        data_dict, self.metadata, self.fitted_resonators_parameters = read_s21(path=self.path, return_res_params=True)
         self.unprocessed_freq_GHz = data_dict["freq_ghz"]
         self.unprocessed_freq_Hz = self.unprocessed_freq_GHz * 1.0e9
         self.unprocessed_reals21, self.unprocessed_imags21 = data_dict["real"],  data_dict["imag"]
@@ -201,12 +204,11 @@ class ResPipe:
         self.metadata["peak_threshold_dB"] = i_thresh.peak_threshold_dB
 
     def analyze_resonators(self, save_res_plots=False):
-        res_plot_dir = os.path.join(self.dirname, F"resonatorplots_{self.basename_prefix}")
-        if save_res_plots:
-            if os.path.exists(res_plot_dir):
-                rmtree(res_plot_dir)
-            os.mkdir(res_plot_dir)
 
+        if save_res_plots:
+            if os.path.exists(self.res_plot_dir):
+                rmtree(self.res_plot_dir)
+            os.mkdir(self.res_plot_dir)
 
         self.fitted_resonators_parameters = []
         for res_number, single_window in zip(range(1, len(self.minima_as_windows) + 1), self.minima_as_windows):
@@ -232,7 +234,7 @@ class ResPipe:
             fcenter_guess_Hz = self.unprocessed_freq_Hz[single_window.minima]
             base_amplitude_abs_guess = 1.0  # This the expected value for a highpass in magnitude space
             # a_phase_rad_guess = np.mean(np.concatenate((phase[left_baseline_slice], phase[right_baseline_slice])))
-            a_phase_rad_guess = np.mean(self.highpass_phase[fitter_slice])
+            a_phase_rad_guess = float(np.mean(self.highpass_phase[fitter_slice]))
 
             # find the fullwidth half maximum
             goal_depth = halfway_in_log_mag  # basically 3 dB down from the baseline
@@ -242,8 +244,8 @@ class ResPipe:
             # Quality factors
             Q_guess_Hz = f_fwhm_right_Hz - f_fwhm_left_Hz
             Q_guess = fcenter_guess_Hz / Q_guess_Hz
-            Qi_guess = Q_guess * np.sqrt(0 - minima_mag_single_res_highpass)
-            Qc_guess = Qi_guess * Q_guess / (Qi_guess - Q_guess)
+            q_i_guess = Q_guess * np.sqrt(0 - minima_mag_single_res_highpass)
+            q_c_guess = q_i_guess * Q_guess / (q_i_guess - Q_guess)
 
             # tau_ns
             delta_freq_GHz = f_GHz_single_res[-1] - f_GHz_single_res[0]
@@ -257,19 +259,19 @@ class ResPipe:
                                          / (delta_freq_GHz * 2.0 * np.pi)
             params_guess = ResParams(base_amplitude_abs=base_amplitude_abs_guess, a_phase_rad=a_phase_rad_guess,
                                      base_amplitude_slope=base_amplitude_slope_guess, tau_ns=tau_ns_guess,
-                                     f0=fcenter_guess_GHz, Qi=Qi_guess, Qc=Qc_guess, Zratio=0)
+                                     fcenter_ghz=fcenter_guess_GHz, q_i=q_i_guess, q_c=q_c_guess, impedance_ratio=0)
 
             popt, pcov = wrap_simple_res_gain_slope_complex(freqs_GHz=f_GHz_single_res,
                                                             s21_complex=s21_complex_single_res_highpass,
                                                             s21_linear_mag=s21_mag_single_res_highpass_linear,
                                                             base_amplitude_abs_guess=params_guess.base_amplitude_abs,
                                                             a_phase_rad_guess=params_guess.a_phase_rad,
-                                                            f0_guess=params_guess.f0,
-                                                            Qi_guess=params_guess.Qi,
-                                                            Qc_guess=params_guess.Qc,
+                                                            fcenter_GHz_guess=params_guess.fcenter_ghz,
+                                                            q_i_guess=params_guess.q_i,
+                                                            q_c_guess=params_guess.q_c,
                                                             base_amplitude_slope_guess=params_guess.base_amplitude_slope,
                                                             tau_ns_guess=params_guess.tau_ns,
-                                                            Zratio_guess=params_guess.Zratio)
+                                                            impedance_ratio_guess=params_guess.impedance_ratio)
             params_fit = package_res_results(popt=popt, pcov=pcov, res_number=res_number,
                                              parent_file=self.path,
                                              verbose=self.verbose)
@@ -291,9 +293,9 @@ class ResPipe:
                                            self.unprocessed_freq_GHz[single_window.right_pad]),
                                           (self.highpass_filter_mags21[single_window.left_pad],
                                            self.highpass_filter_mags21[single_window.right_pad])),
-                             output_filename=os.path.join(res_plot_dir, F"{'%04i' % res_number}.png"))
+                             output_filename=os.path.join(self.res_plot_dir, F"{'%04i' % res_number}.png"))
         self.metadata["baseline_removed"] = True
-        self.metadata["baseline_technique"] = "windows function based on the a threshold, then smoothed"
+        self.metadata["baseline_technique"] = "windows function based on the a threshold then smoothed"
         self.metadata["smoothing_scale_GHz"] = rpc.baseline_smoothing_window_GHz
         self.metadata["resonator_spacing_threshold_Hz"] = rpc.resonator_spacing_threshold_Hz
         data_filename, plot_filename = self.generate_output_filename(processing_steps=["windowBaselineSmoothedRemoved"])
@@ -317,14 +319,14 @@ class ResPipe:
         return frs
 
     def scan_to_band(self):
-        f_centers_GHz = np.array(fit_params.f0 for fit_params in self.fitted_resonators_parameters)
-        res_nums = np.array([fit_params.res_nums for fit_params in self.fitted_resonators_parameters])
+        f_centers_GHz = np.array([fit_params.fcenter_ghz for fit_params in self.fitted_resonators_parameters])
+        res_nums = np.array([fit_params.res_number for fit_params in self.fitted_resonators_parameters])
         # find the connected groups
         connected_groups = []
         current_group = [self.fitted_resonators_parameters[0]]
         for f_index in range(len(f_centers_GHz) - 1):
             f_left_GHz = f_centers_GHz[f_index]
-            f_right_GHz = f_centers_GHz[f_index + 1 ]
+            f_right_GHz = f_centers_GHz[f_index + 1]
             if 0.1 < f_right_GHz - f_left_GHz:
                 connected_groups.append(current_group)
             current_group = [self.fitted_resonators_parameters[f_index + 1]]
@@ -338,7 +340,9 @@ class ResPipe:
             min_GHz = ref.band_params[band_name_str]["min_GHz"]
             max_GHz = ref.band_params[band_name_str]["max_GHz"]
             # there is a dead space between bands, resonators in that space are not counted
-            res_nums_per_band[band_name_str] = set(res_nums[min_GHz <= f_centers_GHz <= max_GHz])
+            res_nums_over_min = set(res_nums[min_GHz <= f_centers_GHz])
+            res_nums_below_max = set(res_nums[f_centers_GHz <= max_GHz])
+            res_nums_per_band[band_name_str] = res_nums_over_min & res_nums_below_max
 
         # Expecting every other band to be mostly populated
         even_res_nums = set()
@@ -354,8 +358,8 @@ class ResPipe:
                 even_band_nums.append(band_number)
             else:
                 [odd_res_nums.add(res_num) for res_num in res_nums_per_band[band_name_str]]
-                odd_band_nums.append(band_name_str)
-                odd_band_names.append(band_number)
+                odd_band_names.append(band_name_str)
+                odd_band_nums.append(band_number)
         if len(odd_res_nums) < len(even_res_nums):
             self.is_even_bands = True
             band_names = even_band_names
@@ -368,7 +372,7 @@ class ResPipe:
         # find the overlap between the connected groups of resonators and the resonators that are in known bands.
         self.fitted_resonators_parameters_by_band = {}
         for resonator_group in connected_groups:
-            res_nums_this_group = set(fit_params.res_nums for fit_params in resonator_group)
+            res_nums_this_group = set([fit_params.res_number for fit_params in resonator_group])
             for band_name, band_num in zip(band_names, band_nums):
                 res_nums_this_band = res_nums_per_band[band_name]
                 if res_nums_this_band & res_nums_this_group:
@@ -379,27 +383,3 @@ class ResPipe:
 
 
 
-
-
-
-
-
-
-
-
-# Simons Observatory Frequency Band definitions
-band_params = {"Band00": {"min_GHz": 4.019, "max_GHz": 4.147},
-               "Band01": {"min_GHz": 4.152, "max_GHz": 4.280},
-               "Band02": {"min_GHz": 4.285, "max_GHz": 4.414},
-               "Band03": {"min_GHz": 4.419, "max_GHz": 4.581},
-               "Band04": {"min_GHz": 4.584, "max_GHz": 4.714},
-               "Band05": {"min_GHz": 4.718, "max_GHz": 4.848},
-               "Band06": {"min_GHz": 4.852, "max_GHz": 4.981},
-               "Band07": {"min_GHz": 5.019, "max_GHz": 5.147},
-               "Band08": {"min_GHz": 5.152, "max_GHz": 5.280},
-               "Band09": {"min_GHz": 5.286, "max_GHz": 5.413},
-               "Band10": {"min_GHz": 5.421, "max_GHz": 5.581},
-               "Band11": {"min_GHz": 5.585, "max_GHz": 5.714},
-               "Band12": {"min_GHz": 5.718, "max_GHz": 5.848},
-               "Band13": {"min_GHz": 5.851, "max_GHz": 5.981},
-               }

@@ -5,25 +5,25 @@ from waferscreen.analyze.res_io import ResParams
 
 
 def simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope,
-                                        tau_ns, f0, Qi, Qc, Zratio):
-    A = base_amplitude_abs * (1 + base_amplitude_slope * (freq_GHz - f0)) * (
+                                        tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio):
+    A = base_amplitude_abs * (1 + base_amplitude_slope * (freq_GHz - fcenter_GHz)) * (
                 np.cos(a_phase_rad) + 1j * np.sin(a_phase_rad))  # complex gain factor A
-    phase_delay = np.exp(-1j * (freq_GHz - f0) * 2.0 * np.pi * tau_ns)  # tau_ns in ns, freq_GHz in GHz
+    phase_delay = np.exp(-1j * (freq_GHz - fcenter_GHz) * 2.0 * np.pi * tau_ns)  # tau_ns in ns, freq_GHz in GHz
     # shunt resonator model
-    # s11_temp = (Zratio / Qc - 1j / Qc) / (1 - (freq_GHz / f0) ** 2 + 1j / Qi + 1j / Qc)
-    s21_temp = (1 - (freq_GHz / f0) ** 2 + 1j / Qi) / (1 - (freq_GHz / f0) ** 2 - Zratio / Qc + 1j / Qi + 1j / Qc)
+    # s11_temp = (impedance_ratio / q_c - 1j / q_c) / (1 - (freq_GHz / fcenter_GHz) ** 2 + 1j / q_i + 1j / q_c)
+    s21_temp = (1 - (freq_GHz / fcenter_GHz) ** 2 + 1j / q_i) / (1 - (freq_GHz / fcenter_GHz) ** 2 - impedance_ratio / q_c + 1j / q_i + 1j / q_c)
     s21data = A * phase_delay * s21_temp
     return s21data
 
 
 def fit_simple_res_gain_slope_complex(freqs_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope,
-                                      tau_ns, f0, Qi, Qc, Zratio):
+                                      tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio):
     """
     Lorentzian Resonator w/ gain slope and complex feedline impedance
     """
     s21data = []
     for freq_GHz in freqs_GHz:
-        s21 = simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope, tau_ns, f0, Qi, Qc, Zratio)
+        s21 = simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope, tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio)
         s21data.append(np.array([s21.real, s21.imag]))
     s21data = np.array(s21data).ravel()
     return s21data
@@ -50,19 +50,19 @@ def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=F
     fit_a_phase_rad = popt[1]
     fit_base_amplitude_slope = popt[2]
     fit_tau_ns = popt[3]
-    fit_f0 = popt[4]
-    fit_Qi = popt[5]
-    fit_Qc = popt[6]
-    fit_Zratio = popt[7]
+    fit_fcenter_GHz = popt[4]
+    fit_q_i = popt[5]
+    fit_q_c = popt[6]
+    fit_impedance_ratio = popt[7]
 
     error_base_amplitude_abs = np.sqrt(pcov[0, 0])
     error_a_phase_rad = np.sqrt(pcov[1, 1])
     error_base_amplitude_slope = np.sqrt(pcov[2, 2])
     error_tau_ns = np.sqrt(pcov[3, 3])
-    error_f0 = np.sqrt(pcov[4, 4])
-    error_Qi = np.sqrt(pcov[5, 5])
-    error_Qc = np.sqrt(pcov[6, 6])
-    error_Zratio = np.sqrt(pcov[7, 7])
+    error_fcenter_GHz = np.sqrt(pcov[4, 4])
+    error_q_i = np.sqrt(pcov[5, 5])
+    error_q_c = np.sqrt(pcov[6, 6])
+    error_impedance_ratio = np.sqrt(pcov[7, 7])
 
     if verbose:
         res_number_str = "\n"
@@ -75,10 +75,10 @@ def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=F
         print('a_phase_rad          : %.4f +/- %.6f Radians' % (fit_a_phase_rad, error_a_phase_rad))
         print('base_amplitude_slope : %.3f +/- %.3f GHz' % (fit_base_amplitude_slope, error_base_amplitude_slope))
         print('tau_ns        : %.3f +/- %.3f ns' % (fit_tau_ns, error_tau_ns))
-        print('fcenter       : %.6f +/- %.8f GHz' % (fit_f0, error_f0))
-        print('Qi            : %.0f +/- %.0f' % (fit_Qi, error_Qi))
-        print('Qc            : %.0f +/- %.0f' % (fit_Qc, error_Qc))
-        print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_Zratio, error_Zratio))
+        print('fcenter       : %.6f +/- %.8f GHz' % (fit_fcenter_GHz, error_fcenter_GHz))
+        print('q_i            : %.0f +/- %.0f' % (fit_q_i, error_q_i))
+        print('q_c            : %.0f +/- %.0f' % (fit_q_c, error_q_c))
+        print('Im(Z0)/Re(Z0) : %.2f +/- %.3f' % (fit_impedance_ratio, error_impedance_ratio))
 
     single_res_params = ResParams(base_amplitude_abs=fit_base_amplitude_abs,
                                   base_amplitude_abs_error=error_base_amplitude_abs,
@@ -86,23 +86,23 @@ def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=F
                                   base_amplitude_slope=fit_base_amplitude_slope,
                                   base_amplitude_slope_error=error_base_amplitude_slope,
                                   tau_ns=fit_tau_ns, tau_ns_error=error_tau_ns,
-                                  f0=fit_f0, f0_error=error_f0,
-                                  Qi=fit_Qi, Qi_error=error_Qi,
-                                  Qc=fit_Qc, Qc_error=error_Qc,
-                                  Zratio=fit_Zratio, Zratio_error=error_Zratio,
+                                  fcenter_ghz=fit_fcenter_GHz, fcenter_ghz_error=error_fcenter_GHz,
+                                  q_i=fit_q_i, q_i_error=error_q_i,
+                                  q_c=fit_q_c, q_c_error=error_q_c,
+                                  impedance_ratio=fit_impedance_ratio, impedance_ratio_error=error_impedance_ratio,
                                   res_number=res_number, parent_file=parent_file)
     return single_res_params
 
 
 def wrap_simple_res_gain_slope_complex(freqs_GHz, s21_complex, s21_linear_mag,
-                                       base_amplitude_abs_guess, a_phase_rad_guess, f0_guess, Qi_guess, Qc_guess,
+                                       base_amplitude_abs_guess, a_phase_rad_guess, fcenter_GHz_guess, q_i_guess, q_c_guess,
                                        base_amplitude_slope_guess, tau_ns_guess,
-                                       Zratio_guess):
+                                       impedance_ratio_guess):
 
     error_ravel = np.array([[a_s21_linear_mag, a_s21_linear_mag] for a_s21_linear_mag in s21_linear_mag]).ravel()
     s21data_ravel = np.array([[s21.real, s21.imag] for s21 in s21_complex]).ravel()
     starting_vals = [base_amplitude_abs_guess, a_phase_rad_guess, base_amplitude_slope_guess, tau_ns_guess,
-                     f0_guess, Qi_guess, Qc_guess, Zratio_guess]
+                     fcenter_GHz_guess, q_i_guess, q_c_guess, impedance_ratio_guess]
     bounds = ((0, -np.pi, -1000, 0, freqs_GHz.min(), 0, 0, -5.0),
               (np.inf, np.pi, 1000, 100, freqs_GHz.max(), np.inf, np.inf, 5.0))
     starting_vals = rebound_starting_vals(bounds, starting_vals)

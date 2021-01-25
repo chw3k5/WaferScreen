@@ -4,11 +4,16 @@ from waferscreen.analyze.table_read import num_format
 allowed_meta_data_types = (str, float, int)
 raw_filename_key = "output_filename"
 metadata_primary_types = {"utc", "path"}
+forbidden_characters = {"|", ","}
 
 
 def metadata_key_format(key):
     string_key = str(key)
-    return string_key.strip().lower()
+    formatted_string_key = string_key.strip().lower()
+    for letter in formatted_string_key:
+        if letter in forbidden_characters:
+            raise TypeError(F"The characters {forbidden_characters} are not allowed for metadata keys.")
+    return formatted_string_key
 
 
 class MetaDataDict(UserDict):
@@ -31,7 +36,12 @@ class MetaDataDict(UserDict):
                                "This is not allowed, and may indicate a mistake in the metadata system")
         else:
             formatted_value = num_format(value)
-            if isinstance(formatted_value, allowed_meta_data_types):
+            if isinstance(formatted_value, str):
+                for letter in formatted_value:
+                    if letter in forbidden_characters:
+                        raise TypeError(F"The characters {forbidden_characters} are not allowed for metadata values.")
+                self.data[formatted_key] = formatted_value
+            elif isinstance(formatted_value, allowed_meta_data_types):
                 self.data[formatted_key] = formatted_value
             else:
                 raise TypeError("The MetaDataDict only excepts values of the following types: " +

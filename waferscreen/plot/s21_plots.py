@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from ref import today_str
 from waferscreen.plot.quick_plots import ls, len_ls
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
-from waferscreen.analyze.s21_io import read_s21, write_s21, dirname_create, ri_to_magphase, plot_bands
+from waferscreen.analyze.s21_io import read_s21, ri_to_magphase, plot_bands
 from waferscreen.analyze.res_fit_jake import fit_simple_res_gain_slope_complex
 
 
@@ -181,8 +181,9 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
     if params_guess is not None:
         guess_fit_out = fit_simple_res_gain_slope_complex(f_GHz_single_res, params_guess.base_amplitude_abs,
                                                           params_guess.a_phase_rad, params_guess.base_amplitude_slope,
-                                                          params_guess.tau_ns, params_guess.f0,
-                                                          params_guess.Qi, params_guess.Qc, params_guess.Zratio)
+                                                          params_guess.tau_ns, params_guess.fcenter_ghz,
+                                                          params_guess.q_i, params_guess.q_c,
+                                                          params_guess.impedance_ratio)
         guess_complex = np.array([guess_fit_out[2 * n] + 1j * guess_fit_out[(2 * n) + 1]
                                   for n in range(len(f_GHz_single_res))])
         guess_mag, guess_phase = ri_to_magphase(r=guess_complex.real, i=guess_complex.imag)
@@ -198,8 +199,8 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
     if params_fit is not None:
         final_fit_out = fit_simple_res_gain_slope_complex(f_GHz_single_res, params_fit.base_amplitude_abs,
                                                           params_fit.a_phase_rad, params_fit.base_amplitude_slope,
-                                                          params_fit.tau_ns, params_fit.f0,
-                                                          params_fit.Qi, params_fit.Qc, params_fit.Zratio)
+                                                          params_fit.tau_ns, params_fit.fcenter_ghz,
+                                                          params_fit.q_i, params_fit.q_c, params_fit.impedance_ratio)
         final_complex = np.array([final_fit_out[2 * n] + 1j * final_fit_out[(2 * n) + 1]
                                   for n in range(len(f_GHz_single_res))])
         final_mag, final_phase = ri_to_magphase(r=final_complex.real, i=final_complex.imag)
@@ -308,8 +309,8 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
     plt.ylabel(F"dB")
     format_str = '%i'
     if params_fit is not None:
-        title_str = F"Qi: {format_str % params_fit.Qi}({format_str % params_fit.Qi_error})   "
-        title_str += F"Qc: {format_str % params_fit.Qc}({format_str % params_fit.Qc_error})"
+        title_str = F"Qi: {format_str % params_fit.q_i}({format_str % params_fit.q_i_error})   "
+        title_str += F"Qc: {format_str % params_fit.q_c}({format_str % params_fit.q_c_error})"
         plt.title(title_str)
     plt.legend(leglines,
                leglabels, loc=0,

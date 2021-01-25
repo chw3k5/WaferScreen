@@ -29,11 +29,8 @@ def ramp_name_create(power_dBm, current_uA, res_num, utc):
 
 def dirname_create_raw(sweep_type="scan", res_id=None):
     path_str = dirname_create(output_basedir=fsc.output_base_dir, location=fsc.location,
-                              wafer=fsc.wafer, date_str=today_str, sweep_type=sweep_type, res_id=res_id)
-    raw_dir = os.path.join(path_str, "raw")
-    if not os.path.isdir(raw_dir):
-        os.mkdir(raw_dir)
-    return raw_dir
+                              wafer=fsc.wafer, date_str=today_str, is_raw=True, sweep_type=sweep_type, res_id=res_id)
+    return path_str
 
 
 class AbstractFluxSweep:
@@ -50,8 +47,10 @@ class AbstractFluxSweep:
         test_letter = rf_chain_letter.lower().strip()
         if test_letter == "a":
             self.ramp = SRS_SIM928(srs_port=1, srs_connect=self.flux_ramp_srs_connect)
+            self.rf_chain = "a"
         elif test_letter == "b":
             self.ramp = SRS_SIM928(srs_port=2, srs_connect=self.flux_ramp_srs_connect)
+            self.rf_chain = "b"
         else:
             self.ramp = SRS_SIM928(srs_port=rf_chain_letter, srs_connect=self.flux_ramp_srs_connect)
         self.abstract_vna = AbstractVNA(vna_address=vna_address, verbose=verbose)
@@ -112,6 +111,7 @@ class AbstractFluxSweep:
                                         utc=sweep_metadata['utc'])
             dirname = dirname_create_raw(sweep_type=kwargs["export_type"], res_id=sweep_metadata['res_id'])
         sweep_metadata['path'] = os.path.join(dirname, basename)
+        sweep_metadata['rf_chain'] = self.rf_chain
         metadata_this_sweep.update(sweep_metadata)
         self.write(output_file=sweep_metadata['path'], freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
                    metadata=metadata_this_sweep)
