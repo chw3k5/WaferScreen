@@ -94,6 +94,6 @@ class DataManager:
 
 if __name__ == "__main__":
     dm = DataManager(user_input_group_delay=None)
-    # dm.raw_process_all()
-    # dm.find_scans_resonators()
+    dm.raw_process_all()
+    dm.find_scans_resonators()
     dm.load_scans_resonators()

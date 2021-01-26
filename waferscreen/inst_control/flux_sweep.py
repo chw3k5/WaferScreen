@@ -221,7 +221,9 @@ class AbstractFluxSweep:
                 res_num = res_params.res_number
                 seed_base = metadata["seed_base"]
                 resonator_metadata = {"export_type": "single_res", "res_id": F"{res_num}_{seed_base}",
-                                      "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname}
+                                      "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname,
+                                      "location": metadata["location"], "wafer": metadata["wafer"],
+                                      "so_band": metadata["so_band"], "seed_base": seed_base}
                 self.survey_power_ramp(resonator_metadata)
 
     def survey_from_job_file(self, job):
@@ -255,9 +257,14 @@ class JobAssignment:
 
 
 if __name__ == "__main__":
-    job_assign = JobAssignment()
-    with job_assign:
-        job_assign.launch_hungry_for_jobs(chain_letter="a")
+    abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter="a")
+    with abstract_flux_sweep:
+        abstract_flux_sweep.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz)
+
+    # resonator sweeps based on an analyzed scan
+    # job_assign = JobAssignment()
+    # with job_assign:
+    #     job_assign.launch_hungry_for_jobs(chain_letter="a")
         # format = "%(asctime)s: %(message)s"
         # logging.basicConfig(format=format, level=logging.INFO,
         #                     datefmt="%H:%M:%S")
