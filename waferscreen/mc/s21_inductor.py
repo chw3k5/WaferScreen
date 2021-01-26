@@ -109,6 +109,10 @@ class InductS21:
                 group_delay = self.group_delay
             else:
                 group_delay = user_input_group_delay
+                self.group_delay = group_delay
+                self.group_delay_slope = -1 * group_delay
+                self.phase_offset = 0
+                self.group_delay_offset = 0
             # remove group delay
             phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay - self.phase_offset))
             self.s21_complex = self.s21_complex * phase_factors

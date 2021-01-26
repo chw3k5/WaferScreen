@@ -10,20 +10,27 @@ def num_format(a_string):
     if isinstance(a_string, int):
         # it is an int
         return a_string
-    else:
+    elif isinstance(a_string, float):
         # it is either and float or a string
+
+        int_version = int(a_string)
+        float_version = float(a_string)
+        if int_version == float_version:
+            # check if it really should be an int
+            return int_version
+        else:
+            # it was already a float or a string representing a float
+            return float_version
+    else:
         try:
-            int_version = int(a_string)
-            float_version = float(a_string)
-            if int_version == float_version:
-                # check if it really should be an int
-                return int_version
-            else:
-                # it was already a float or a string representing a float
-                return float_version
+            return int(a_string)
         except ValueError:
-            # this can only be represented as a string
-            return a_string.strip()
+            try:
+                return float(a_string)
+            except ValueError:
+                 # this can only be represented as a string
+                 return a_string.strip()
+
 
 
 def metadata_key_format(key):

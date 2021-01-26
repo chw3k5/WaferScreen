@@ -259,8 +259,8 @@ class JobAssignment:
 
 
 if __name__ == "__main__":
-    do_scan = True
-    do_res_sweeps = False
+    do_scan = False
+    do_res_sweeps = not do_scan
 
     if do_scan:
         abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter="a")
