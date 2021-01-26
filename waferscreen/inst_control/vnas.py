@@ -120,9 +120,14 @@ class AbstractVNA:
     def set_num_freq_points(self, num_freq_points):
         if self.max_frequency_points < num_freq_points:
             # need more points than the VNA can handle
+            q, r = divmod(num_freq_points, self.max_frequency_points)
+            if r != 0:
+                q +=1
+            self.num_freq_points = q * self.max_frequency_points
             self.num_freq_points_per_sweep = self.max_frequency_points
+
         else:
-            # less than ort exactly the number of point handled be the VNA
+            # less than or exactly the number of point handled be the VNA
             self.num_freq_points_per_sweep = num_freq_points
         self.vna.set_num_freq_points(self.num_freq_points_per_sweep)
 
@@ -185,7 +190,7 @@ class AbstractVNA:
             print(F"{'%2.3f' % freqs[0]} GHz to {'%2.3f' % freqs[-1]} GHz Trace Acquired")
         return freqs, s21real, s21imag
 
-    def sweep_sticher(self, loops_required, points_acquired_after_n_loops):
+    def sweep_stitcher(self, loops_required, points_acquired_after_n_loops):
         points_needed_last_loop = self.max_frequency_points - (points_acquired_after_n_loops - self.num_freq_points)
         # initialized the data variables
         self.s21real = np.zeros(self.num_freq_points)
@@ -264,7 +269,7 @@ class AbstractVNA:
                       F"{fmin_str} GHz to {fmax_str} GHz")
             self.freqs_GHz, self.s21real, self.s21imag = self.get_sweep()
         else:
-            self.sweep_sticher(loops_required, points_acquired_after_n_loops)
+            self.sweep_stitcher(loops_required, points_acquired_after_n_loops)
         self.end_time = time.time()
         self.utc = str(datetime.utcnow())
         return self.freqs_GHz, self.s21real, self.s21imag, self.export_metadata()
