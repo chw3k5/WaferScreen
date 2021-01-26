@@ -2,14 +2,13 @@ import os
 import time
 import numpy as np
 import logging
-import threading
 from collections import deque
 from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.analyze.s21_metadata import MetaDataDict
 from waferscreen.analyze.s21_io import write_s21, dirname_create, read_s21
-import waferscreen.inst_control.flux_sweep_config as fsc
+import waferscreen.mc.flux_sweep_config as fsc
 import ref
 
 
@@ -191,22 +190,6 @@ class AbstractFluxSweep:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
 
-    def hungry_for_jobs(self):
-        try_attempts = deque(
-            np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) / self.hungry_for_jobs_retry_time_s))
-        try_attempts.appendleft(True)
-        while any(try_attempts):
-            job = get_job(chain_letter=self.rf_chain)
-            if job is not None:
-                try_attempts.appendleft(True)
-                self.survey_from_job_file(job=job)
-            else:
-                try_attempts.appendleft(False)
-                time.sleep(self.hungry_for_jobs_retry_time_s)
-
-            print(F"No new data for {self.hungry_for_jobs_retry_time_s} seconds, " +
-                  "hungry_for_jobs() is complete")
-
     def single_res_survey_from_job_file(self, seed_files):
         for seed_file in seed_files:
             seed_dirname, seed_file_basename = os.path.split(seed_file)
@@ -225,6 +208,22 @@ class AbstractFluxSweep:
                                       "location": metadata["location"], "wafer": metadata["wafer"],
                                       "so_band": metadata["so_band"], "seed_base": seed_base}
                 self.survey_power_ramp(resonator_metadata)
+
+    def hungry_for_jobs(self):
+        try_attempts = deque(
+            np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) / self.hungry_for_jobs_retry_time_s))
+        try_attempts.appendleft(True)
+        while any(try_attempts):
+            job = get_job(chain_letter=self.rf_chain)
+            if job is not None:
+                try_attempts.appendleft(True)
+                self.survey_from_job_file(job=job)
+            else:
+                try_attempts.appendleft(False)
+                time.sleep(self.hungry_for_jobs_retry_time_s)
+
+            print(F"No new data for {self.hungry_for_jobs_retry_time_s} seconds, " +
+                  "hungry_for_jobs() is complete")
 
     def survey_from_job_file(self, job):
         job_type, seed_files = job

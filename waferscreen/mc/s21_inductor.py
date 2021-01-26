@@ -120,6 +120,8 @@ class InductS21:
         pro_dir = os.path.join(self.parent_dirname, "pro")
         if not os.path.exists(pro_dir):
             os.mkdir(pro_dir)
+        if self.metadata["export_type"] in {"band", "single_res"}:
+            print('testing_point_to see what data is a available from debug mode')
         prefix, _extension = self.basename.rsplit(".", 1)
         output_dir = os.path.join(pro_dir, prefix)
         if not os.path.exists(output_dir):

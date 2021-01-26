@@ -1,7 +1,7 @@
 import os
 from ref import output_dirs
-from waferscreen.analyze.s21_inductor import InductS21
-from waferscreen.analyze.res_pipeline import ResPipe
+from waferscreen.mc.s21_inductor import InductS21
+from waferscreen.mc.res_pipeline import ResPipe
 
 
 def get_subdirs(rootdir, matching_str):
@@ -45,21 +45,57 @@ class DataManager:
         self.user_input_group_delay = user_input_group_delay
         self.verbose = verbose
         self.raw_search_dirs = output_dirs
+
         self.raw_scan_files = []
         self.phase_corrected_scan_files = []
+
+        self.raw_bands_files = []
+        self.phase_corrected_bands_files = []
+
+        self.raw_single_res_files = []
+        self.phase_corrected_single_res_files = []
+
         self.windowbaselinesmoothedremoved_scan_files = []
 
     def from_scratch(self):
         self.raw_process_all()
 
-    def raw_process_all(self):
+    def get_all_scan_files(self):
         for rootdir in output_dirs:
             raw_dirs = get_subdirs(rootdir=rootdir, matching_str='raw')
+
+            # scans
             scans_dirs = []
             [scans_dirs.extend(get_subdirs(rootdir=raw_dir, matching_str='scans')) for raw_dir in raw_dirs]
             [self.raw_scan_files.extend([os.path.join(scans_dir, path) for path in os.listdir(scans_dir)])
              for scans_dir in scans_dirs]
 
+    def get_all_single_res_or_bands_files(self, file_type="bands"):
+        for rootdir in output_dirs:
+            raw_dirs = get_subdirs(rootdir=rootdir, matching_str='raw')
+            matching_str = file_type
+            if file_type == "bands":
+                output_var = self.raw_bands_files
+            elif file_type == "single_res":
+                output_var = self.raw_single_res_files
+            else:
+                raise KeyError
+            # bands
+            bands_or_res_dirs = []
+            parent_scan_dirs = []
+            number_dirs = []
+            [bands_or_res_dirs.extend(get_subdirs(rootdir=raw_dir, matching_str=matching_str)) for raw_dir in raw_dirs]
+            [parent_scan_dirs.extend(get_all_subdirs(rootdir=bands_or_res_dir))
+             for bands_or_res_dir in bands_or_res_dirs]
+            [number_dirs.extend(get_all_subdirs(rootdir=parent_scan_dir)) for parent_scan_dir in parent_scan_dirs]
+
+            [output_var.extend([os.path.join(number_dir, path) for path in os.listdir(number_dir)])
+             for number_dir in number_dirs]
+
+    def raw_process_all(self):
+        self.get_all_scan_files()
+        self.get_all_single_res_or_bands_files(file_type="bands")
+        self.get_all_single_res_or_bands_files(file_type="single_res")
         for raw_scan_path in self.raw_scan_files:
             self.raw_process(path=raw_scan_path)
 

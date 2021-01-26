@@ -6,7 +6,7 @@ from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
 from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
-import waferscreen.analyze.res_pipeline_config as rpc
+import waferscreen.mc.res_pipeline_config as rpc
 from waferscreen.analyze.res_io import ResParams
 from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
