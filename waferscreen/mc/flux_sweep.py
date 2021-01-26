@@ -206,7 +206,7 @@ class AbstractFluxSweep:
                     res_num = res_param.res_number
                     seed_base = metadata["seed_base"]
                     resonator_metadata = {"export_type": "single_res", "res_id": F"{res_num}_{seed_base}",
-                                          "res_num": res_num, "seed_group_delay": metadata[""],
+                                          "res_num": res_num, "seed_group_delay_s": metadata["group_delay_found_s"],
                                           "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname,
                                           "location": fsc.location, "wafer": metadata["wafer"],
                                           "so_band": metadata["so_band"], "seed_base": seed_base}
