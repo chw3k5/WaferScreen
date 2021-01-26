@@ -189,8 +189,10 @@ class ResPipe:
                                plot=show_filter_plots)
 
         self.not_smoothed_mag = copy.copy(self.highpass_filter_mags21)
+        if window_length % 2 == 0:
+            window_length += 1
         self.synthetic_baseline_smoothed = savgol_filter(x=synthetic_baseline,
-                                                         window_length=window_length + 1, polyorder=3)
+                                                         window_length=window_length, polyorder=3)
         self.filter_update_mag(mag=mag, phase=phase,
                                lowpass_filter_mags21=self.synthetic_baseline_smoothed,
                                plot=show_filter_plots)

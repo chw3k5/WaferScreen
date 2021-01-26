@@ -32,11 +32,11 @@ def get_pro_s21_scans(process_type, extensions={"txt", "csv"}):
         for basename in os.listdir(pro_data_folder):
             if os.path.isfile(os.path.join(pro_data_folder, basename)):
                 filename, extension = basename.rsplit(".", 1)
-            if len_pro_type < len(filename):
-                if filename[-len_pro_type:] == process_type and extension.lower() in extensions:
-                    test_name = os.path.join(pro_data_folder, basename)
-                    if os.path.isfile(test_name):
-                        scan_files.append(test_name)
+                if len_pro_type < len(filename):
+                    if filename[-len_pro_type:] == process_type and extension.lower() in extensions:
+                        test_name = os.path.join(pro_data_folder, basename)
+                        if os.path.isfile(test_name):
+                            scan_files.append(test_name)
     return scan_files
 
 
@@ -114,7 +114,7 @@ class DataManager:
             res_pipe = ResPipe(s21_path=scan_file, verbose=self.verbose)
             res_pipe.read()
             res_pipe.find_window(cosine_filter=False,
-                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=False, debug_mode=True)
+                                 window_pad_factor=3, fitter_pad_factor=6, show_filter_plots=False, debug_mode=False)
             res_pipe.analyze_resonators(save_res_plots=False)
 
     def load_scans_resonators(self):

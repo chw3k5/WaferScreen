@@ -26,7 +26,7 @@ def ramp_name_parse(basename):
 
 
 def ramp_name_create(power_dBm, current_uA, res_num, utc):
-    return F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm_utc{utc}.csv"
+    return F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm_utc{utc.replace(':', '-')}.csv"
 
 
 def dirname_create_raw(sweep_type="scan", res_id=None):
@@ -41,7 +41,7 @@ def get_job(chain_letter):
         with open(job_filename, "r") as f:
             lines = f.readlines()
         job_type = lines[0].strip()
-        seed_files = [filename for filename in lines[1:]]
+        seed_files = [filename.strip() for filename in lines[1:]]
         return job_type, seed_files
     else:
         return None
@@ -129,25 +129,25 @@ class AbstractFluxSweep:
         vna_settings_dict = {vna_setting: kwargs[vna_setting] for vna_setting in vna_settings_keys}
         self.abstract_vna.update_settings(**vna_settings_dict)
         # preform the sweep
-        freqs_GHz, s21real, s21imag, sweep_metadata = self.abstract_vna.vna_sweep()
+        freqs_GHz, s21real, s21imag, vna_sweep_metadata = self.abstract_vna.vna_sweep()
         # write out sdata
         if kwargs["export_type"] == "scan":
             dirname = dirname_create_raw(sweep_type=kwargs["export_type"])
-            basename = F"scan{'%2.3f' % sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % sweep_metadata['fmax_GHz']}GHz_" + \
-                       F"{sweep_metadata['utc'].replace(':', '-')}.csv"
+            basename = F"scan{'%2.3f' % vna_sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % vna_sweep_metadata['fmax_GHz']}GHz_" + \
+                       F"{vna_sweep_metadata['utc'].replace(':', '-')}.csv"
         elif kwargs["export_type"] == "single_res":
-            basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
-                                        current_uA=sweep_metadata['flux_current_uA'],
-                                        res_num=sweep_metadata['res_num'],
-                                        utc=sweep_metadata['utc'])
+            basename = ramp_name_create(power_dBm=vna_sweep_metadata['port_power_dBm'],
+                                        current_uA=metadata_this_sweep['flux_current_ua'],
+                                        res_num=metadata_this_sweep['res_num'],
+                                        utc=vna_sweep_metadata['utc'])
             dirname = metadata_this_sweep['dirname']
         else:
             raise TypeError
 
-        sweep_metadata['path'] = os.path.join(dirname, basename)
-        sweep_metadata['rf_chain'] = self.rf_chain
-        metadata_this_sweep.update(sweep_metadata)
-        self.write(output_file=sweep_metadata['path'], freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
+        vna_sweep_metadata['path'] = os.path.join(dirname, basename)
+        vna_sweep_metadata['rf_chain'] = self.rf_chain
+        metadata_this_sweep.update(vna_sweep_metadata)
+        self.write(output_file=vna_sweep_metadata['path'], freqs_ghz=freqs_GHz, s21_complex=s21real + 1j * s21imag,
                    metadata=metadata_this_sweep)
 
     @staticmethod
@@ -167,7 +167,7 @@ class AbstractFluxSweep:
     def survey_power_ramp(self, resonator_metadata):
         for port_power_dBm in fsc.power_sweep_dBm:
             resonator_metadata["port_power_dBm"] = port_power_dBm
-            resonator_metadata["num_freq_points"] = fsc.num_freq_points
+            resonator_metadata["num_freq_points"] = fsc.ramp_num_freq_points
             resonator_metadata["sweeptype"] = fsc.sweeptype
             resonator_metadata["if_bw_Hz"] = fsc.if_bw_Hz
             resonator_metadata["vna_avg"] = fsc.vna_avg
@@ -181,7 +181,8 @@ class AbstractFluxSweep:
         resonator_metadata = {'flux_current_uA': 0.0, 'flux_supply_V': 0.0, "export_type": "scan",
                               'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dBm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
-                              "fspan_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz + fmin_GHz) / 2.0}
+                              "fspan_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz + fmin_GHz) / 2.0,
+                              "location": fsc.location, "wafer": fsc.wafer}
         # overwrite the default values with what ever was sent by the use
         for user_key in kwargs.keys():
             resonator_metadata[user_key] = kwargs[user_key]
@@ -197,21 +198,23 @@ class AbstractFluxSweep:
             # skip files that have already have data
             if len(all_files_in_seed_dir) < 2:
                 _, metadata, res_params = read_s21(path=seed_file, return_res_params=True)
-                fcenter_GHz = res_params.fcenter_GHz
-                quality_factor_total = (res_params.q_i * res_params.q_c) / (res_params.q_c + res_params.q_i)
-                quality_factor_bw_Hz = fcenter_GHz / quality_factor_total
-                fspan_GHz = quality_factor_bw_Hz * 1.e-9 * fsc.ramp_span_as_multiple_of_quality_factor
-                res_num = res_params.res_number
-                seed_base = metadata["seed_base"]
-                resonator_metadata = {"export_type": "single_res", "res_id": F"{res_num}_{seed_base}",
-                                      "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname,
-                                      "location": metadata["location"], "wafer": metadata["wafer"],
-                                      "so_band": metadata["so_band"], "seed_base": seed_base}
-                self.survey_power_ramp(resonator_metadata)
+                for res_param in res_params:
+                    fcenter_GHz = res_param.fcenter_ghz
+                    quality_factor_total = (res_param.q_i * res_param.q_c) / (res_param.q_c + res_param.q_i)
+                    quality_factor_bw_GHz = fcenter_GHz / quality_factor_total
+                    fspan_GHz = quality_factor_bw_GHz * fsc.ramp_span_as_multiple_of_quality_factor
+                    res_num = res_param.res_number
+                    seed_base = metadata["seed_base"]
+                    resonator_metadata = {"export_type": "single_res", "res_id": F"{res_num}_{seed_base}",
+                                          "res_num": res_num, "seed_group_delay": metadata[""],
+                                          "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname,
+                                          "location": fsc.location, "wafer": metadata["wafer"],
+                                          "so_band": metadata["so_band"], "seed_base": seed_base}
+                    self.survey_power_ramp(resonator_metadata)
 
     def hungry_for_jobs(self):
-        try_attempts = deque(
-            np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) / self.hungry_for_jobs_retry_time_s))
+        try_attempts = deque(maxlen=int(np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) /
+                                                self.hungry_for_jobs_retry_time_s)))
         try_attempts.appendleft(True)
         while any(try_attempts):
             job = get_job(chain_letter=self.rf_chain)
@@ -256,24 +259,31 @@ class JobAssignment:
 
 
 if __name__ == "__main__":
-    abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter="a")
-    with abstract_flux_sweep:
-        abstract_flux_sweep.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz)
+    do_scan = True
+    do_res_sweeps = False
 
-    # resonator sweeps based on an analyzed scan
-    # job_assign = JobAssignment()
-    # with job_assign:
-    #     job_assign.launch_hungry_for_jobs(chain_letter="a")
-        # format = "%(asctime)s: %(message)s"
-        # logging.basicConfig(format=format, level=logging.INFO,
-        #                     datefmt="%H:%M:%S")
-        # logging.info("Main    : before creating thread")
-        # x = threading.Thread(target=job_assign.launch_hungry_for_jobs, args=("a",))
-        # logging.info("Main    : before running thread")
-        # x.start()
-        # logging.info("Main    : wait for the thread to finish")
-        # # x.join()
-        # logging.info("Main    : all done")
+    if do_scan:
+        abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter="a")
+        with abstract_flux_sweep:
+            abstract_flux_sweep.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz)
+
+    if do_res_sweeps:
+        # resonator sweeps based on an analyzed scan
+        job_assign = JobAssignment()
+        with job_assign:
+            job_assign.launch_hungry_for_jobs(chain_letter="a")
+
+            # # Not ready for continuous use.
+            # format = "%(asctime)s: %(message)s"
+            # logging.basicConfig(format=format, level=logging.INFO,
+            #                     datefmt="%H:%M:%S")
+            # logging.info("Main    : before creating thread")
+            # x = threading.Thread(target=job_assign.launch_hungry_for_jobs, args=("a",))
+            # logging.info("Main    : before running thread")
+            # x.start()
+            # logging.info("Main    : wait for the thread to finish")
+            # # x.join()
+            # logging.info("Main    : all done")
 
 
 

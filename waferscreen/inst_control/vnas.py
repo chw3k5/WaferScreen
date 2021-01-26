@@ -31,6 +31,7 @@ class AbstractVNA:
         # meta data types (these attributes are here for notation, and have same names as the automated setting above.)
         self.fcenter_GHz = None
         self.fspan_GHz = None
+        self.num_freq_points_per_sweep = None  # number of frequency points measured
         self.num_freq_points = None  # number of frequency points measured
         self.use_exact_num_of_points = None
         self.sweeptype = None  # lin or log in freq space
@@ -50,6 +51,7 @@ class AbstractVNA:
                 # some settings need to be send to the VNA here
                 if key in self.programmable_settings:
                     self.__getattribute__("set_" + key)(kwargs[key])
+
             else:
                 raise KeyError(F"{self.__name__} has no attribute named {key}\n" +
                                F"in the allowed types {self.meta_data_types}")
@@ -116,16 +118,13 @@ class AbstractVNA:
 
     @timer
     def set_num_freq_points(self, num_freq_points):
-        if self.vna_address == agilent8722es_address:
-            multiple_of_max_points = 0
-            while self.num_freq_points > multiple_of_max_points:
-                multiple_of_max_points += self.max_frequency_points
-            self.num_freq_points = multiple_of_max_points
-            if num_freq_points > self.max_frequency_points:
-                self.vna.set_num_freq_points(self.max_frequency_points)
-                return
-        # What happens if no 'return' is reach
-        self.vna.set_num_freq_points(num_freq_points)
+        if self.max_frequency_points < num_freq_points:
+            # need more points than the VNA can handle
+            self.num_freq_points_per_sweep = self.max_frequency_points
+        else:
+            # less than ort exactly the number of point handled be the VNA
+            self.num_freq_points_per_sweep = num_freq_points
+        self.vna.set_num_freq_points(self.num_freq_points_per_sweep)
 
     @timer
     def set_vna_avg(self, vna_avg):
@@ -186,26 +185,7 @@ class AbstractVNA:
             print(F"{'%2.3f' % freqs[0]} GHz to {'%2.3f' % freqs[-1]} GHz Trace Acquired")
         return freqs, s21real, s21imag
 
-    @timer
-    def vna_sweep(self):
-        """
-        Older VNAs can only send a limited amount of datapoints per sweep.
-        This method addresses this issue by appending many smaller sweeps to
-        make the requested sweep.
-        
-        VNAs that are newer and have no limits or large limits will complete 
-        this method in a single 'for' loop
-        
-        :return: frequencies, S21_Real, S21_Imaginary
-        """
-        # count how many loops we need to get all the data for this sweep.
-        self.start_time = time.time()
-        self.freq_calculations()
-        loops_required = 0
-        points_acquired_after_n_loops = 0
-        while points_acquired_after_n_loops < self.num_freq_points:
-            loops_required += 1
-            points_acquired_after_n_loops += self.max_frequency_points
+    def sweep_sticher(self, loops_required, points_acquired_after_n_loops):
         points_needed_last_loop = self.max_frequency_points - (points_acquired_after_n_loops - self.num_freq_points)
         # initialized the data variables
         self.s21real = np.zeros(self.num_freq_points)
@@ -244,11 +224,47 @@ class AbstractVNA:
             # Store the data in the variables for this class
             self.s21real[start_index: end_index] = s21real_this_loop
             self.s21imag[start_index: end_index] = s21imag_this_loop
-            
+
             # things to reset for the next loop
             points_last_loop = points_this_loop
             start_index = int(end_index)
             end_index += self.max_frequency_points
+
+
+    @timer
+    def vna_sweep(self):
+        """
+        Older VNAs can only send a limited amount of datapoints per sweep.
+        This method addresses this issue by appending many smaller sweeps to
+        make the requested sweep.
+        
+        VNAs that are newer and have no limits or large limits will complete 
+        this method in a single 'for' loop
+        
+        :return: frequencies, S21_Real, S21_Imaginary
+        """
+        # count how many loops we need to get all the data for this sweep.
+        self.start_time = time.time()
+        self.freq_calculations()
+        loops_required = 0
+        points_acquired_after_n_loops = 0
+        while points_acquired_after_n_loops < self.num_freq_points:
+            loops_required += 1
+            points_acquired_after_n_loops += self.max_frequency_points
+        if loops_required == 1:
+            fmin = self.freqs_GHz[0]
+            fmax = self.freqs_GHz[-1]
+            if self.verbose:
+                fmax_str = '%1.4f' % fmax
+                fmin_str = '%1.4f' % fmin
+                if fmax_str == fmin_str:
+                    fmax_str = '%1.6f' % fmax
+                    fmin_str = '%1.6f' % fmin
+                print(F"Single sweep ({self.num_freq_points} points)  " +
+                      F"{fmin_str} GHz to {fmax_str} GHz")
+            self.freqs_GHz, self.s21real, self.s21imag = self.get_sweep()
+        else:
+            self.sweep_sticher(loops_required, points_acquired_after_n_loops)
         self.end_time = time.time()
         self.utc = str(datetime.utcnow())
         return self.freqs_GHz, self.s21real, self.s21imag, self.export_metadata()

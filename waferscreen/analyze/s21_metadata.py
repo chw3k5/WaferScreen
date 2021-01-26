@@ -7,12 +7,22 @@ forbidden_characters = {"|", ","}
 
 
 def num_format(a_string):
-    try:
-        return int(a_string)
-    except ValueError:
+    if isinstance(a_string, int):
+        # it is an int
+        return a_string
+    else:
+        # it is either and float or a string
         try:
-            return float(a_string)
+            int_version = int(a_string)
+            float_version = float(a_string)
+            if int_version == float_version:
+                # check if it really should be an int
+                return int_version
+            else:
+                # it was already a float or a string representing a float
+                return float_version
         except ValueError:
+            # this can only be represented as a string
             return a_string.strip()
 
 
