@@ -1,11 +1,14 @@
 import os
 import time
 import numpy as np
+import logging
+import threading
+from collections import deque
 from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.analyze.s21_metadata import MetaDataDict
-from waferscreen.analyze.s21_io import write_s21, dirname_create
+from waferscreen.analyze.s21_io import write_s21, dirname_create, read_s21
 import waferscreen.inst_control.flux_sweep_config as fsc
 import ref
 
@@ -33,6 +36,33 @@ def dirname_create_raw(sweep_type="scan", res_id=None):
     return path_str
 
 
+def get_job(chain_letter):
+    job_filename = os.path.join(ref.working_dir, F"{chain_letter}_chain_job.csv")
+    if os.path.isfile(job_filename):
+        with open(job_filename, "r") as f:
+            lines = f.readlines()
+        job_type = lines[0].strip()
+        seed_files = [filename for filename in lines[1:]]
+        return job_type, seed_files
+    else:
+        return None
+
+
+def get_jobs():
+    return get_job(chain_letter='a'), get_job(chain_letter="b")
+
+
+def thread_function(name):
+    """
+    A simple test function to practice on
+    :param name:
+    :return:
+    """
+    logging.info("Thread %s: starting", name)
+    time.sleep(2)
+    logging.info("Thread %s: finishing", name)
+
+
 class AbstractFluxSweep:
     """
     Manages the AbstractVNA and FluxRamp controllers
@@ -42,6 +72,8 @@ class AbstractFluxSweep:
     """
     # one connection is shared by all instances of this class
     flux_ramp_srs_connect = SRS_Connect(address=ref.flux_ramp_address)
+    hungry_for_jobs_retry_time_s = 20
+    hungry_for_jobs_timeout_hours = 0.01
 
     def __init__(self, rf_chain_letter, vna_address=agilent8722es_address, verbose=True, working_dir=None):
         test_letter = rf_chain_letter.lower().strip()
@@ -104,12 +136,15 @@ class AbstractFluxSweep:
             dirname = dirname_create_raw(sweep_type=kwargs["export_type"])
             basename = F"scan{'%2.3f' % sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % sweep_metadata['fmax_GHz']}GHz_" + \
                        F"{sweep_metadata['utc'].replace(':', '-')}.csv"
-        else:
+        elif kwargs["export_type"] == "single_res":
             basename = ramp_name_create(power_dBm=sweep_metadata['port_power_dBm'],
                                         current_uA=sweep_metadata['flux_current_uA'],
                                         res_num=sweep_metadata['res_num'],
                                         utc=sweep_metadata['utc'])
-            dirname = dirname_create_raw(sweep_type=kwargs["export_type"], res_id=sweep_metadata['res_id'])
+            dirname = metadata_this_sweep['dirname']
+        else:
+            raise TypeError
+
         sweep_metadata['path'] = os.path.join(dirname, basename)
         sweep_metadata['rf_chain'] = self.rf_chain
         metadata_this_sweep.update(sweep_metadata)
@@ -133,18 +168,11 @@ class AbstractFluxSweep:
     def survey_power_ramp(self, resonator_metadata):
         for port_power_dBm in fsc.power_sweep_dBm:
             resonator_metadata["port_power_dBm"] = port_power_dBm
-            resonator_metadata["fspan_GHz"] = resonator_metadata["fcenter_GHz"] / fsc.span_scale_factor
             resonator_metadata["num_freq_points"] = fsc.num_freq_points
             resonator_metadata["sweeptype"] = fsc.sweeptype
             resonator_metadata["if_bw_Hz"] = fsc.if_bw_Hz
             resonator_metadata["vna_avg"] = fsc.vna_avg
             self.survey_ramp(resonator_metadata)
-
-    def resonator_ramp_survey(self, resonator_freqs_GHz, scan_name):
-        for res_num, fcenter_GHz in list(enumerate(resonator_freqs_GHz)):
-            resonator_metadata = {"fcenter_GHz": fcenter_GHz, "res_id": F"{res_num}_{scan_name}",
-                                  "export_type": "single_res"}
-            self.survey_power_ramp(resonator_metadata)
 
     def scan_for_resonators(self, fmin_GHz, fmax_GHz, group_delay_s=None, **kwargs):
         if fmin_GHz > fmax_GHz:
@@ -155,7 +183,7 @@ class AbstractFluxSweep:
                               'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dBm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
                               "fspan_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz + fmin_GHz) / 2.0}
-        # overwrite the defult values with what ever was sent by the use
+        # overwrite the default values with what ever was sent by the use
         for user_key in kwargs.keys():
             resonator_metadata[user_key] = kwargs[user_key]
         resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["fspan_GHz"] / scan_stepsize_GHz))
@@ -163,12 +191,84 @@ class AbstractFluxSweep:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
 
+    def hungry_for_jobs(self):
+        try_attempts = deque(
+            np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) / self.hungry_for_jobs_retry_time_s))
+        try_attempts.appendleft(True)
+        while any(try_attempts):
+            job = get_job(chain_letter=self.rf_chain)
+            if job is not None:
+                try_attempts.appendleft(True)
+                self.survey_from_job_file(job=job)
+            else:
+                try_attempts.appendleft(False)
+                time.sleep(self.hungry_for_jobs_retry_time_s)
+
+            print(F"No new data for {self.hungry_for_jobs_retry_time_s} seconds, " +
+                  "hungry_for_jobs() is complete")
+
+    def single_res_survey_from_job_file(self, seed_files):
+        for seed_file in seed_files:
+            seed_dirname, seed_file_basename = os.path.split(seed_file)
+            all_files_in_seed_dir = os.listdir(seed_dirname)
+            # skip files that have already have data
+            if len(all_files_in_seed_dir) < 2:
+                _, metadata, res_params = read_s21(path=seed_file, return_res_params=True)
+                fcenter_GHz = res_params.fcenter_GHz
+                quality_factor_total = (res_params.q_i * res_params.q_c) / (res_params.q_c + res_params.q_i)
+                quality_factor_bw_Hz = fcenter_GHz / quality_factor_total
+                fspan_GHz = quality_factor_bw_Hz * 1.e-9 * fsc.ramp_span_as_multiple_of_quality_factor
+                res_num = res_params.res_number
+                seed_base = metadata["seed_base"]
+                resonator_metadata = {"export_type": "single_res", "res_id": F"{res_num}_{seed_base}",
+                                      "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname}
+                self.survey_power_ramp(resonator_metadata)
+
+    def survey_from_job_file(self, job):
+        job_type, seed_files = job
+        if job_type == "single_res":
+            self.single_res_survey_from_job_file(seed_files=seed_files)
+        else:
+            raise TypeError(F"Job type: {job_type} is not recognized.")
+
+
+class JobAssignment:
+    def __init__(self):
+        self.a_jobs, self.b_job = None, None
+        self.a_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='a',
+                                                    vna_address=agilent8722es_address,
+                                                    verbose=True, working_dir=None)
+        # self.b_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='b',
+        #                                             vna_address=agilent8722es_address,
+        #                                             verbose=True, working_dir=None)
+
+    def __enter__(self):
+        self.a_chain_flux_sweep.power_on()
+        # self.b_chain_flux_sweep.end()
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.a_chain_flux_sweep.end()
+        # self.b_chain_flux_sweep.end()
+
+    def launch_hungry_for_jobs(self, chain_letter="a"):
+        self.__getattribute__(F"{chain_letter}_chain_flux_sweep").hungry_for_jobs()
+
 
 if __name__ == "__main__":
-    afs = AbstractFluxSweep(rf_chain_letter="a")
-    with afs:
-        for if_bw_Hz in [300, 100]:
-            afs.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz, if_bw_Hz=if_bw_Hz)
+    job_assign = JobAssignment()
+    with job_assign:
+        job_assign.launch_hungry_for_jobs(chain_letter="a")
+        # format = "%(asctime)s: %(message)s"
+        # logging.basicConfig(format=format, level=logging.INFO,
+        #                     datefmt="%H:%M:%S")
+        # logging.info("Main    : before creating thread")
+        # x = threading.Thread(target=job_assign.launch_hungry_for_jobs, args=("a",))
+        # logging.info("Main    : before running thread")
+        # x.start()
+        # logging.info("Main    : wait for the thread to finish")
+        # # x.join()
+        # logging.info("Main    : all done")
+
 
 
 

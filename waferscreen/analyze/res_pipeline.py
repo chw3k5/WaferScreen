@@ -8,7 +8,7 @@ from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magp
 from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
 import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.analyze.res_io import ResParams
-from waferscreen.analyze.res_fit_jake import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
+from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 import ref
 
@@ -416,7 +416,7 @@ class ResPipe:
                     if not os.path.exists(res_dir):
                         os.mkdir(res_dir)
                     seed_filename = os.path.join(res_dir, "seed.csv")
-                    write_s21(output_file=seed_filename, freqs_ghz=[], s21_complex=[], metadata=seed_metadata,
+                    write_s21(output_file=seed_filename, metadata=seed_metadata,
                               fitted_resonators_parameters=[res_fit])
                     f.write(F"{seed_filename}\n")
 

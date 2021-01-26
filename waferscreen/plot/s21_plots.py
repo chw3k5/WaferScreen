@@ -4,7 +4,7 @@ from ref import today_str
 from waferscreen.plot.quick_plots import ls, len_ls, colors
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.analyze.s21_io import read_s21, ri_to_magphase, plot_bands
-from waferscreen.analyze.res_fit_jake import fit_simple_res_gain_slope_complex
+from waferscreen.analyze.resfit import fit_simple_res_gain_slope_complex
 from ref import band_params
 
 
