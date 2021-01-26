@@ -374,14 +374,14 @@ class InteractiveThresholdPlot(object):
                                      "minima": data_index_minima, "right_window": data_index_boundary_right}
                 # window padding
                 test_left_pad = single_window["minima"] \
-                                - int(np.round((single_window["minima"] - single_window["left_window"]) \
+                                - int(np.round((single_window["minima"] - single_window["left_window"])
                                                * self.window_pad_factor))
                 if test_left_pad < single_window["left_max"]:
                     single_window["left_pad"] = single_window["left_max"]
                 else:
                     single_window["left_pad"] = test_left_pad
                 test_left_fitter_pad = single_window["minima"] \
-                                       - int(np.round((single_window["minima"] - single_window["left_window"]) \
+                                       - int(np.round((single_window["minima"] - single_window["left_window"])
                                                       * self.fitter_pad_factor))
                 if test_left_fitter_pad < single_window["left_max"]:
                     single_window["left_fitter_pad"] = single_window["left_max"]
