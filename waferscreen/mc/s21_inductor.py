@@ -97,35 +97,44 @@ class InductS21:
             print(print_str)
 
     def remove_group_delay(self, user_input_group_delay=None):
-        if "group_delay_removed" not in self.metadata.keys():
-            # get the calculate the group delay if no user input
-            if user_input_group_delay is None:
+        if "group_delay_removed" in self.metadata.keys():
+            print("Metadata indicates that group delay was already removed, no action is taken.")
+        else:
+            if "seed_group_delay_s" in self.metadata.keys():
+                self.group_delay = self.metadata["seed_group_delay_s"]
+                self.group_delay_slope = -1 * self.group_delay
+                self.phase_offset = 0
+                self.group_delay_offset = 0
+            elif user_input_group_delay is not None:
+                self.group_delay = user_input_group_delay
+                self.group_delay_slope = -1 * self.group_delay
+                self.phase_offset = 0
+                self.group_delay_offset = 0
+            else:
+                # get the calculate the group delay if there is not value provided
                 if self.group_delay is None:
                     self.calc_group_delay()
                 if self.group_delay == float("nan"):
                     raise ValueError("Calculated group delay was greater than the allowed resolution.\n" +\
                                      "If the group delay " +
                                      "is known, input it thought the 'user_input_group_delay' variable.")
-                group_delay = self.group_delay
-            else:
-                group_delay = user_input_group_delay
-                self.group_delay = group_delay
-                self.group_delay_slope = -1 * group_delay
-                self.phase_offset = 0
-                self.group_delay_offset = 0
             # remove group delay
-            phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * group_delay - self.phase_offset))
+            phase_factors = np.exp(1j * (2.0 * np.pi * self.freqs_GHz * 1.0e9 * self.group_delay - self.phase_offset))
             self.s21_complex = self.s21_complex * phase_factors
             self.group_delay_removed = True
-            self.metadata["group_delay_removed"] = group_delay
+            self.metadata["group_delay_removed"] = self.group_delay
             self.metadata["group_delay_removed_on"] = F"utc:{datetime.datetime.utcnow()}"
 
     def prepare_output_filenames(self):
-        pro_dir = os.path.join(self.parent_dirname, "pro")
+        if self.metadata["export_type"] in {"band", "single_res"}:
+            single_res_dir = self.parent_dirname
+            raw_path, _single_res_or_bands_dirname = os.path.split(single_res_dir)
+            date_str_path, _raw_dirname = os.path.split(raw_path)
+            pro_dir = os.path.join(date_str_path, "pro")
+        else:
+            pro_dir = os.path.join(self.parent_dirname, "pro")
         if not os.path.exists(pro_dir):
             os.mkdir(pro_dir)
-        if self.metadata["export_type"] in {"band", "single_res"}:
-            print('testing_point_to see what data is a available from debug mode')
         prefix, _extension = self.basename.rsplit(".", 1)
         output_dir = os.path.join(pro_dir, prefix)
         if not os.path.exists(output_dir):

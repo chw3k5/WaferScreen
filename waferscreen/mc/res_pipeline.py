@@ -4,7 +4,8 @@ from shutil import rmtree
 import copy
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
-from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag
+from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag, \
+    generate_output_filename
 from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
 import waferscreen.mc.res_pipeline_config as rpc
 from waferscreen.analyze.res_io import ResParams
@@ -73,13 +74,9 @@ class ResPipe:
                   fitted_resonators_parameters=self.fitted_resonators_parameters)
 
     def generate_output_filename(self, processing_steps):
-        output_prefix = str(self.basename_prefix)
-        for process_step in processing_steps:
-            output_prefix += F"_{process_step.lower().strip()}"
-        outputfile_basename_prefix = os.path.join(self.dirname, output_prefix)
-        plot_filename = outputfile_basename_prefix + ".pdf"
-        data_filename = outputfile_basename_prefix + "." + self.file_extension
-        return data_filename, plot_filename
+        return generate_output_filename(processing_steps=processing_steps,
+                                        basename_prefix=self.basename_prefix,
+                                        dirname=self.dirname, file_extension=self.file_extension)
 
     def savgol_filter_mag(self, reals21=None, imags21=None, window_length=31, polyorder=2, plot=False):
         self.filter_reset()
@@ -167,7 +164,7 @@ class ResPipe:
         # interaction threshold plotting, return local minima and window information about size of the resonators
         i_thresh = fr_interactive.InteractiveThresholdPlot(f_Hz=self.unprocessed_freq_GHz * 1.0e9,
                                                            s21_mag=self.highpass_filter_mags21,
-                                                           peak_threshold_dB=0.5,
+                                                           peak_threshold_dB=2.0,
                                                            spacing_threshold_Hz=rpc.resonator_spacing_threshold_Hz,
                                                            window_pad_factor=window_pad_factor,
                                                            fitter_pad_factor=fitter_pad_factor,
@@ -229,8 +226,8 @@ class ResPipe:
             s21_complex_single_res_highpass = s21_real_single_res_highpass + 1j * s21_imag_single_res_highpass
             minima_mag_single_res_highpass_linear = self.highpass_linear_mag[single_window.minima]
             minima_mag_single_res_highpass = self.highpass_filter_mags21[single_window.minima]
-            # Guess the initial fit parameters
 
+            # Guess the initial fit parameters
             fcenter_guess_GHz = self.unprocessed_freq_GHz[single_window.minima]
             fcenter_guess_Hz = self.unprocessed_freq_Hz[single_window.minima]
             base_amplitude_abs_guess = 1.0  # This the expected value for a highpass in magnitude space

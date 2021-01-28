@@ -97,6 +97,28 @@ def dirname_create(output_basedir, location, wafer, date_str, is_raw=True, sweep
     return path_str
 
 
+def generate_output_filename(processing_steps, basename_prefix, dirname, file_extension):
+    output_prefix = str(basename_prefix)
+    for process_step in processing_steps:
+        output_prefix += F"_{process_step.lower().strip()}"
+    outputfile_basename_prefix = os.path.join(dirname, output_prefix)
+    plot_filename = outputfile_basename_prefix + ".pdf"
+    data_filename = outputfile_basename_prefix + "." + file_extension
+    return data_filename, plot_filename
+
+
+def parse_output_file(path):
+    dirname, basename = os.path.split(path)
+    basename_prefix, extension = basename.rsplit(".", 1)
+    return dirname, basename_prefix, extension
+
+
+def input_to_output_filename(processing_steps, input_path):
+    dirname, basename_prefix, extension = parse_output_file(path=input_path)
+    return generate_output_filename(processing_steps=processing_steps, basename_prefix=basename_prefix,
+                                    dirname=dirname, file_extension=extension)
+
+
 def ri_to_magphase(r, i):
     s21_mag = 20 * np.log10(np.sqrt((r ** 2.0) + (i ** 2.0)))
     s21_phase = np.arctan2(i, r)

@@ -41,6 +41,7 @@ with open(runtime_log, "a") as f:
 
 # data types
 file_extension_to_delimiter = {'csv': ",", 'psv': "|", 'txt': " ", "tsv": '\t'}
+s21_file_extensions = {"txt", "csv"}
 
 # Constants used in WaferScreen
 h = 6.6260755E-34  # Js
