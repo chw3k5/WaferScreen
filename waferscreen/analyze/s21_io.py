@@ -144,3 +144,7 @@ def plot_bands(ax, plot_data, legend_dict):
         counter += 1
     center_band_freq, center_band_str = find_center_band(center_GHz=plot_data["center_freq"])
     return center_band_str
+
+
+def mx_plus_b(x, m, b):
+    return (x * m) + b

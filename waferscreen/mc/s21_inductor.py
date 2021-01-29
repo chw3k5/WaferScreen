@@ -1,10 +1,11 @@
 import os
 import copy
 import numpy as np
+from scipy.optimize import curve_fit
 import datetime
 from matplotlib import pyplot as plt
 from waferscreen.plot.s21_plots import s21_subplot
-from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, plot_bands
+from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, plot_bands, mx_plus_b
 from ref import today_str
 
 
@@ -80,7 +81,6 @@ class InductS21:
             self.metadata.update(kwargs)
 
     def calc_group_delay(self):
-        self.get_mag_phase()
         self.group_delay_slope, self.group_delay_offset = \
             np.polyfit(self.radians_per_second, self.s21_phase_unwrapped, deg=1)
         group_delay = self.group_delay_slope * -1.0
@@ -97,19 +97,22 @@ class InductS21:
             print(print_str)
 
     def remove_group_delay(self, user_input_group_delay=None):
+        self.get_mag_phase()
         if "group_delay_removed" in self.metadata.keys():
             print("Metadata indicates that group delay was already removed, no action is taken.")
         else:
-            if "seed_group_delay_s" in self.metadata.keys():
-                self.group_delay = self.metadata["seed_group_delay_s"]
+            if "seed_group_delay_s" in self.metadata.keys() or user_input_group_delay is not None:
+                if "seed_group_delay_s" in self.metadata.keys():
+                    self.group_delay = self.metadata["seed_group_delay_s"]
+                else:
+                    self.group_delay = user_input_group_delay
                 self.group_delay_slope = -1 * self.group_delay
-                self.phase_offset = 0
-                self.group_delay_offset = 0
-            elif user_input_group_delay is not None:
-                self.group_delay = user_input_group_delay
-                self.group_delay_slope = -1 * self.group_delay
-                self.phase_offset = 0
-                self.group_delay_offset = 0
+
+                def plus_b(x, b):
+                    return mx_plus_b(x=x, m=self.group_delay_slope, b=b)
+                popt, pcov = curve_fit(plus_b, self.radians_per_second, self.s21_phase_unwrapped)
+                self.group_delay_offset = popt[0]
+                self.phase_offset = ((self.group_delay_offset + np.pi) % (2.0 * np.pi)) - np.pi
             else:
                 # get the calculate the group delay if there is not value provided
                 if self.group_delay is None:
@@ -126,6 +129,8 @@ class InductS21:
             self.metadata["group_delay_removed_on"] = F"utc:{datetime.datetime.utcnow()}"
 
     def prepare_output_filenames(self):
+        prefix, _extension = self.basename.rsplit(".", 1)
+        # the pro data dir
         if self.metadata["export_type"] in {"band", "single_res"}:
             single_res_dir = self.parent_dirname
             raw_path, _single_res_or_bands_dirname = os.path.split(single_res_dir)
@@ -135,12 +140,19 @@ class InductS21:
             pro_dir = os.path.join(self.parent_dirname, "pro")
         if not os.path.exists(pro_dir):
             os.mkdir(pro_dir)
-        prefix, _extension = self.basename.rsplit(".", 1)
-        output_dir = os.path.join(pro_dir, prefix)
-        if not os.path.exists(output_dir):
-            os.mkdir(output_dir)
-        self.output_file = os.path.join(output_dir, prefix + "_phase.csv")
-        self.plot_file = os.path.join(output_dir, prefix + "_phase.pdf")
+        # the output dir for the data
+        if self.metadata["export_type"] == "single_res":
+            output_dirname = self.metadata["res_id"]
+        elif self.metadata["export_type"] == "bands":
+            output_dirname = self.metadata["band_id"]
+        else:
+            output_dirname = prefix
+        output_dir_path = os.path.join(pro_dir, output_dirname)
+        if not os.path.exists(output_dir_path):
+            os.mkdir(output_dir_path)
+        # the file names
+        self.output_file = os.path.join(output_dir_path, prefix + "_phase.csv")
+        self.plot_file = os.path.join(output_dir_path, prefix + "_phase.pdf")
 
     def write(self):
         if not self.group_delay_removed:
@@ -255,5 +267,5 @@ class InductS21:
             plt.savefig(self.plot_file)
             print("Saved Plot to:", self.plot_file)
         if show:
-            plt.show()
-        plt.clf()
+            plt.show(block=True)
+        plt.close(fig=fig)

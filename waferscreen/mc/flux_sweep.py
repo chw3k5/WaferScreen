@@ -205,7 +205,7 @@ class AbstractFluxSweep:
                     fspan_GHz = quality_factor_bw_GHz * fsc.ramp_span_as_multiple_of_quality_factor
                     res_num = res_param.res_number
                     seed_base = metadata["seed_base"]
-                    resonator_metadata = {"export_type": "single_res", "res_id": F"{res_num}_{seed_base}",
+                    resonator_metadata = {"export_type": "single_res", "res_id": F"res{res_num}_{seed_base}",
                                           "res_num": res_num, "seed_group_delay_s": metadata["group_delay_found_s"],
                                           "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname,
                                           "location": fsc.location, "wafer": metadata["wafer"],

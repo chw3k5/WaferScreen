@@ -78,9 +78,12 @@ class DataManager:
         [parent_scan_dirs.extend(get_all_subdirs(rootdir=bands_or_res_dir))
          for bands_or_res_dir in bands_or_res_dirs]
         [number_dirs.extend(get_all_subdirs(rootdir=parent_scan_dir)) for parent_scan_dir in parent_scan_dirs]
-
-        [output_var.extend([os.path.join(number_dir, path) for path in os.listdir(number_dir)])
-         for number_dir in number_dirs]
+        for number_dir in number_dirs:
+            for basename in os.listdir(number_dir):
+                basename_prefix, _extension = basename.rsplit(".", 1)
+                if basename_prefix != "seed":
+                    full_path = os.path.join(number_dir, basename)
+                    output_var.append(full_path)
         if file_type == "bands":
             self.raw_bands_files = output_var
         elif file_type == "single_res":
@@ -109,12 +112,18 @@ class DataManager:
     def raw_process_all_bands(self):
         self.get_all_single_res_or_bands_files(file_type="bands")
         for raw_band_path in self.raw_bands_files:
-            self.raw_process(path=raw_band_path)
+            _dirname, basename = os.path.split(raw_band_path)
+            basename_prefix, _extension = basename.rsplit(".", 1)
+            if basename_prefix != "seed":
+                self.raw_process(path=raw_band_path)
 
     def raw_process_all_single_res(self):
         self.get_all_single_res_or_bands_files(file_type="single_res")
         for raw_single_res_path in self.raw_single_res_files:
-            self.raw_process(path=raw_single_res_path)
+            _dirname, basename = os.path.split(raw_single_res_path)
+            basename_prefix, _extension = basename.rsplit(".", 1)
+            if basename_prefix != "seed":
+                self.raw_process(path=raw_single_res_path)
 
     def raw_process(self, path):
         inducts21 = InductS21(path, verbose=self.verbose)
