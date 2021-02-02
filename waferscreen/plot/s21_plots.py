@@ -146,16 +146,17 @@ def plot_filter(freqs_GHz, original_s21, lowpass_s21, highpass_s21, output_filen
 def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_single_res=None,
                  s21_mag_single_res_highpass=None,
                  params_guess=None, params_fit=None,
-                 minima_pair=None, fwhm_pair=None, window_pair=None, fitter_pair=None, output_filename=None):
+                 minima_pair=None, fwhm_pair=None, window_pair=None, fitter_pair=None, zero_line=False,
+                 output_filename=None):
     fig = plt.figure(figsize=(8, 8))
     leglines = []
     leglabels = []
 
     # unprocessed (yet still phase corrected, group delay removed, data)
     if s21_mag_single_res is not None:
-        unprocessed_color = "black"
+        unprocessed_color = "cyan"
         unprocessed_linewidth = 5
-        plt.plot(f_GHz_single_res, s21_mag_single_res - s21_mag_single_res[0], color="black",
+        plt.plot(f_GHz_single_res, s21_mag_single_res, color=unprocessed_color,
                  linewidth=unprocessed_linewidth)
         leglines.append(plt.Line2D(range(10), range(10), color=unprocessed_color, ls="-",
                                    linewidth=unprocessed_linewidth))
@@ -171,7 +172,7 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
                                    linewidth=window_bl_linewidth))
         leglabels.append(F"Highpass Window")
 
-    # window baseline substraction and smooth
+    # window baseline subtraction and smooth
     if s21_mag_single_res_highpass is not None:
         window_bl_smooth_color = "chartreuse"
         window_bl_smooth_linewidth = 3
@@ -218,14 +219,15 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
         leglabels.append(F"Final Fit")
 
     # Zero Line for reference
-    zero_line_color = "darkgoldenrod"
-    zero_line_smooth_linewidth = 1
-    zero_line_ls = "dashed"
-    plt.plot((f_GHz_single_res[0], f_GHz_single_res[-1]), (0, 0), color=zero_line_color,
-             linewidth=zero_line_smooth_linewidth, ls=zero_line_ls)
-    leglines.append(plt.Line2D(range(10), range(10), color=zero_line_color, ls=zero_line_ls,
-                               linewidth=zero_line_smooth_linewidth))
-    leglabels.append(F"Zero dB line")
+    if zero_line:
+        zero_line_color = "darkgoldenrod"
+        zero_line_smooth_linewidth = 1
+        zero_line_ls = "dashed"
+        plt.plot((f_GHz_single_res[0], f_GHz_single_res[-1]), (0, 0), color=zero_line_color,
+                 linewidth=zero_line_smooth_linewidth, ls=zero_line_ls)
+        leglines.append(plt.Line2D(range(10), range(10), color=zero_line_color, ls=zero_line_ls,
+                                   linewidth=zero_line_smooth_linewidth))
+        leglabels.append(F"Zero dB line")
 
     # show minima
     if minima_pair is not None:
@@ -258,7 +260,8 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
         fwhm_alpha = 0.8
         fwhm_marker = 'D'
         fwhm_markersize = 10
-        plt.plot(f_GHz_fwhm, mag_fwhm,
+
+        plt.plot(f_GHz_fwhm, 20.0 * np.log10(mag_fwhm),
                  color=fwhm_color, linewidth=fwhm_linewidth, ls=fwhm_ls, marker=fwhm_marker,
                  markersize=fwhm_markersize, markerfacecolor=fwhm_color, alpha=fwhm_alpha)
         leglines.append(plt.Line2D(range(10), range(10), color=fwhm_color, ls=fwhm_ls,
@@ -327,8 +330,7 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
         print("Saved Plot to:", output_filename)
     else:
         plt.show(block=True)
-    plt.clf()
-    plt.close(fig)
+    plt.close(fig=fig)
 
 
 def band_plot(freqs_GHz, mags, fitted_resonators_parameters_by_band, output_filename=None):

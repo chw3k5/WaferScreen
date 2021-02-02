@@ -120,13 +120,13 @@ def input_to_output_filename(processing_steps, input_path):
 
 
 def ri_to_magphase(r, i):
-    s21_mag = 20 * np.log10(np.sqrt((r ** 2.0) + (i ** 2.0)))
+    s21_mag = 20.0 * np.log10(np.sqrt((r ** 2.0) + (i ** 2.0)))
     s21_phase = np.arctan2(i, r)
     return s21_mag, s21_phase
 
 
 def magphase_to_realimag(mag, phase):
-    linear_mag = 10.0**(mag / 20)
+    linear_mag = 10.0**(mag / 20.0)
     s21_complex = linear_mag * np.exp(1j * phase)
     return np.real(s21_complex), np.imag(s21_complex)
 

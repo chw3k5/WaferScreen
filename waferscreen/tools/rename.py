@@ -28,10 +28,17 @@ def rename_data_column(file, old_column_name, new_column_name, delimiter=','):
             f.write(line_str[:-1] + '\n')
 
 
+def rename_dir(old_path, new_path=None):
+    if new_path is None:
+        parent_dir, local_dirname = os.path.split(old_path)
+        new_path = os.path.join(parent_dir, F"res{local_dirname}")
+    os.rename(old_path, new_path)
+
+
 if __name__ == "__main__":
-    pro_data_dir = ""
-    for wafer_str, band_str, data_str in reversed([("7", "Band02", "2020-09-10"), ("7", "Band02", "2020-09-08"),
-                                                   ("7", "Band01", "2020-09-10"),  ("7", "Band01", "2020-09-08")]):
-        dir = os.path.join(pro_data_dir, "s21", wafer_str, band_str, data_str, "flux_ramp", "res_fits")
-        for file in get_all_file_paths(directory=dir):
-            rename_data_column(file=file, old_column_name='ramp_current_mA', new_column_name='ramp_current_uA')
+    parent_dir = "C:\\Users\\chw3k5\\PycharmProjects\\WaferScreen\\waferscreen\\nist\\9\\2021-01-26\\pro"
+    all_dirs = [os.path.join(parent_dir, dirname) for dirname in os.listdir(parent_dir)
+                if os.path.isdir(os.path.join(parent_dir, dirname)) and dirname[:4] != "scan"]
+    for old_path in all_dirs:
+        rename_dir(old_path=old_path)
+

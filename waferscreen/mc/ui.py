@@ -24,4 +24,4 @@ if __name__ == "__main__":
     #                    show_filter_plots=True,
     #                    skip_interactive_plot=False, save_res_plots=True,
     #                    make_band_seeds=False, make_single_res_seeds=False)
-    dm.full_loop_single_res(res_dirs=test_res_dirs)
+    dm.full_loop_single_res(res_dirs=test_res_dirs, save_res_plots=True, reprocess_res=True)

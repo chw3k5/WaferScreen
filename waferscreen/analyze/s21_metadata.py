@@ -28,9 +28,8 @@ def num_format(a_string):
             try:
                 return float(a_string)
             except ValueError:
-                 # this can only be represented as a string
-                 return a_string.strip()
-
+                # this can only be represented as a string
+                return a_string.strip()
 
 
 def metadata_key_format(key):

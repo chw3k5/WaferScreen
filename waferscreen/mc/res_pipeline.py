@@ -13,11 +13,14 @@ from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, packa
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 import ref
 
-halfway_in_log_mag = 10.0 * np.log10(0.5)  # when 3 dB is not accurate enough
-
 
 def fwhm(goal_depth, f_Hz_single_res, s21_mag_singe_res):
     f_fwhm_Hz_now = f_fwhm_Hz_last = f_fwhm_mag_now = f_fwhm_mag_last = None
+
+    # can the goal depth be found?
+    min_index = np.argmin(s21_mag_singe_res)
+    min_s21_value = s21_mag_singe_res[min_index]
+
     for single_f_Hz, single_linear_mag in zip(f_Hz_single_res, s21_mag_singe_res):
         if single_linear_mag < goal_depth:
             f_fwhm_Hz_now = single_f_Hz
@@ -149,18 +152,19 @@ class ResPipe:
                     lowpass_s21=self.lowpass_filter_reals21 + 1j * self.lowpass_filter_imags21,
                     highpass_s21=self.highpass_filter_reals21 + 1j * self.highpass_filter_imags21)
 
-    def find_window(self, cosine_filter=False, window_pad_factor=3, fitter_pad_factor=5, show_filter_plots=False,
+    def find_window(self, cosine_filter=None, window_pad_factor=3, fitter_pad_factor=5, show_filter_plots=False,
                     debug_mode=False):
         # initial filtering in magnitude space
         f_step_GHz = self.unprocessed_freq_GHz[1] - self.unprocessed_freq_GHz[0]
         window_length = int(np.round(rpc.baseline_smoothing_window_GHz / f_step_GHz))
-        if cosine_filter:
-            mag, phase = self.cosine_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                                                smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9,
-                                                plot=show_filter_plots)
-        else:
-            mag, phase = self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
-                                                window_length=window_length, polyorder=2, plot=show_filter_plots)
+        if cosine_filter is not None:
+            if cosine_filter:
+                mag, phase = self.cosine_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                                                    smoothing_scale=rpc.baseline_smoothing_window_GHz * 1.0e9,
+                                                    plot=show_filter_plots)
+            else:
+                mag, phase = self.savgol_filter_mag(reals21=self.unprocessed_reals21, imags21=self.unprocessed_imags21,
+                                                    window_length=window_length, polyorder=2, plot=show_filter_plots)
         # interaction threshold plotting, return local minima and window information about size of the resonators
         i_thresh = fr_interactive.InteractiveThresholdPlot(f_Hz=self.unprocessed_freq_GHz * 1.0e9,
                                                            s21_mag=self.highpass_filter_mags21,
@@ -202,21 +206,68 @@ class ResPipe:
         self.metadata["fitter_pad_factor"] = fitter_pad_factor
         self.metadata["peak_threshold_dB"] = i_thresh.peak_threshold_dB
 
+    def prepare_res_pot_dir(self):
+        if os.path.exists(self.res_plot_dir):
+            rmtree(self.res_plot_dir)
+        os.mkdir(self.res_plot_dir)
+
+    @staticmethod
+    def guess_res_params(freq_GHz, s21_mag_dB, s21_phase_rad, left_margin=None, right_margin=None, margin_fraction=0.1):
+        # most of the calculation need to me in linear magnitude space for clarity.
+        s21_linear_mag = 10.0 ** (s21_mag_dB / 20.0)
+        # determine an approximate baseline margin on each side of the resonator, estimate if None are provided
+        if left_margin is None or right_margin is None:
+            data_len = len(s21_mag_dB)
+            margin_len = int(np.round(data_len * margin_fraction))
+            if left_margin is None:
+                left_margin = margin_len
+            if right_margin is None:
+                right_margin = data_len - margin_len
+        left_lin_mag_s21 = np.mean(s21_linear_mag[0:left_margin])
+        right_lin_mag_s21 = np.mean(s21_linear_mag[right_margin:])
+        # frequency calculations
+        delta_freq_GHz = freq_GHz[-1] - freq_GHz[0]
+        # minima calculations
+        minima_index = np.argmin(s21_mag_dB)
+        minima_mag = s21_mag_dB[minima_index]
+        minima_mag_lin = s21_linear_mag[minima_index]
+        # find the fullwidth half maximum basically 3 dB down from the baseline
+        left_goal_depth = left_lin_mag_s21 + (0.5 * (minima_mag_lin - left_lin_mag_s21))
+        right_goal_depth = right_lin_mag_s21 + (0.5 * (minima_mag_lin - right_lin_mag_s21))
+        f_fwhm_left_GHz = fwhm(left_goal_depth, freq_GHz, s21_linear_mag)
+        f_fwhm_right_GHz = fwhm(right_goal_depth, list(reversed(freq_GHz)), list(reversed(s21_linear_mag)))
+        # fcenter
+        fcenter_guess_GHz = freq_GHz[minima_index]
+        # base amplitude
+        base_amplitude_abs_guess = float(np.mean((left_lin_mag_s21, right_lin_mag_s21)))
+        # base amplitude slope
+        base_amplitude_slope_guess = (left_lin_mag_s21 - right_lin_mag_s21) / (delta_freq_GHz * 4.0 * np.pi)
+        # base phase
+        a_phase_rad_guess = float(np.mean(s21_phase_rad))
+        # Quality factors
+        Q_guess_GHz = f_fwhm_right_GHz - f_fwhm_left_GHz
+        Q_guess = fcenter_guess_GHz / Q_guess_GHz
+        q_i_guess = Q_guess * np.sqrt(base_amplitude_abs_guess - minima_mag)
+        q_c_guess = q_i_guess * Q_guess / (q_i_guess - Q_guess)
+        # phase slope?, this removed by s21_inductor...
+        tau_ns_guess = 0.0
+        # package the resonator parameters
+        params_guess = ResParams(base_amplitude_abs=base_amplitude_abs_guess, a_phase_rad=a_phase_rad_guess,
+                                 base_amplitude_slope=base_amplitude_slope_guess, tau_ns=tau_ns_guess,
+                                 fcenter_ghz=fcenter_guess_GHz, q_i=q_i_guess, q_c=q_c_guess, impedance_ratio=0)
+        plot_data = {"f_fwhm_left_GHz": f_fwhm_left_GHz, "f_fwhm_right_GHz": f_fwhm_right_GHz,
+                     "left_goal_depth": left_goal_depth, "right_goal_depth": right_goal_depth,
+                     "minima_mag": minima_mag, "left_margin": left_margin, "right_margin": right_margin}
+        return params_guess, plot_data
+
     def analyze_resonators(self, save_res_plots=False):
-
         if save_res_plots:
-            if os.path.exists(self.res_plot_dir):
-                rmtree(self.res_plot_dir)
-            os.mkdir(self.res_plot_dir)
-
+            self.prepare_res_pot_dir()
         self.fitted_resonators_parameters = []
         for res_number, single_window in zip(range(1, len(self.minima_as_windows) + 1), self.minima_as_windows):
             # get slices of data ready
             fitter_slice = slice(single_window.left_fitter_pad, single_window.right_fitter_pad)
-            left_baseline_slice = slice(single_window.left_fitter_pad, single_window.left_window)
-            right_baseline_slice = slice(single_window.right_window, single_window.right_fitter_pad)
             f_GHz_single_res = self.unprocessed_freq_GHz[fitter_slice]
-            f_Hz_single_res = self.unprocessed_freq_Hz[fitter_slice]
             s21_mag_single_res = self.unprocessed_mags21[fitter_slice]
             s21_phase_single_res = self.highpass_phase[fitter_slice]
             s21_mag_single_res_highpass = self.highpass_filter_mags21[fitter_slice]
@@ -224,40 +275,13 @@ class ResPipe:
             s21_real_single_res_highpass = self.highpass_filter_reals21[fitter_slice]
             s21_imag_single_res_highpass = self.highpass_filter_imags21[fitter_slice]
             s21_complex_single_res_highpass = s21_real_single_res_highpass + 1j * s21_imag_single_res_highpass
-            minima_mag_single_res_highpass_linear = self.highpass_linear_mag[single_window.minima]
-            minima_mag_single_res_highpass = self.highpass_filter_mags21[single_window.minima]
 
-            # Guess the initial fit parameters
-            fcenter_guess_GHz = self.unprocessed_freq_GHz[single_window.minima]
-            fcenter_guess_Hz = self.unprocessed_freq_Hz[single_window.minima]
-            base_amplitude_abs_guess = 1.0  # This the expected value for a highpass in magnitude space
-            # a_phase_rad_guess = np.mean(np.concatenate((phase[left_baseline_slice], phase[right_baseline_slice])))
-            a_phase_rad_guess = float(np.mean(self.highpass_phase[fitter_slice]))
+            left_margin = single_window.left_window - single_window.left_fitter_pad
+            right_margin = single_window.right_fitter_pad - single_window.right_window
 
-            # find the fullwidth half maximum
-            goal_depth = halfway_in_log_mag  # basically 3 dB down from the baseline
-            f_fwhm_left_Hz = fwhm(goal_depth, f_Hz_single_res, s21_mag_single_res_highpass)
-            f_fwhm_right_Hz = fwhm(goal_depth, reversed(f_Hz_single_res), reversed(s21_mag_single_res_highpass))
-
-            # Quality factors
-            Q_guess_Hz = f_fwhm_right_Hz - f_fwhm_left_Hz
-            Q_guess = fcenter_guess_Hz / Q_guess_Hz
-            q_i_guess = Q_guess * np.sqrt(0 - minima_mag_single_res_highpass)
-            q_c_guess = q_i_guess * Q_guess / (q_i_guess - Q_guess)
-
-            # tau_ns
-            delta_freq_GHz = f_GHz_single_res[-1] - f_GHz_single_res[0]
-            group_delay_slope, group_delay_offset = \
-                np.polyfit(f_Hz_single_res * 2.0 * np.pi, np.unwrap(s21_phase_single_res, discont=np.pi), deg=1)
-            tau_ns_guess = group_delay_slope * 1.0e9 / (2.0 * np.pi)
-
-            # base amplitude slope
-            base_amplitude_slope_guess = (np.mean(self.highpass_linear_mag[single_window.left_fitter_pad])
-                                          - np.mean(self.highpass_linear_mag[single_window.right_fitter_pad])) \
-                                         / (delta_freq_GHz * 2.0 * np.pi)
-            params_guess = ResParams(base_amplitude_abs=base_amplitude_abs_guess, a_phase_rad=a_phase_rad_guess,
-                                     base_amplitude_slope=base_amplitude_slope_guess, tau_ns=tau_ns_guess,
-                                     fcenter_ghz=fcenter_guess_GHz, q_i=q_i_guess, q_c=q_c_guess, impedance_ratio=0)
+            params_guess, plot_data = self.guess_res_params(freq_GHz=f_GHz_single_res, s21_mag_dB=s21_mag_single_res,
+                                                            s21_phase_rad=s21_phase_single_res,
+                                                            left_margin=left_margin, right_margin=right_margin)
 
             popt, pcov = wrap_simple_res_gain_slope_complex(freqs_GHz=f_GHz_single_res,
                                                             s21_complex=s21_complex_single_res_highpass,
@@ -276,13 +300,14 @@ class ResPipe:
             self.fitted_resonators_parameters.append(params_fit)
             if save_res_plots:
                 plot_res_fit(f_GHz_single_res=f_GHz_single_res,
-                             s21_mag_single_res=s21_mag_single_res,
+                             s21_mag_single_res=s21_mag_single_res - s21_mag_single_res[0],
                              not_smoothed_mag_single_res=self.not_smoothed_mag[fitter_slice],
                              s21_mag_single_res_highpass=s21_mag_single_res_highpass,
                              params_guess=params_guess, params_fit=params_fit,
                              minima_pair=(self.unprocessed_freq_GHz[single_window.minima],
                                           self.highpass_filter_mags21[single_window.minima]),
-                             fwhm_pair=((f_fwhm_left_Hz * 1.0e-9, f_fwhm_right_Hz * 1.0e-9), (goal_depth, goal_depth)),
+                             fwhm_pair=((plot_data["f_fwhm_left_GHz"], plot_data["f_fwhm_right_GHz"]),
+                                        (plot_data["goal_depth"], plot_data["goal_depth"])),
                              window_pair=((self.unprocessed_freq_GHz[single_window.left_window],
                                            self.unprocessed_freq_GHz[single_window.right_window]),
                                           (self.highpass_filter_mags21[single_window.left_window],
@@ -291,6 +316,7 @@ class ResPipe:
                                            self.unprocessed_freq_GHz[single_window.right_pad]),
                                           (self.highpass_filter_mags21[single_window.left_pad],
                                            self.highpass_filter_mags21[single_window.right_pad])),
+                             zero_line=True,
                              output_filename=os.path.join(self.res_plot_dir, F"{'%04i' % res_number}.png"))
         self.metadata["baseline_removed"] = True
         self.metadata["baseline_technique"] = "windows function based on the a threshold then smoothed"
@@ -300,6 +326,47 @@ class ResPipe:
         output_s21complex = self.highpass_filter_reals21 + 1j * self.highpass_filter_imags21
         self.write(output_file=data_filename, freqs_ghz=self.unprocessed_freq_GHz,
                    s21_complex=output_s21complex)
+
+    def analyze_single_res(self, save_res_plots=False):
+        s21_complex = self.unprocessed_reals21 + 1j * self.unprocessed_imags21
+        s21_linear_mag = np.sqrt((self.unprocessed_reals21 ** 2.0) + (self.unprocessed_imags21 ** 2.0))
+        params_guess, plot_data = self.guess_res_params(freq_GHz=self.unprocessed_freq_GHz,
+                                                        s21_mag_dB=self.unprocessed_mags21,
+                                                        s21_phase_rad=self.unprocessed_phases21)
+
+        popt, pcov = wrap_simple_res_gain_slope_complex(freqs_GHz=self.unprocessed_freq_GHz,
+                                                        s21_complex=s21_complex,
+                                                        s21_linear_mag=s21_linear_mag,
+                                                        base_amplitude_abs_guess=params_guess.base_amplitude_abs,
+                                                        a_phase_rad_guess=params_guess.a_phase_rad,
+                                                        fcenter_GHz_guess=params_guess.fcenter_ghz,
+                                                        q_i_guess=params_guess.q_i,
+                                                        q_c_guess=params_guess.q_c,
+                                                        base_amplitude_slope_guess=params_guess.base_amplitude_slope,
+                                                        tau_ns_guess=params_guess.tau_ns,
+                                                        impedance_ratio_guess=params_guess.impedance_ratio)
+        params_fit = package_res_results(popt=popt, pcov=pcov, res_number=self.metadata["res_num"],
+                                         parent_file=self.path,
+                                         verbose=self.verbose)
+        self.fitted_resonators_parameters = [params_fit]
+        self.write(output_file=self.path, freqs_ghz=self.unprocessed_freq_GHz, s21_complex=s21_complex)
+        if save_res_plots:
+            basename = F"{'%04i' % self.metadata['res_num']}_cur{self.metadata['flux_current_ua']}uA.png"
+            plot_res_fit(f_GHz_single_res=self.unprocessed_freq_GHz,
+                         s21_mag_single_res=self.unprocessed_mags21,
+                         not_smoothed_mag_single_res=None,
+                         s21_mag_single_res_highpass=None,
+                         params_guess=params_guess, params_fit=params_fit,
+                         minima_pair=(params_guess.fcenter_ghz, plot_data["minima_mag"]),
+                         fwhm_pair=((plot_data["f_fwhm_left_GHz"], plot_data["f_fwhm_right_GHz"]),
+                                    (plot_data["left_goal_depth"], plot_data["right_goal_depth"])),
+                         window_pair=None,
+                         fitter_pair=((self.unprocessed_freq_GHz[plot_data["left_margin"]],
+                                       self.unprocessed_freq_GHz[plot_data["right_margin"]]),
+                                      (self.unprocessed_mags21[plot_data["left_margin"]],
+                                       self.unprocessed_mags21[plot_data["right_margin"]])),
+                         zero_line=False,
+                         output_filename=os.path.join(self.res_plot_dir, basename))
 
     def fit_resonators_jake(self):
         frs = jake_res_finder(unprocessed_freq_GHz=self.unprocessed_freq_GHz,
