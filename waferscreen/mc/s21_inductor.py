@@ -107,11 +107,8 @@ class InductS21:
                 else:
                     self.group_delay = user_input_group_delay
                 self.group_delay_slope = -1 * self.group_delay
-
-                def plus_b(x, b):
-                    return mx_plus_b(x=x, m=self.group_delay_slope, b=b)
-                popt, pcov = curve_fit(plus_b, self.radians_per_second, self.s21_phase_unwrapped)
-                self.group_delay_offset = popt[0]
+                b0_line = mx_plus_b(x=self.radians_per_second, m=self.group_delay_slope, b=0.0)
+                self.group_delay_offset = np.mean(self.s21_phase_unwrapped - b0_line)
                 self.phase_offset = ((self.group_delay_offset + np.pi) % (2.0 * np.pi)) - np.pi
             else:
                 # get the calculate the group delay if there is not value provided

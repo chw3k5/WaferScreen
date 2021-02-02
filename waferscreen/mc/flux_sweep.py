@@ -26,7 +26,11 @@ def ramp_name_parse(basename):
 
 
 def ramp_name_create(power_dBm, current_uA, res_num, utc):
-    return F"sdata_res_{res_num}_cur_{int(round(current_uA))}uA_{power_dBm}dBm_utc{utc.replace(':', '-')}.csv"
+    if current_uA >= 0.0:
+        current_str = F"+{'%05.1f' % current_uA}"
+    else:
+        current_str = str('%06.1f' % current_uA)
+    return F"sdata_res_{res_num}_cur_{current_str}uA_{power_dBm}dBm_utc{utc.replace(':', '-')}.csv"
 
 
 def dirname_create_raw(sweep_type="scan", res_id=None):
@@ -213,20 +217,24 @@ class AbstractFluxSweep:
                     self.survey_power_ramp(resonator_metadata)
 
     def hungry_for_jobs(self):
-        try_attempts = deque(maxlen=int(np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) /
-                                                self.hungry_for_jobs_retry_time_s)))
-        try_attempts.appendleft(True)
-        while any(try_attempts):
+        max_try_attempts = int(np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) /
+                                       self.hungry_for_jobs_retry_time_s))
+        last_job_found_time = time.time()
+        attempts_count = 0
+        while attempts_count < max_try_attempts:
             job = get_job(chain_letter=self.rf_chain)
             if job is not None:
-                try_attempts.appendleft(True)
                 self.survey_from_job_file(job=job)
+                last_job_found_time = time.time()
+                attempts_count = 0
             else:
-                try_attempts.appendleft(False)
+                attempts_count += 1
+                now = time.time()
+                delta_t_minutes = (last_job_found_time - now) / 60.0
+                print(F"No new data for {delta_t_minutes} minutes, " +
+                      F"sleeping for {self.hungry_for_jobs_retry_time_s} seconds, " +
+                      F"attempt {'%4i' % attempts_count} of {max_try_attempts}.")
                 time.sleep(self.hungry_for_jobs_retry_time_s)
-
-            print(F"No new data for {self.hungry_for_jobs_retry_time_s} seconds, " +
-                  "hungry_for_jobs() is complete")
 
     def survey_from_job_file(self, job):
         job_type, seed_files = job

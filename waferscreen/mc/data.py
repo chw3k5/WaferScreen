@@ -241,7 +241,7 @@ class DataManager:
     def full_loop_single_res(self, res_dirs=None,
                              save_res_plots=False, reprocess_res=True):
         self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=res_dirs)
-        # x[self.raw_process(path=raw_single_res) for raw_single_res in self.raw_single_res_files]
+        [self.raw_process(path=raw_single_res) for raw_single_res in self.raw_single_res_files]
         self.analyze_single_res(single_res_parent_dirs=None, save_res_plots=save_res_plots, reprocess=reprocess_res)
 
 
