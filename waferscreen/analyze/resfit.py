@@ -45,7 +45,7 @@ def rebound_starting_vals(bounds, starting_vals):
     return new_starting_vals
 
 
-def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=False):
+def package_res_results(popt, pcov, res_number=None, flux_ramp_current_ua=None, parent_file=None, verbose=False):
     fit_base_amplitude_abs = popt[0]
     fit_a_phase_rad = popt[1]
     fit_base_amplitude_slope = popt[2]
@@ -90,7 +90,8 @@ def package_res_results(popt, pcov, res_number=None, parent_file=None, verbose=F
                                   q_i=fit_q_i, q_i_error=error_q_i,
                                   q_c=fit_q_c, q_c_error=error_q_c,
                                   impedance_ratio=fit_impedance_ratio, impedance_ratio_error=error_impedance_ratio,
-                                  res_number=res_number, parent_file=parent_file.strip())
+                                  res_number=res_number, parent_file=parent_file.strip(),
+                                  flux_ramp_current_ua=flux_ramp_current_ua)
     return single_res_params
 
 

@@ -17,7 +17,7 @@ test_res_dirs = [raw_single_res_dir]
 
 
 if __name__ == "__main__":
-    do_scan = True
+    do_scan = False
     do_res_sweeps = not do_scan
 
     # this statement is true if this file is run direct, it is false if this file imported from another file.

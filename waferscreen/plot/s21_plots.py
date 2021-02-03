@@ -5,6 +5,7 @@ from waferscreen.plot.quick_plots import ls, len_ls, colors
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.analyze.s21_io import read_s21, ri_to_magphase, plot_bands
 from waferscreen.analyze.resfit import fit_simple_res_gain_slope_complex
+from waferscreen.analyze.lambfit import f0_of_I
 from ref import band_params
 
 
@@ -382,3 +383,97 @@ def band_plot(freqs_GHz, mags, fitted_resonators_parameters_by_band, output_file
     plt.close()
 
 
+def lamb_plot(input_data=None, lamb_params_guess=None, lamb_params_fit=None, resfits_and_metadata=None,
+              current_axis_num_of_points=1000, title_str=None, output_filename=None):
+    fig = plt.figure(figsize=(14, 8))
+    leglines = []
+    leglabels = []
+    f_min_GHz = None
+
+    # define the current axis that the guess and fitter plots use
+    if input_data is None:
+        current_axis_uA = np.linspace(-125, 125, current_axis_num_of_points)
+    else:
+        currentuA, freqGHz = input_data
+        current_axis_uA = np.linspace(np.min(currentuA), np.max(currentuA), current_axis_num_of_points)
+
+    # This is final result of the parameters found using curve-fit
+    if lamb_params_fit is not None:
+        current_axis_A = current_axis_uA * 1.0e-6
+        final_fit_out_GHz = f0_of_I(ramp_current_amps=current_axis_A,
+                                    ramp_current_amps_0=lamb_params_fit.I0fit,
+                                    m=lamb_params_fit.mfit, f2=lamb_params_fit.f2fit,
+                                    P=lamb_params_fit.Pfit, lamb=lamb_params_fit.lambfit)
+        if f_min_GHz is None:
+            f_min_GHz = np.min(final_fit_out_GHz)
+        final_fit_delta_f_kHz = (final_fit_out_GHz - f_min_GHz) * 1.0e6
+        fit_color = "firebrick"
+        fit_linewidth = 2
+
+        plt.plot(current_axis_uA, final_fit_delta_f_kHz, color=fit_color,
+                 linewidth=fit_linewidth)
+        leglines.append(plt.Line2D(range(10), range(10), color=fit_color, ls="-",
+                                   linewidth=fit_linewidth))
+        leglabels.append(F"Fitted Parameters")
+
+    # This is the guess of parameters that are used to initialize the curve-fit
+    if lamb_params_guess is not None:
+        current_axis_A = current_axis_uA * 1.0e-6
+        guess_fit_out_GHz = f0_of_I(ramp_current_amps=current_axis_A, ramp_current_amps_0=lamb_params_guess.I0fit,
+                                    m=lamb_params_guess.mfit, f2=lamb_params_guess.f2fit,
+                                    P=lamb_params_guess.Pfit, lamb=lamb_params_guess.lambfit)
+        if f_min_GHz is None:
+            f_min_GHz = np.min(guess_fit_out_GHz)
+        guess_fit_delta_f_kHz = (guess_fit_out_GHz - f_min_GHz) * 1.0e6
+        guess_color = "dodgerblue"
+        guess_linewidth = 1
+
+        plt.plot(current_axis_uA, guess_fit_delta_f_kHz, color=guess_color,
+                 linewidth=guess_linewidth)
+        leglines.append(plt.Line2D(range(10), range(10), color=guess_color, ls="-",
+                                   linewidth=guess_linewidth))
+        leglabels.append(F"Initial Parameters Guess")
+
+    # the raw data that is used as the basis for a fit/lambda parameter determination.
+    if input_data is not None:
+        currentuA, freqGHz = input_data
+        if f_min_GHz is None:
+            f_min_GHz = np.min(freqGHz)
+        delta_f_kHz = (freqGHz - f_min_GHz) * 1.0e6
+        input_data_color = "darkorchid"
+        input_data_linewidth = 1
+        input_data_ls = "none"
+        input_data_alpha = 0.65
+        input_data_marker = 'o'
+        input_data_markersize = 10
+        plt.plot(currentuA, delta_f_kHz,
+                 color=input_data_color,
+                 linewidth=input_data_linewidth, ls=input_data_ls, marker=input_data_marker,
+                 markersize=input_data_markersize, markerfacecolor=input_data_color, alpha=input_data_alpha)
+        leglines.append(plt.Line2D(range(10), range(10), color=input_data_color, ls=input_data_ls,
+                                   linewidth=input_data_linewidth, marker=input_data_marker,
+                                   markersize=input_data_markersize,
+                                   markerfacecolor=input_data_color, alpha=input_data_alpha))
+        leglabels.append(F"Fit Input Data")
+        if resfits_and_metadata is not None:
+            for single_uA, res_fit, single_metadata in resfits_and_metadata:
+                single_delta_f_kHz = (res_fit.fcenter_ghz - f_min_GHz) * 1.0e6
+                q_format_str = '%i'
+                text_str = F"{single_uA} uA\nQi: {q_format_str % res_fit.q_i}\nQc: {q_format_str % res_fit.q_c}"
+                plt.text(x=single_uA, y=single_delta_f_kHz, s=text_str, color="white", fontsize=6,
+                         bbox={"facecolor": input_data_color, "alpha": 0.5})
+
+    # Whole plot options:
+    plt.xlabel(F"Flux Ramp Current (uA)")
+    plt.ylabel(F"Relative Frequency Center (kHz)")
+    if title_str is not None:
+        plt.title(title_str)
+    plt.legend(leglines, leglabels, loc=0, numpoints=3, handlelength=5, fontsize=10)
+    # Display
+    if output_filename is not None:
+        plt.draw()
+        plt.savefig(output_filename)
+        print("Saved Plot to:", output_filename)
+    else:
+        plt.show(block=True)
+    plt.close(fig=fig)

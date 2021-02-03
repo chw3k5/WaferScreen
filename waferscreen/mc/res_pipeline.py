@@ -253,7 +253,7 @@ class ResPipe:
         self.minima_as_windows = i_thresh.minima_as_windows
         self.metadata["window_pad_factor"] = window_pad_factor
         self.metadata["fitter_pad_factor"] = fitter_pad_factor
-        self.metadata["peak_threshold_dB"] = i_thresh.peak_threshold_dB
+        self.metadata["peak_threshold_db"] = i_thresh.peak_threshold_dB
 
     def prepare_res_pot_dir(self):
         if os.path.exists(self.res_plot_dir):
@@ -295,8 +295,8 @@ class ResPipe:
                                                             tau_ns_guess=params_guess.tau_ns,
                                                             impedance_ratio_guess=params_guess.impedance_ratio)
             params_fit = package_res_results(popt=popt, pcov=pcov, res_number=res_number,
-                                             parent_file=self.path,
-                                             verbose=self.verbose)
+                                             flux_ramp_current_ua=self.metadata["flux_current_ua"],
+                                             parent_file=self.path, verbose=self.verbose)
             self.fitted_resonators_parameters.append(params_fit)
             if save_res_plots:
                 plot_res_fit(f_GHz_single_res=f_GHz_single_res,
@@ -346,8 +346,8 @@ class ResPipe:
                                                         tau_ns_guess=params_guess.tau_ns,
                                                         impedance_ratio_guess=params_guess.impedance_ratio)
         params_fit = package_res_results(popt=popt, pcov=pcov, res_number=self.metadata["res_num"],
-                                         parent_file=self.path,
-                                         verbose=self.verbose)
+                                         flux_ramp_current_ua=self.metadata["flux_current_ua"],
+                                         parent_file=self.path, verbose=self.verbose)
         self.fitted_resonators_parameters = [params_fit]
         self.write(output_file=self.path, freqs_ghz=self.unprocessed_freq_GHz, s21_complex=s21_complex)
         if save_res_plots:

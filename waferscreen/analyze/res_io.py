@@ -39,6 +39,7 @@ class ResParams(NamedTuple):
     impedance_ratio_error: Optional[float] = None
     parent_file: Optional[str] = None
     res_number: Optional[int] = None
+    flux_ramp_current_ua: Optional[float] = None
 
     def __str__(self):
         output_string = F"{self.res_number},"
