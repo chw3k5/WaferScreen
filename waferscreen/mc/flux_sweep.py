@@ -2,7 +2,6 @@ import os
 import time
 import numpy as np
 import logging
-from collections import deque
 from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
@@ -120,7 +119,7 @@ class AbstractFluxSweep:
 
     def step(self, **kwargs):
         # initialize the data storage tools
-        flux_ramp_voltage = kwargs['flux_supply_V']
+        flux_ramp_voltage = kwargs['flux_supply_v']
         metadata_this_sweep = MetaDataDict()
         kwargs_keys = set(kwargs.keys())
         vna_settings_keys = kwargs_keys & self.abstract_vna.programmable_settings
@@ -137,10 +136,10 @@ class AbstractFluxSweep:
         # write out sdata
         if kwargs["export_type"] == "scan":
             dirname = dirname_create_raw(sweep_type=kwargs["export_type"])
-            basename = F"scan{'%2.3f' % vna_sweep_metadata['fmin_GHz']}GHz-{'%2.3f' % vna_sweep_metadata['fmax_GHz']}GHz_" + \
+            basename = F"scan{'%2.3f' % vna_sweep_metadata['fmin_ghz']}GHz-{'%2.3f' % vna_sweep_metadata['fmax_ghz']}GHz_" + \
                        F"{vna_sweep_metadata['utc'].replace(':', '-')}.csv"
         elif kwargs["export_type"] == "single_res":
-            basename = ramp_name_create(power_dBm=vna_sweep_metadata['port_power_dBm'],
+            basename = ramp_name_create(power_dBm=vna_sweep_metadata['port_power_dbm'],
                                         current_uA=metadata_this_sweep['flux_current_ua'],
                                         res_num=metadata_this_sweep['res_num'],
                                         utc=vna_sweep_metadata['utc'])
@@ -163,17 +162,17 @@ class AbstractFluxSweep:
             if counter == 0 and dwell is not None:
                 # dwell after the ramp is reset.
                 time.sleep(dwell)
-            resonator_metadata['flux_current_uA'] = fsc.ramp_volt_to_uA[flux_supply_V]
-            resonator_metadata['flux_supply_V'] = flux_supply_V
+            resonator_metadata['flux_current_ua'] = fsc.ramp_volt_to_uA[flux_supply_V]
+            resonator_metadata['flux_supply_v'] = flux_supply_V
             resonator_metadata['ramp_series_resistance_ohms'] = fsc.ramp_rseries
             self.step(**resonator_metadata)
 
     def survey_power_ramp(self, resonator_metadata):
         for port_power_dBm in fsc.power_sweep_dBm:
-            resonator_metadata["port_power_dBm"] = port_power_dBm
+            resonator_metadata["port_power_dbm"] = port_power_dBm
             resonator_metadata["num_freq_points"] = fsc.ramp_num_freq_points
             resonator_metadata["sweeptype"] = fsc.sweeptype
-            resonator_metadata["if_bw_Hz"] = fsc.if_bw_Hz
+            resonator_metadata["if_bw_hz"] = fsc.if_bw_Hz
             resonator_metadata["vna_avg"] = fsc.vna_avg
             self.survey_ramp(resonator_metadata)
 
@@ -182,15 +181,15 @@ class AbstractFluxSweep:
             fmin_GHz, fmax_GHz = fmax_GHz, fmin_GHz
         scan_stepsize_GHz = fsc.scan_stepsize_kHz * 1.e-6
         # set the default values from the config file
-        resonator_metadata = {'flux_current_uA': 0.0, 'flux_supply_V': 0.0, "export_type": "scan",
-                              'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dBm": fsc.probe_power_dBm,
+        resonator_metadata = {'flux_current_ua': 0.0, 'flux_supply_v': 0.0, "export_type": "scan",
+                              'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dbm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
-                              "fspan_GHz": fmax_GHz - fmin_GHz, "fcenter_GHz": (fmax_GHz + fmin_GHz) / 2.0,
+                              "fspan_ghz": fmax_GHz - fmin_GHz, "fcenter_ghz": (fmax_GHz + fmin_GHz) / 2.0,
                               "location": fsc.location, "wafer": fsc.wafer}
         # overwrite the default values with what ever was sent by the use
         for user_key in kwargs.keys():
             resonator_metadata[user_key] = kwargs[user_key]
-        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["fspan_GHz"] / scan_stepsize_GHz))
+        resonator_metadata["num_freq_points"] = int(np.round(resonator_metadata["fspan_ghz"] / scan_stepsize_GHz))
         if group_delay_s is not None:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
@@ -211,7 +210,7 @@ class AbstractFluxSweep:
                     seed_base = metadata["seed_base"]
                     resonator_metadata = {"export_type": "single_res", "res_id": F"res{res_num}_{seed_base}",
                                           "res_num": res_num, "seed_group_delay_s": metadata["group_delay_found_s"],
-                                          "fspan_GHz": fspan_GHz, "fcenter_GHz": fcenter_GHz, "dirname": seed_dirname,
+                                          "fspan_ghz": fspan_GHz, "fcenter_ghz": fcenter_GHz, "dirname": seed_dirname,
                                           "location": fsc.location, "wafer": metadata["wafer"],
                                           "so_band": metadata["so_band"], "seed_base": seed_base}
                     self.survey_power_ramp(resonator_metadata)

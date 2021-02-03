@@ -233,8 +233,7 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
     if minima_pair is not None:
         f_GHz_min = minima_pair[0]
         mag_min = minima_pair[1]
-        window_bound_color \
-            = "darkorchid"
+        window_bound_color = "darkorchid"
         window_bound_linewidth = 1
         window_bound_ls = "None"
         window_bound_alpha = 0.65

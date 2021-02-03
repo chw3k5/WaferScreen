@@ -1,7 +1,6 @@
 import os
 import copy
 import numpy as np
-from scipy.optimize import curve_fit
 import datetime
 from matplotlib import pyplot as plt
 from waferscreen.plot.s21_plots import s21_subplot

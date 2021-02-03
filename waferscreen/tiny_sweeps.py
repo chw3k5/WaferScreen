@@ -11,7 +11,7 @@ from waferscreen.inst_control import srs
 from waferscreen.res.single_fits import fit_resonator
 from waferscreen.res.finder import ResParams, res_params_header, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
-from waferscreen.analyze.lamb_fit import lambdafit, Phi0
+
 from waferscreen.analyze.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
 from waferscreen.mc.prodata import read_res_params
@@ -397,7 +397,7 @@ class TinySweeps:
         currents_uA, res_params, power_dBm, res_num = mega_variable
         try:
             I0fit, mfit, f2fit, Pfit, lambfit = lambdafit(I=np.array(currents_uA) * 1.0e-6,
-                                                          f0=np.array([res_param_this_power.f0
+                                                          f0=np.array([res_param_this_power.fcenter_ghz
                                                                        for res_param_this_power in res_params]))
         except RuntimeError:
             I0fit = mfit = f2fit = Pfit = lambfit = np.nan
