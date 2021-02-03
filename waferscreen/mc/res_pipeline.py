@@ -50,7 +50,7 @@ def guess_res_params(freq_GHz, s21_mag_dB, s21_phase_rad, left_margin=None, righ
             left_margin = margin_len
         if right_margin is None:
             right_margin = data_len - margin_len
-    left_lin_mag_s21 = np.mean(s21_linear_mag[0:left_margin])
+    left_lin_mag_s21 = np.mean(s21_linear_mag[0:left_margin + 1])
     right_lin_mag_s21 = np.mean(s21_linear_mag[right_margin:])
     # frequency calculations
     delta_freq_GHz = freq_GHz[-1] - freq_GHz[0]
@@ -307,7 +307,7 @@ class ResPipe:
                              minima_pair=(self.unprocessed_freq_GHz[single_window.minima],
                                           self.highpass_filter_mags21[single_window.minima]),
                              fwhm_pair=((plot_data["f_fwhm_left_GHz"], plot_data["f_fwhm_right_GHz"]),
-                                        (plot_data["goal_depth"], plot_data["goal_depth"])),
+                                        (plot_data["left_goal_depth"], plot_data["right_goal_depth"])),
                              window_pair=((self.unprocessed_freq_GHz[single_window.left_window],
                                            self.unprocessed_freq_GHz[single_window.right_window]),
                                           (self.highpass_filter_mags21[single_window.left_window],
