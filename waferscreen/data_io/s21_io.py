@@ -1,10 +1,10 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from waferscreen.analyze.s21_metadata import MetaDataDict, num_format
+from waferscreen.data_io.s21_metadata import MetaDataDict, num_format
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
-from waferscreen.analyze.res_io import res_params_header, ResParams
+from waferscreen.data_io.res_io import res_params_header, ResParams
 
 s21_header = "# Header:freq_ghz,real,imag"
 

@@ -4,11 +4,11 @@ from shutil import rmtree
 import copy
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
-from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag, \
+from waferscreen.data_io.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag, \
     generate_output_filename
 from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
-import waferscreen.mc.res_pipeline_config as rpc
-from waferscreen.analyze.res_io import ResParams
+import waferscreen.analyze.res_pipeline_config as rpc
+from waferscreen.data_io.res_io import ResParams
 from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 import ref
@@ -16,11 +16,6 @@ import ref
 
 def fwhm(goal_depth, f_Hz_single_res, s21_mag_singe_res):
     f_fwhm_Hz_now = f_fwhm_Hz_last = f_fwhm_mag_now = f_fwhm_mag_last = None
-
-    # can the goal depth be found?
-    min_index = np.argmin(s21_mag_singe_res)
-    min_s21_value = s21_mag_singe_res[min_index]
-
     for single_f_Hz, single_linear_mag in zip(f_Hz_single_res, s21_mag_singe_res):
         if single_linear_mag < goal_depth:
             f_fwhm_Hz_now = single_f_Hz

@@ -1,8 +1,8 @@
 import os
 import ref
-from waferscreen.mc.s21_inductor import InductS21
-from waferscreen.mc.res_pipeline import ResPipe
-from waferscreen.analyze.s21_io import input_to_output_filename
+from waferscreen.analyze.s21_inductor import InductS21
+from waferscreen.analyze.res_pipeline import ResPipe
+from waferscreen.data_io.s21_io import input_to_output_filename
 
 
 def get_subdirs(rootdir, matching_str):
@@ -93,10 +93,11 @@ class DataManager:
         [number_dirs.extend(get_all_subdirs(rootdir=parent_scan_dir)) for parent_scan_dir in parent_scan_dirs]
         for number_dir in number_dirs:
             for basename in os.listdir(number_dir):
-                basename_prefix, _extension = basename.rsplit(".", 1)
-                if basename_prefix != "seed":
-                    full_path = os.path.join(number_dir, basename)
-                    output_var.append(full_path)
+                if "." in basename:
+                    basename_prefix, _extension = basename.rsplit(".", 1)
+                    if basename_prefix != "seed":
+                        full_path = os.path.join(number_dir, basename)
+                        output_var.append(full_path)
         if file_type == "bands":
             self.raw_bands_files = output_var
         elif file_type == "single_res":

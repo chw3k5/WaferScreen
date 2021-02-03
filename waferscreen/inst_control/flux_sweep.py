@@ -5,9 +5,9 @@ import logging
 from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
-from waferscreen.analyze.s21_metadata import MetaDataDict
-from waferscreen.analyze.s21_io import write_s21, dirname_create, read_s21
-import waferscreen.mc.flux_sweep_config as fsc
+from waferscreen.data_io.s21_metadata import MetaDataDict
+from waferscreen.data_io.s21_io import write_s21, dirname_create, read_s21
+import waferscreen.inst_control.flux_sweep_config as fsc
 import ref
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import datetime
 from matplotlib import pyplot as plt
 from waferscreen.plot.s21_plots import s21_subplot
-from waferscreen.analyze.s21_io import read_s21, write_s21, ri_to_magphase, plot_bands, mx_plus_b
+from waferscreen.data_io.s21_io import read_s21, write_s21, ri_to_magphase, plot_bands, mx_plus_b
 from ref import today_str
 
 

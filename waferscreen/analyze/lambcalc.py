@@ -1,43 +1,12 @@
 import os
 from operator import itemgetter
-from typing import NamedTuple, Optional
 import numpy as np
 from scipy.optimize import curve_fit
-from waferscreen.analyze.s21_io import write_s21, read_s21
+from waferscreen.data_io.s21_io import write_s21, read_s21
 from waferscreen.analyze.lambfit import f0_of_I, guess_lamb_fit_params
+from waferscreen.data_io.lamb_io import remove_processing_tags, prep_lamb_dirs, LambdaParams
 from waferscreen.plot.s21_plots import lamb_plot
 import ref
-
-lamb_params_prime_types = ["I0fit", "mfit", "f2fit", "Pfit", "lambfit"]
-lambda_header_list = ["res_num"]
-for prime_type in lamb_params_prime_types:
-    lambda_header_list.append(prime_type)
-    lambda_header_list.append(F"{prime_type}_err")
-lambda_header_list.append("parent_dir")
-lambda_header = F"{lambda_header_list[0]}"
-for header_item in lambda_header_list[1:]:
-    lambda_header += F",{header_item}"
-
-
-class LambdaParams(NamedTuple):
-    I0fit: float
-    mfit: float
-    f2fit: float
-    Pfit: float
-    lambfit: float
-    res_num: int
-    parent_dir: str
-    I0fit_err: Optional[float] = None
-    mfit_err: Optional[float] = None
-    f2fit_err: Optional[float] = None
-    Pfit_err: Optional[float] = None
-    lambfit_err: Optional[float] = None
-
-    def __str__(self):
-        output_string = ""
-        for header_item in lambda_header_list:
-            output_string += str(self.__getattribute__(header_item)) + ","
-        return output_string[:-1]
 
 
 class LambCalc:
@@ -49,6 +18,13 @@ class LambCalc:
         self.lamb_params_guess = None
         self.lamb_params_fit = None
         self.unified_metadata = None
+
+        self.pro_data_dir, self.local_dirname = os.path.split(self.lambda_dir)
+        self.report_dir = None
+        self.lamb_outputs_dir = None
+        self.lamb_plots_dir = None
+        self.lamb_output_path = None
+        self.lamb_plot_path = None
         if auto_fit:
             self.read_input()
             self.fit()
@@ -85,8 +61,14 @@ class LambCalc:
                         if self.unified_metadata[data_type] != metadata_this_file[data_type]:
                             del self.unified_metadata[data_type]
         self.resfits_and_metadata = sorted(self.resfits_and_metadata, key=itemgetter(0))
+        report_parent_dir_str = remove_processing_tags(self.unified_metadata["seed_base"])
+        self.report_dir, self.lamb_outputs_dir, self.lamb_plots_dir \
+            = prep_lamb_dirs(pro_data_dir=self.pro_data_dir, report_parent_dir_str=report_parent_dir_str)
 
-    def fit(self):
+    def write(self):
+        write_s21()
+
+    def fit(self, plot=True):
         currentuA = np.array([pair[0] for pair in self.resfits_and_metadata])
         freqGHz = np.array([pair[1].fcenter_ghz for pair in self.resfits_and_metadata])
         # guess for curve fit
@@ -109,25 +91,31 @@ class LambCalc:
                                             I0fit_err=I0fit_err, mfit_err=mfit_err, f2fit_err=f2fit_err,
                                             Pfit_err=Pfit_err, lambfit_err=lambfit_err)
 
-        q_i_array = np.array([res_param.q_i for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
-        q_i_mean = np.mean(q_i_array)
-        q_i_std = np.std(q_i_array)
-        q_c_array = np.array([res_param.q_c for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
-        q_c_mean = np.mean(q_c_array)
-        q_c_std = np.std(q_c_array)
-        lamb_format_str = '%8.6f'
-        q_format_str = "%i"
-        title_str = F"Resonator Number: {self.lamb_params_fit.res_num},  "
-        title_str += F"lambda: {lamb_format_str % self.lamb_params_fit.lambfit} "
-        title_str += F"({lamb_format_str % self.lamb_params_fit.lambfit_err})  "
-        title_str += F"mean Qi: {q_format_str % q_i_mean} "
-        title_str += F"({q_format_str % q_i_std})  "
-        title_str += F"mean Qc: {q_format_str % q_c_mean} "
-        title_str += F"({q_format_str % q_c_std})"
+        # output the fit data
+        self.write()
 
-        lamb_plot(input_data=(currentuA, freqGHz), lamb_params_guess=self.lamb_params_guess,
-                  lamb_params_fit=self.lamb_params_fit, resfits_and_metadata=self.resfits_and_metadata,
-                  title_str=title_str)
+        # make a showing the fit input and results.
+        if plot:
+            q_i_array = np.array([res_param.q_i for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
+            q_i_mean = np.mean(q_i_array)
+            q_i_std = np.std(q_i_array)
+            q_c_array = np.array([res_param.q_c for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
+            q_c_mean = np.mean(q_c_array)
+            q_c_std = np.std(q_c_array)
+            lamb_format_str = '%8.6f'
+            q_format_str = "%i"
+            title_str = F"Resonator Number: {self.lamb_params_fit.res_num},  "
+            title_str += F"lambda: {lamb_format_str % self.lamb_params_fit.lambfit} "
+            title_str += F"({lamb_format_str % self.lamb_params_fit.lambfit_err})  "
+            title_str += F"mean Qi: {q_format_str % q_i_mean} "
+            title_str += F"({q_format_str % q_i_std})  "
+            title_str += F"mean Qc: {q_format_str % q_c_mean} "
+            title_str += F"({q_format_str % q_c_std})"
+            lamb_plt_basename = F"res{'%04i' % self.lamb_params_fit.res_num}.png"
+            self.lamb_plot_path = os.path.join(self.lamb_plots_dir, lamb_plt_basename)
+            lamb_plot(input_data=(currentuA, freqGHz), lamb_params_guess=self.lamb_params_guess,
+                      lamb_params_fit=self.lamb_params_fit, resfits_and_metadata=self.resfits_and_metadata,
+                      title_str=title_str, output_filename=self.lamb_plot_path)
 
 
 if __name__ == "__main__":

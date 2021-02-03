@@ -1,7 +1,7 @@
 from scipy.signal import savgol_filter
 from scipy.optimize import curve_fit
 import numpy as np
-from waferscreen.analyze.res_io import ResParams
+from waferscreen.data_io.res_io import ResParams
 
 
 def simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope,

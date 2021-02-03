@@ -73,4 +73,6 @@ for band in band_params.keys():
     params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
     params_dict["band_num"] = int(band.lower().replace("band", ""))
 
+s21_processing_types = {"phase", "windowbaselinesmoothedremoved"}
+
 google_drive_api_key = "AIzaSyAJBe0g27WNUhsjSBLoLSNlT4WIdDgUJ_U"

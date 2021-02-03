@@ -12,7 +12,7 @@ from waferscreen.res.single_fits import fit_resonator
 from waferscreen.res.finder import ResParams, res_params_header, package_res_results
 from waferscreen.measure.res_sweep import VnaMeas, ramp_name_parse
 
-from waferscreen.analyze.table_read import ClassyReader, floats_table
+from waferscreen.data_io.table_read import ClassyReader, floats_table
 from waferscreen.plot.quick_plots import markers
 from waferscreen.mc.prodata import read_res_params
 
