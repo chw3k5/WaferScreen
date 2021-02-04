@@ -518,25 +518,6 @@ class TinySweeps:
             plt.show()
 
 
-lambda_header = "I0fit,mfit,f2fit,Pfit,lambfit,res_num,power_dBm"
-
-
-class LambdaParams(NamedTuple):
-    I0fit: float
-    mfit: float
-    f2fit: float
-    Pfit: float
-    lambfit: float
-    res_num: Optional[int] = None
-    power_dBm: Optional[float] = None
-
-    def __str__(self):
-        output_string = ""
-        for attr in lambda_header.split(','):
-            output_string += str(self.__getattribute__(attr)) + ","
-        return output_string[:-1]
-
-
 if __name__ == "__main__":
     ts = TinySweeps(wafer=7, band_number=1, date_str="2020-09-08", run_number=9, auto_run=False, verbose=True)
     ts.eager_analyze()

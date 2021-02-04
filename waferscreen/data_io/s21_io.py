@@ -1,15 +1,17 @@
-import numpy as np
 import os
+import numpy as np
 import matplotlib.pyplot as plt
 from waferscreen.data_io.s21_metadata import MetaDataDict, num_format
+from waferscreen.data_io.res_io import res_params_header, ResParams
+from waferscreen.data_io.lamb_io import lambda_header, LambdaParams
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
-from waferscreen.data_io.res_io import res_params_header, ResParams
 
 s21_header = "# Header:freq_ghz,real,imag"
 
 
-def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None, fitted_resonators_parameters=None):
+def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None,
+              fitted_resonators_parameters=None, lamb_params_fits=None):
     with open(output_file, 'w') as f:
         if metadata is not None:
             f.write(F"{metadata}\n")
@@ -17,6 +19,10 @@ def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None, fitt
             f.write(F"{res_params_header}\n")
             for res_param in fitted_resonators_parameters:
                 f.write(F"{res_param}\n")
+        if lamb_params_fits is not None:
+            f.write(F"{lambda_header}\n")
+            for lamb_params_fit in lamb_params_fits:
+                f.write(F"{lamb_params_fit}\n")
         if freqs_ghz is not None and s21_complex is not None:
             f.write(F"{s21_header}\n")
             for freq, s21_value in list(zip(freqs_ghz, s21_complex)):

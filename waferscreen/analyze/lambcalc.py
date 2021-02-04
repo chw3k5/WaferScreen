@@ -2,9 +2,10 @@ import os
 from operator import itemgetter
 import numpy as np
 from scipy.optimize import curve_fit
-from waferscreen.data_io.s21_io import write_s21, read_s21
 from waferscreen.analyze.lambfit import f0_of_I, guess_lamb_fit_params
+from waferscreen.data_io.s21_io import write_s21, read_s21
 from waferscreen.data_io.lamb_io import remove_processing_tags, prep_lamb_dirs, LambdaParams
+from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.plot.s21_plots import lamb_plot
 import ref
 
@@ -20,6 +21,7 @@ class LambCalc:
         self.unified_metadata = None
 
         self.pro_data_dir, self.local_dirname = os.path.split(self.lambda_dir)
+        self.report_parent_dir_str = None
         self.report_dir = None
         self.lamb_outputs_dir = None
         self.lamb_plots_dir = None
@@ -46,7 +48,7 @@ class LambCalc:
                 # some of the metadata is the same across all resonators, that result is in self.unified_metadata
                 if self.unified_metadata is None:
                     # this is the first metadata encountered
-                    self.unified_metadata = {}
+                    self.unified_metadata = MetaDataDict()
                     self.unified_metadata.update(metadata_this_file)
                 else:
                     # each subsequent loop removes keys from self.unified_metadata if values are found to be different
@@ -61,12 +63,16 @@ class LambCalc:
                         if self.unified_metadata[data_type] != metadata_this_file[data_type]:
                             del self.unified_metadata[data_type]
         self.resfits_and_metadata = sorted(self.resfits_and_metadata, key=itemgetter(0))
-        report_parent_dir_str = remove_processing_tags(self.unified_metadata["seed_base"])
+        self.report_parent_dir_str = remove_processing_tags(self.unified_metadata["seed_base"])
         self.report_dir, self.lamb_outputs_dir, self.lamb_plots_dir \
-            = prep_lamb_dirs(pro_data_dir=self.pro_data_dir, report_parent_dir_str=report_parent_dir_str)
+            = prep_lamb_dirs(pro_data_dir=self.pro_data_dir, report_parent_dir_str=self.report_parent_dir_str)
 
     def write(self):
-        write_s21()
+        lamb_basename = F"lambda_res{'%04i' % self.lamb_params_fit.res_num}_{self.report_parent_dir_str}.csv"
+        self.lamb_output_path = os.path.join(self.lamb_outputs_dir, lamb_basename)
+        res_fits = [a_tup[1] for a_tup in self.resfits_and_metadata]
+        write_s21(output_file=self.lamb_output_path, metadata=self.unified_metadata,
+                  fitted_resonators_parameters=res_fits, lamb_params_fits=[self.lamb_params_fit])
 
     def fit(self, plot=True):
         currentuA = np.array([pair[0] for pair in self.resfits_and_metadata])
@@ -96,6 +102,7 @@ class LambCalc:
 
         # make a showing the fit input and results.
         if plot:
+            # calculations for the plot's title string
             q_i_array = np.array([res_param.q_i for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
             q_i_mean = np.mean(q_i_array)
             q_i_std = np.std(q_i_array)

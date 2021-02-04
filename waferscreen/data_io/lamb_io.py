@@ -8,7 +8,7 @@ for prime_type in lamb_params_prime_types:
     lambda_header_list.append(prime_type)
     lambda_header_list.append(F"{prime_type}_err")
 lambda_header_list.append("parent_dir")
-lambda_header = F"{lambda_header_list[0]}"
+lambda_header = F"# Lambda:{lambda_header_list[0]}"
 for header_item in lambda_header_list[1:]:
     lambda_header += F",{header_item}"
 

@@ -14,10 +14,12 @@ def read_res_params(path):
 
 
 primary_res_params = ["fcenter_ghz", "q_i", "q_c", "base_amplitude_abs", "a_phase_rad", "base_amplitude_slope", "tau_ns", "impedance_ratio"]
-res_params_header = "# Resfits:res_number,"
+res_params_header = "res_number,"
 for param_type in primary_res_params:
     res_params_header += param_type + "," + param_type + "_error,"
-res_params_header += "parent_file"
+res_params_header += "flux_ramp_current_ua,parent_file"
+res_params_head_list = res_params_header.split(",")
+res_params_header = "# Resfits:" + res_params_header
 
 
 class ResParams(NamedTuple):
@@ -42,13 +44,15 @@ class ResParams(NamedTuple):
     flux_ramp_current_ua: Optional[float] = None
 
     def __str__(self):
-        output_string = F"{self.res_number},"
-        for attr in primary_res_params:
-            error_value = str(self.__getattribute__(attr + "_error"))
-            if error_value is None:
-                error_str = ""
+        value_list = [self.__getattribute__(item_name) for item_name in res_params_head_list]
+        output_string = None
+        for value in value_list:
+            if value is None:
+                value_str = ""
             else:
-                error_str = str(error_value)
-            output_string += str(self.__getattribute__(attr)) + "," + error_str + ","
-        output_string += F"{self.parent_file}"
+                value_str = str(value)
+            if output_string is None:
+                output_string = F"{value_str}"
+            else:
+                output_string += F",{value_str}"
         return output_string
