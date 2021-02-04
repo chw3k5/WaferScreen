@@ -2,7 +2,7 @@ import os
 from typing import NamedTuple, Optional
 import ref
 
-lamb_params_prime_types = ["I0fit", "mfit", "f2fit", "Pfit", "lambfit"]
+lamb_params_prime_types = ["i0fit", "mfit", "f2fit", "pfit", "lambfit"]
 lambda_header_list = ["res_num"]
 for prime_type in lamb_params_prime_types:
     lambda_header_list.append(prime_type)
@@ -14,17 +14,17 @@ for header_item in lambda_header_list[1:]:
 
 
 class LambdaParams(NamedTuple):
-    I0fit: float
+    i0fit: float
     mfit: float
     f2fit: float
-    Pfit: float
+    pfit: float
     lambfit: float
     res_num: int
     parent_dir: str
-    I0fit_err: Optional[float] = None
+    i0fit_err: Optional[float] = None
     mfit_err: Optional[float] = None
     f2fit_err: Optional[float] = None
-    Pfit_err: Optional[float] = None
+    pfit_err: Optional[float] = None
     lambfit_err: Optional[float] = None
 
     def __str__(self):

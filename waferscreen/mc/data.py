@@ -29,6 +29,18 @@ def get_pro_data_dirs():
     return pro_data_dirs
 
 
+def get_report_dirs():
+    report_data_dirs = []
+    [report_data_dirs.extend(get_subdirs(rootdir=rootdir, matching_str="report")) for rootdir in ref.output_dirs]
+    return report_data_dirs
+
+
+def get_lamb_dirs():
+    lamb_data_dirs = []
+    [lamb_data_dirs.extend(get_subdirs(rootdir=rootdir, matching_str="lambda")) for rootdir in ref.output_dirs]
+    return lamb_data_dirs
+
+
 def get_pro_s21_scans(process_type):
     pro_data_dirs = get_pro_data_dirs()
     scan_dirs = []
@@ -47,12 +59,24 @@ def get_pro_s21_scans(process_type):
     return scan_files
 
 
+def get_all_lamb_files():
+    lamb_files = []
+    for lamb_data_dir in get_lamb_dirs():
+        for basename in os.listdir(lamb_data_dir):
+            if "." in basename:
+                test_basename_prefix, extension = basename.rsplit(".", 1)
+                if extension in ref.s21_file_extensions and "lambda_" == test_basename_prefix[:7]:
+                    lamb_files.append(os.path.join(lamb_data_dir, basename))
+    return lamb_files
+
+
 def get_pro_res_dirs():
     pro_res_dirs = []
     [pro_res_dirs.extend([os.path.join(pro_data_dir, test_dir) for test_dir in os.listdir(pro_data_dir)
                           if os.path.isdir(os.path.join(pro_data_dir, test_dir)) and test_dir[:3] == "res"])
      for pro_data_dir in get_pro_data_dirs()]
     return pro_res_dirs
+
 
 def get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
     if single_res_parent_dirs is None:

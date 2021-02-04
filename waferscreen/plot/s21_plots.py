@@ -401,9 +401,9 @@ def lamb_plot(input_data=None, lamb_params_guess=None, lamb_params_fit=None, res
     if lamb_params_fit is not None:
         current_axis_A = current_axis_uA * 1.0e-6
         final_fit_out_GHz = f0_of_I(ramp_current_amps=current_axis_A,
-                                    ramp_current_amps_0=lamb_params_fit.I0fit,
+                                    ramp_current_amps_0=lamb_params_fit.i0fit,
                                     m=lamb_params_fit.mfit, f2=lamb_params_fit.f2fit,
-                                    P=lamb_params_fit.Pfit, lamb=lamb_params_fit.lambfit)
+                                    P=lamb_params_fit.pfit, lamb=lamb_params_fit.lambfit)
         if f_min_GHz is None:
             f_min_GHz = np.min(final_fit_out_GHz)
         final_fit_delta_f_kHz = (final_fit_out_GHz - f_min_GHz) * 1.0e6
@@ -419,9 +419,9 @@ def lamb_plot(input_data=None, lamb_params_guess=None, lamb_params_fit=None, res
     # This is the guess of parameters that are used to initialize the curve-fit
     if lamb_params_guess is not None:
         current_axis_A = current_axis_uA * 1.0e-6
-        guess_fit_out_GHz = f0_of_I(ramp_current_amps=current_axis_A, ramp_current_amps_0=lamb_params_guess.I0fit,
+        guess_fit_out_GHz = f0_of_I(ramp_current_amps=current_axis_A, ramp_current_amps_0=lamb_params_guess.i0fit,
                                     m=lamb_params_guess.mfit, f2=lamb_params_guess.f2fit,
-                                    P=lamb_params_guess.Pfit, lamb=lamb_params_guess.lambfit)
+                                    P=lamb_params_guess.pfit, lamb=lamb_params_guess.lambfit)
         if f_min_GHz is None:
             f_min_GHz = np.min(guess_fit_out_GHz)
         guess_fit_delta_f_kHz = (guess_fit_out_GHz - f_min_GHz) * 1.0e6

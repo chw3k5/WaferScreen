@@ -8,6 +8,7 @@ from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
 
 s21_header = "# Header:freq_ghz,real,imag"
+default_header = ["freq_ghz", "real", "imag"]
 
 
 def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None,
@@ -31,16 +32,19 @@ def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None,
                 f.write(F"{freq},{real},{imag}\n")
 
 
-def read_s21(path, return_res_params=False):
+def read_s21(path, return_res_params=False, return_lamb_params=False):
     with open(path, "r") as f:
         raw_lines = f.readlines()
     metadata = MetaDataDict()
-    header = ["freq_ghz", "real", "imag"]  # this is only used if a the expected header is absent
+    header = default_header  # this is only used if a the expected header is absent
     # get the metadata and header and other ancillary data types
     line_index = 0
     res_fits_trigger = False
     res_fits_header = None
     res_fits = None
+    lamb_fits_trigger = False
+    lamb_fits_header = None
+    lamb_fits = None
     found_s21_header_data = False
     for line_index, raw_line in list(enumerate(raw_lines)):
         if raw_lines[line_index][0] == "#":
@@ -62,12 +66,22 @@ def read_s21(path, return_res_params=False):
                     res_fits_trigger = False
                 elif context_type == "resfits":
                     res_fits_trigger = True
+                    lamb_fits_trigger = False
                     res_fits = []
                     res_fits_header = [column_name.strip().lower() for column_name in context_data.split(",")]
+                elif context_type == "lambda":
+                    lamb_fits_trigger = True
+                    res_fits_trigger = False
+                    lamb_fits = []
+                    lamb_fits_header = [column_name.strip().lower() for column_name in context_data.split(",")]
         elif res_fits_trigger:
             res_fits_dict = {column_name: num_format(row_value)
                              for column_name, row_value in zip(res_fits_header, raw_line.split(","))}
             res_fits.append(ResParams(**res_fits_dict))
+        elif lamb_fits_trigger:
+            lamb_fits_dict = {column_name: num_format(row_value)
+                              for column_name, row_value in zip(lamb_fits_header, raw_line.split(","))}
+            lamb_fits.append(LambdaParams(**lamb_fits_dict))
     # Process the S21 data
     if found_s21_header_data:
         s21_data = raw_lines[line_index + 1:]
@@ -79,8 +93,12 @@ def read_s21(path, return_res_params=False):
                               for column_name in s21_assembly_dict.keys()}
     else:
         formatted_s21_dict = None
-    if return_res_params:
+    if return_res_params and return_lamb_params:
+        return formatted_s21_dict, metadata, res_fits, lamb_fits
+    elif return_res_params:
         return formatted_s21_dict, metadata, res_fits
+    elif return_lamb_params:
+        return formatted_s21_dict, metadata, lamb_fits
     else:
         return formatted_s21_dict, metadata
 

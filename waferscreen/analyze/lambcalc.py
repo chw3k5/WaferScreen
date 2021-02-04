@@ -79,23 +79,23 @@ class LambCalc:
         freqGHz = np.array([pair[1].fcenter_ghz for pair in self.resfits_and_metadata])
         # guess for curve fit
         currentA = currentuA * 1.0e-6
-        I0fit_guess, mfit_guess, f2fit_guess, Pfit_guess, lambfit_guess = guess_lamb_fit_params(currentA, freqGHz)
-        self.lamb_params_guess = LambdaParams(I0fit=I0fit_guess, mfit=mfit_guess, f2fit=f2fit_guess, Pfit=Pfit_guess,
+        i0fit_guess, mfit_guess, f2fit_guess, pfit_guess, lambfit_guess = guess_lamb_fit_params(currentA, freqGHz)
+        self.lamb_params_guess = LambdaParams(i0fit=i0fit_guess, mfit=mfit_guess, f2fit=f2fit_guess, pfit=pfit_guess,
                                               lambfit=lambfit_guess, res_num=self.unified_metadata["res_num"],
                                               parent_dir=self.lamb_dir)
 
-        popt, pcov = curve_fit(f0_of_I, currentA, freqGHz, (I0fit_guess, mfit_guess, f2fit_guess, Pfit_guess,
+        popt, pcov = curve_fit(f0_of_I, currentA, freqGHz, (i0fit_guess, mfit_guess, f2fit_guess, pfit_guess,
                                                             lambfit_guess))
-        I0fit, mfit, f2fit, Pfit, lambfit = popt
-        I0fit_err = pcov[0, 0]
+        i0fit, mfit, f2fit, pfit, lambfit = popt
+        i0fit_err = pcov[0, 0]
         mfit_err = pcov[1, 1]
         f2fit_err = pcov[2, 2]
-        Pfit_err = pcov[3, 3]
+        pfit_err = pcov[3, 3]
         lambfit_err = pcov[4, 4]
-        self.lamb_params_fit = LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit,
+        self.lamb_params_fit = LambdaParams(i0fit=i0fit, mfit=mfit, f2fit=f2fit, pfit=pfit, lambfit=lambfit,
                                             res_num=self.unified_metadata["res_num"], parent_dir=self.lamb_dir,
-                                            I0fit_err=I0fit_err, mfit_err=mfit_err, f2fit_err=f2fit_err,
-                                            Pfit_err=Pfit_err, lambfit_err=lambfit_err)
+                                            i0fit_err=i0fit_err, mfit_err=mfit_err, f2fit_err=f2fit_err,
+                                            pfit_err=pfit_err, lambfit_err=lambfit_err)
 
         # output the fit data
         self.write()
