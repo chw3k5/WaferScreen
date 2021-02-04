@@ -11,8 +11,8 @@ import ref
 
 
 class LambCalc:
-    def __init__(self, lambda_dir, auto_fit=True):
-        self.lambda_dir = lambda_dir
+    def __init__(self, lamb_dir, auto_fit=True, plot=True):
+        self.lamb_dir = lamb_dir
         self.input_paths = None
         self.res_fit_to_metadata = None
         self.resfits_and_metadata = None
@@ -20,7 +20,7 @@ class LambCalc:
         self.lamb_params_fit = None
         self.unified_metadata = None
 
-        self.pro_data_dir, self.local_dirname = os.path.split(self.lambda_dir)
+        self.pro_data_dir, self.local_dirname = os.path.split(self.lamb_dir)
         self.report_parent_dir_str = None
         self.report_dir = None
         self.lamb_outputs_dir = None
@@ -29,15 +29,15 @@ class LambCalc:
         self.lamb_plot_path = None
         if auto_fit:
             self.read_input()
-            self.fit()
+            self.fit(plot=plot)
 
     def read_input(self):
         self.input_paths = []
-        for test_filename in os.listdir(self.lambda_dir):
+        for test_filename in os.listdir(self.lamb_dir):
             if "." in test_filename:
                 _basename_prefix, extension = test_filename.rsplit(".", 1)
                 if extension in ref.s21_file_extensions:
-                    self.input_paths.append(os.path.join(self.lambda_dir, test_filename))
+                    self.input_paths.append(os.path.join(self.lamb_dir, test_filename))
         self.res_fit_to_metadata = {}
         self.resfits_and_metadata = []
         for input_path in self.input_paths:
@@ -82,7 +82,7 @@ class LambCalc:
         I0fit_guess, mfit_guess, f2fit_guess, Pfit_guess, lambfit_guess = guess_lamb_fit_params(currentA, freqGHz)
         self.lamb_params_guess = LambdaParams(I0fit=I0fit_guess, mfit=mfit_guess, f2fit=f2fit_guess, Pfit=Pfit_guess,
                                               lambfit=lambfit_guess, res_num=self.unified_metadata["res_num"],
-                                              parent_dir=self.lambda_dir)
+                                              parent_dir=self.lamb_dir)
 
         popt, pcov = curve_fit(f0_of_I, currentA, freqGHz, (I0fit_guess, mfit_guess, f2fit_guess, Pfit_guess,
                                                             lambfit_guess))
@@ -93,7 +93,7 @@ class LambCalc:
         Pfit_err = pcov[3, 3]
         lambfit_err = pcov[4, 4]
         self.lamb_params_fit = LambdaParams(I0fit=I0fit, mfit=mfit, f2fit=f2fit, Pfit=Pfit, lambfit=lambfit,
-                                            res_num=self.unified_metadata["res_num"], parent_dir=self.lambda_dir,
+                                            res_num=self.unified_metadata["res_num"], parent_dir=self.lamb_dir,
                                             I0fit_err=I0fit_err, mfit_err=mfit_err, f2fit_err=f2fit_err,
                                             Pfit_err=Pfit_err, lambfit_err=lambfit_err)
 
@@ -112,6 +112,7 @@ class LambCalc:
             lamb_format_str = '%8.6f'
             q_format_str = "%i"
             title_str = F"Resonator Number: {self.lamb_params_fit.res_num},  "
+            title_str += F"{self.unified_metadata['so_band']},  "
             title_str += F"lambda: {lamb_format_str % self.lamb_params_fit.lambfit} "
             title_str += F"({lamb_format_str % self.lamb_params_fit.lambfit_err})  "
             title_str += F"mean Qi: {q_format_str % q_i_mean} "
@@ -128,4 +129,4 @@ class LambCalc:
 if __name__ == "__main__":
     test_folder = "C:\\Users\\chw3k5\\PycharmProjects\\WaferScreen\\waferscreen\\nist\\9\\2021-01-26\\pro\\" + \
                   "res76_scan3.800GHz-6.200GHz_2021-01-26 22-35-20.055941_phase_windowbaselinesmoothedremoved"
-    lc = LambCalc(lambda_dir=test_folder, auto_fit=True)
+    lc = LambCalc(lamb_dir=test_folder, auto_fit=True)

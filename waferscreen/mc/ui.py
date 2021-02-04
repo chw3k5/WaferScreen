@@ -29,4 +29,4 @@ if __name__ == "__main__":
                            skip_interactive_plot=True, save_res_plots=True,
                            make_band_seeds=False, make_single_res_seeds=False)
     if do_res_sweeps:
-        dm.full_loop_single_res(res_dirs=test_res_dirs, save_res_plots=True, reprocess_res=True)
+        dm.full_loop_single_res(res_dirs=test_res_dirs, save_res_plots=True, reprocess_res=True, lamb_plots=True)

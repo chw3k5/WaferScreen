@@ -459,7 +459,7 @@ def lamb_plot(input_data=None, lamb_params_guess=None, lamb_params_fit=None, res
             for single_uA, res_fit, single_metadata in resfits_and_metadata:
                 single_delta_f_kHz = (res_fit.fcenter_ghz - f_min_GHz) * 1.0e6
                 q_format_str = '%i'
-                text_str = F"{single_uA} uA\nQi: {q_format_str % res_fit.q_i}\nQc: {q_format_str % res_fit.q_c}"
+                text_str = F"{single_uA} uA\n   Qi: {q_format_str % res_fit.q_i}\n   Qc: {q_format_str % res_fit.q_c}"
                 plt.text(x=single_uA, y=single_delta_f_kHz, s=text_str, color="white", fontsize=6,
                          bbox={"facecolor": input_data_color, "alpha": 0.5})
 

@@ -2,6 +2,7 @@ import os
 import ref
 from waferscreen.analyze.s21_inductor import InductS21
 from waferscreen.analyze.res_pipeline import ResPipe
+from waferscreen.analyze.lambcalc import LambCalc
 from waferscreen.data_io.s21_io import input_to_output_filename
 
 
@@ -53,6 +54,16 @@ def get_pro_res_dirs():
      for pro_data_dir in get_pro_data_dirs()]
     return pro_res_dirs
 
+def get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
+    if single_res_parent_dirs is None:
+        # by default, get all the processed resonator directories.
+        pro_res_dirs = get_pro_res_dirs()
+    else:
+        pro_res_dirs = []
+        [pro_res_dirs.extend([os.path.join(pro_data_dir, test_dir) for test_dir in os.listdir(pro_data_dir)
+                              if os.path.isdir(os.path.join(pro_data_dir, test_dir)) and test_dir[:3] == "res"])
+         for pro_data_dir in single_res_parent_dirs]
+    return pro_res_dirs
 
 class DataManager:
     def __init__(self, user_input_group_delay=None, verbose=True):
@@ -180,15 +191,7 @@ class DataManager:
                                      save_res_plots=save_res_plots)
 
     def analyze_single_res(self, single_res_parent_dirs=None, save_res_plots=False, reprocess=False):
-        if single_res_parent_dirs is None:
-            # by default, get all the processed resonator directories.
-            pro_res_dirs = get_pro_res_dirs()
-        else:
-            pro_res_dirs = []
-            [pro_res_dirs.extend([os.path.join(pro_data_dir, test_dir) for test_dir in os.listdir(pro_data_dir)
-                                  if os.path.isdir(os.path.join(pro_data_dir, test_dir)) and test_dir[:3] == "res"])
-             for pro_data_dir in single_res_parent_dirs]
-        for single_res_folder in pro_res_dirs:
+        for single_res_folder in get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
             single_res_files_this_folder = []
             for test_file in os.listdir(single_res_folder):
                 test_path = os.path.join(single_res_folder, test_file)
@@ -205,6 +208,10 @@ class DataManager:
                 res_pipe.read()
                 if reprocess or res_pipe.fitted_resonators_parameters is None:
                     res_pipe.analyze_single_res(save_res_plots=save_res_plots)
+
+    def calc_lamb(self, single_res_parent_dirs=None, lamb_plots=True):
+        for lamb_dir in get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
+            single_lamb_calc = LambCalc(lamb_dir=lamb_dir, auto_fit=True, plot=lamb_plots)
 
     def scans_to_seeds(self, pro_scan_paths=None, make_band_seeds=False, make_single_res_seeds=False):
         if pro_scan_paths is None:
@@ -240,9 +247,10 @@ class DataManager:
                             make_band_seeds=make_band_seeds, make_single_res_seeds=make_single_res_seeds)
 
     def full_loop_single_res(self, res_dirs=None,
-                             save_res_plots=False, reprocess_res=True):
+                             save_res_plots=False, reprocess_res=True, lamb_plots=True):
         self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=res_dirs)
         # [self.raw_process(path=raw_single_res) for raw_single_res in self.raw_single_res_files]
-        self.analyze_single_res(single_res_parent_dirs=None, save_res_plots=save_res_plots, reprocess=reprocess_res)
+        # self.analyze_single_res(single_res_parent_dirs=None, save_res_plots=save_res_plots, reprocess=reprocess_res)
+        self.calc_lamb(single_res_parent_dirs=None, lamb_plots=lamb_plots)
 
 
