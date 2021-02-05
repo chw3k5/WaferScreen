@@ -63,7 +63,7 @@ def guess_res_params(freq_GHz, s21_mag_dB, s21_phase_rad, left_margin=None, righ
     # base amplitude
     base_amplitude_abs_guess = float(np.mean((left_lin_mag_s21, right_lin_mag_s21)))
     # base amplitude slope
-    base_amplitude_slope_guess = (left_lin_mag_s21 - right_lin_mag_s21) / (delta_freq_GHz * 4.0 * np.pi)
+    base_amplitude_slope_guess = (left_lin_mag_s21 - right_lin_mag_s21) / (delta_freq_GHz * 2.0 * np.pi)
     # base phase
     a_phase_rad_guess = float(np.mean(s21_phase_rad))
     # Quality factors

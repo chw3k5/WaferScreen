@@ -23,7 +23,8 @@ def fit_simple_res_gain_slope_complex(freqs_GHz, base_amplitude_abs, a_phase_rad
     """
     s21data = []
     for freq_GHz in freqs_GHz:
-        s21 = simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope, tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio)
+        s21 = simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope,
+                                                  tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio)
         s21data.append(np.array([s21.real, s21.imag]))
     s21data = np.array(s21data).ravel()
     return s21data

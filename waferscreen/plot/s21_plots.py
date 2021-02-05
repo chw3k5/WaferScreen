@@ -334,8 +334,6 @@ def plot_res_fit(f_GHz_single_res, s21_mag_single_res=None, not_smoothed_mag_sin
 
 
 def band_plot(freqs_GHz, mags, fitted_resonators_parameters_by_band, output_filename=None):
-
-
     fig = plt.figure(figsize=(20, 8))
     ax1 = fig.add_subplot(111)
     ax1.plot(freqs_GHz, mags, color="black", ls='solid', linewidth=1)
