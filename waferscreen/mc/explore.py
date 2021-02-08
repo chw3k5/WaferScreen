@@ -1,10 +1,11 @@
+import os
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from waferscreen.analyze.lambfit import phi_0
 from waferscreen.data_io.s21_io import read_s21
-from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.mc.data import get_all_lamb_files
+from waferscreen.data_io.lamb_io import remove_processing_tags
 
 
 def error_bar_report_plot(ax, xdata, ydata, yerr, color="black", ls='None', marker="o", alpha=0.7,
@@ -57,10 +58,14 @@ class AttrDict(dict):
 class SingleLamb:
     def __init__(self, path, auto_load=True):
         self.path = path
+        self.lamb_dir, self.basename = os.path.split(self.path)
+        self.report_dir, _lamb_foldername = os.path.split(self.lamb_dir)
+
         self.metadata = None
         self.res_fits = None
         self.lamb_fit = None
         self.res_number = None
+        self.location = None
 
         self.wafer = self.band = self.meas_time = self.seed_name = None
         if auto_load:
@@ -82,6 +87,8 @@ class SingleLamb:
             year_month_day, hour_min_sec = meas_utc.split(" ")
             datetime_str = F"{year_month_day} {hour_min_sec.replace('-', ':')}+00:00"
             self.meas_time = datetime.datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S.%f%z')
+        if 'location' in self.metadata.keys():
+            self.location = self.metadata.location
         self.res_number = self.lamb_fit.res_num
 
 
@@ -186,7 +193,8 @@ class BandSWBR:
         # initialize the plot stuff
         fig, axes = plt.subplots(nrows=6, ncols=2, figsize=(10, 15))
         fig.subplots_adjust(left=0.125, bottom=0.02, right=0.9, top=0.98, wspace=0.25, hspace=0.25)
-        fig.suptitle(F"{wafer_num_to_str(single_lamb.wafer)}, {single_lamb.band} reprot: " +
+        wafer_str = wafer_num_to_str(single_lamb.wafer)
+        fig.suptitle(F"{wafer_str}, {single_lamb.band} report: " +
                      F"{len(f_centers_ghz_mean)}/65 resonators found. " +
                      F"Mean spacing: {'%6.3f' % f_spacings_mhz_mean} MHz, STD: {'%6.3f' % f_spacings_mhz_std} MHz",
                      y=0.995)
@@ -240,9 +248,13 @@ class BandSWBR:
         hist_report_plot(ax=axes[5, 1], data=fr_squid_mi_pH, bins=10, color="blue",
                          x_label=fr_squid_mi_pH_label, y_label=None)
 
-        fig.show()
-
-        print("temp test point")
+        # Display
+        scatter_plot_basename = F"ScatterHist_{single_lamb.band}_{wafer_str}.png"
+        scatter_plot_path = os.path.join(single_lamb.report_dir, scatter_plot_basename)
+        plt.draw()
+        plt.savefig(scatter_plot_path)
+        print("Saved Plot to:", scatter_plot_path)
+        plt.close(fig=fig)
 
 
 class WaferSWBR:
@@ -329,4 +341,3 @@ if __name__ == "__main__":
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.band_swbr_reports()
-
