@@ -76,7 +76,7 @@ class SRS_Module:
         self.is_gpib = srs_connect.is_gpib
         self.ctrl = srs_connect.ctrl
         # SRS SIM 928 Settings
-        self.voltage_precision = '3'
+        self.voltage_precision = '5'
         self.voltage_format_str = '%1.' + self.voltage_precision + 'e'
         self.last_set_voltage = None
         # connection test

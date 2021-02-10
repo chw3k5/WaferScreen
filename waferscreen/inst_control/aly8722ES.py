@@ -222,8 +222,8 @@ class aly8722ES():
             raise KeyError('The IF bandwidth can only take the following discrete values:\n' +
                            str(self.allowedvals_ifbandwidth))
 
-    def set_if_bw_Hz(self, if_bw_Hz):
-        self.setIFbandwidth(if_bw_Hz)
+    def set_if_bw_hz(self, if_bw_hz):
+        self.setIFbandwidth(if_bw_hz)
 
     def set_center_freq(self, center_freq_hz):
         self.ctrl.write(F"CENT {int(center_freq_hz)}")

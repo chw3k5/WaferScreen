@@ -266,7 +266,7 @@ class JobAssignment:
 
 
 if __name__ == "__main__":
-    do_scan = True
+    do_scan = False
     do_res_sweeps = not do_scan
 
     if do_scan:

@@ -274,7 +274,8 @@ class ResPipe:
             left_margin = single_window.left_window - single_window.left_fitter_pad
             right_margin = single_window.right_fitter_pad - single_window.right_window
 
-            params_guess, plot_data = guess_res_params(freq_GHz=f_GHz_single_res, s21_mag_dB=s21_mag_single_res,
+            params_guess, plot_data = guess_res_params(freq_GHz=f_GHz_single_res,
+                                                       s21_mag_dB=s21_mag_single_res_highpass,
                                                        s21_phase_rad=s21_phase_single_res,
                                                        left_margin=left_margin, right_margin=right_margin)
 
