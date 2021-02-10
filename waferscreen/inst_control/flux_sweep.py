@@ -107,7 +107,7 @@ class AbstractFluxSweep:
     def power_off(self):
         self.ramp.setvolt(voltage=0.0)
         self.ramp.output_off()
-        self.abstract_vna.set_port_power_dBm(port_power_dBm=-70)
+        self.abstract_vna.set_port_power_dbm(port_power_dbm=-70)
         self.abstract_vna.power_off()
 
     def close_connections(self):
@@ -266,7 +266,7 @@ class JobAssignment:
 
 
 if __name__ == "__main__":
-    do_scan = False
+    do_scan = True
     do_res_sweeps = not do_scan
 
     if do_scan:

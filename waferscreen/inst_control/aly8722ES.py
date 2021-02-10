@@ -225,8 +225,8 @@ class aly8722ES():
     def set_if_bw_Hz(self, if_bw_Hz):
         self.setIFbandwidth(if_bw_Hz)
 
-    def set_center_freq(self, center_freq_Hz):
-        self.ctrl.write(F"CENT {int(center_freq_Hz)}")
+    def set_center_freq(self, center_freq_hz):
+        self.ctrl.write(F"CENT {int(center_freq_hz)}")
 
     def set_ave_factor(self, ave_factor):
         if isinstance(ave_factor, int):

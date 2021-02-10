@@ -265,3 +265,12 @@ class InductS21:
         if show:
             plt.show(block=True)
         plt.close(fig=fig)
+
+
+if __name__ == "__main__":
+    basename = "scan3.800GHz-6.600GHz_2021-02-10 01-01-10.284327.csv"
+    target_path = os.path.join("D:\\waferscreen\\nist\\12\\2021-02-09\\raw\\scans",  basename)
+    induct_s21 = InductS21(path=target_path)
+    induct_s21.induct()
+    induct_s21.remove_group_delay()
+    induct_s21.plot(show=True, save=False)
