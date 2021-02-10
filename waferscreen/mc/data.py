@@ -89,6 +89,17 @@ def get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
          for pro_data_dir in single_res_parent_dirs]
     return pro_res_dirs
 
+
+def get_single_res_parent_dirs(pro_dirs):
+    single_res_parent_dirs = []
+    for pro_dir in pro_dirs:
+        for test_dir in os.listdir(pro_dir):
+            test_path = os.path.join(pro_dir, test_dir)
+            if os.path.isdir(test_path) and test_dir[:3] == "res":
+                single_res_parent_dirs.append(test_path)
+    return single_res_parent_dirs
+
+
 class DataManager:
     def __init__(self, user_input_group_delay=None, verbose=True):
         self.user_input_group_delay = user_input_group_delay
@@ -270,11 +281,17 @@ class DataManager:
         self.scans_to_seeds(pro_scan_paths=self.windowbaselinesmoothedremoved_scan_files,
                             make_band_seeds=make_band_seeds, make_single_res_seeds=make_single_res_seeds)
 
-    def full_loop_single_res(self, res_dirs=None,
+    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False,
+                             pro_res_dirs=None, do_pro=False,
+                             do_lamb=False,
                              save_res_plots=False, reprocess_res=True, lamb_plots=True):
-        self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=res_dirs)
-        [self.raw_process(path=raw_single_res) for raw_single_res in self.raw_single_res_files]
-        self.analyze_single_res(single_res_parent_dirs=None, save_res_plots=save_res_plots, reprocess=reprocess_res)
-        self.calc_lamb(single_res_parent_dirs=None, lamb_plots=lamb_plots)
+        if do_raw:
+            self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=raw_res_dirs)
+            [self.raw_process(path=raw_single_res) for raw_single_res in self.raw_single_res_files]
+        if do_pro:
+            self.analyze_single_res(single_res_parent_dirs=pro_res_dirs,
+                                    save_res_plots=save_res_plots, reprocess=reprocess_res)
+        if do_lamb:
+            self.calc_lamb(single_res_parent_dirs=pro_res_dirs, lamb_plots=lamb_plots)
 
 

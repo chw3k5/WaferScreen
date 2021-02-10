@@ -12,15 +12,18 @@ raw_dir = os.path.join(ref.working_dir, location, wafer, date_str, "raw")
 raw_scans_dir = os.path.join(raw_dir, "scans")
 raw_single_res_dir = os.path.join(raw_dir, "single_res")
 
-basename = "scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380.csv"
-test_scan_files = [os.path.join(raw_scans_dir, basename)]
-test_res_dirs = [raw_single_res_dir]
+seed_name = "scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380"
+test_scan_files = [os.path.join(raw_scans_dir, F"{seed_name}.csv")]
+test_raw_res_dirs = [raw_single_res_dir]
+
+pro_dir = os.path.join(ref.working_dir, location, wafer, date_str, "pro")
+test_pro_res_dirs = [pro_dir]
 
 
 if __name__ == "__main__":
     do_quick_look = False
     do_scan = False
-    do_res_sweeps = not do_scan
+    do_res_sweeps = True
 
     # this statement is true if this file is run direct, it is false if this file imported from another file.
     # multithreading requires this statement to avoid infinite thread recursion, which is very bad.
@@ -38,4 +41,7 @@ if __name__ == "__main__":
                            skip_interactive_plot=False, save_res_plots=True,
                            make_band_seeds=False, make_single_res_seeds=True)
     if do_res_sweeps:
-        dm.full_loop_single_res(res_dirs=test_res_dirs, save_res_plots=True, reprocess_res=True, lamb_plots=True)
+        dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=False,
+                                pro_res_dirs=test_pro_res_dirs, do_pro=False,
+                                do_lamb=True,
+                                save_res_plots=True, reprocess_res=True, lamb_plots=True)
