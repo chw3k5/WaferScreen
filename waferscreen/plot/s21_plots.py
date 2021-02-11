@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from ref import today_str
-from waferscreen.plot.quick_plots import ls, len_ls, colors
+from waferscreen.plot.quick_plots import ls, len_ls, colors, markers, len_markers
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase, plot_bands
 from waferscreen.analyze.resfit import fit_simple_res_gain_slope_complex
@@ -460,6 +460,116 @@ def lamb_plot(input_data=None, lamb_params_guess=None, lamb_params_fit=None, res
                 text_str = F"{single_uA} uA\n   Qi: {q_format_str % res_fit.q_i}\n   Qc: {q_format_str % res_fit.q_c}"
                 plt.text(x=single_uA, y=single_delta_f_kHz, s=text_str, color="white", fontsize=6,
                          bbox={"facecolor": input_data_color, "alpha": 0.5})
+
+    # Whole plot options:
+    plt.xlabel(F"Flux Ramp Current (uA)")
+    plt.ylabel(F"Relative Frequency Center (kHz)")
+    if title_str is not None:
+        plt.title(title_str)
+    plt.legend(leglines, leglabels, loc=0, numpoints=3, handlelength=5, fontsize=10)
+    # Display
+    if output_filename is not None:
+        plt.draw()
+        plt.savefig(output_filename)
+        print("Saved Plot to:", output_filename)
+    else:
+        plt.show(block=True)
+    plt.close(fig=fig)
+
+
+multi_lamb_plot_colors = ['RoyalBlue', 'OrangeRed', 'SaddleBrown', 'DarkSeaGreen', 'YellowGreen']
+multi_lamb_plot_colors_len = len(multi_lamb_plot_colors)
+
+
+def multi_lamb_plot(multi_resfits_and_metadata, series_type, res_num,
+                    multi_input_data=None, multi_lamb_params_fit=None, multi_labels=None,
+                    current_axis_num_of_points=1000, show_text=True, output_filename=None):
+    title_str = F"Resonator Number: {res_num},  "
+    title_str += F"Series Type: {series_type}"
+    if output_filename is None:
+        output_filename = F"res{'%04i' % res_num}_SeriesType{series_type}.png"
+
+    fig = plt.figure(figsize=(14, 8))
+    leglines = []
+    leglabels = []
+    f_min_GHz = None
+
+    # define the current axis that the guess and fitter plots use
+    if multi_input_data is None:
+        current_axis_uA = np.linspace(-125, 125, current_axis_num_of_points)
+    else:
+        min_uA = float("inf")
+        max_uA = float("-inf")
+        for currentuA, freqGHz in multi_input_data:
+            min_uA = np.min((min_uA, np.min(currentuA)))
+            max_uA = np.max((max_uA, np.max(currentuA)))
+        current_axis_uA = np.linspace(max_uA, max_uA, current_axis_num_of_points)
+
+    # get the loop variables ready
+    loop_vars = []
+    for count_index, resfits_and_metadata in list(enumerate(multi_resfits_and_metadata)):
+        if multi_input_data is None:
+            input_data = None
+        else:
+            input_data = multi_input_data[count_index]
+        if multi_lamb_params_fit is None:
+            lamb_params_fit = None
+        else:
+            lamb_params_fit = multi_lamb_params_fit[count_index]
+        if multi_labels is None:
+            label = ""
+        else:
+            label = multi_labels[count_index]
+        color = multi_lamb_plot_colors[count_index % multi_lamb_plot_colors_len]
+        an_ls = ls[count_index % len_ls]
+        marker = markers[count_index % len_markers]
+        loop_vars.append((input_data, lamb_params_fit, resfits_and_metadata, color, an_ls, marker, label))
+
+    # plot each data type
+    for input_data, lamb_params_fit, resfits_and_metadata, color, an_ls, marker, label in loop_vars:
+        # This is final result of the parameters found using curve-fit
+        if lamb_params_fit is not None:
+            current_axis_A = current_axis_uA * 1.0e-6
+            final_fit_out_GHz = f0_of_I(ramp_current_amps=current_axis_A,
+                                        ramp_current_amps_0=lamb_params_fit.i0fit,
+                                        m=lamb_params_fit.mfit, f2=lamb_params_fit.f2fit,
+                                        P=lamb_params_fit.pfit, lamb=lamb_params_fit.lambfit)
+            if f_min_GHz is None:
+                f_min_GHz = np.min(final_fit_out_GHz)
+            final_fit_delta_f_kHz = (final_fit_out_GHz - f_min_GHz) * 1.0e6
+            fit_linewidth = 2
+
+            plt.plot(current_axis_uA, final_fit_delta_f_kHz, color=color, ls=an_ls,
+                     linewidth=fit_linewidth)
+            leglines.append(plt.Line2D(range(10), range(10), color=color, ls=an_ls,
+                                       linewidth=fit_linewidth))
+            leglabels.append(F"Fitted Parameters {series_type}:{label}")
+
+        # the raw data that is used as the basis for a fit/lambda parameter determination.
+        if input_data is not None:
+            currentuA, freqGHz = input_data
+            if f_min_GHz is None:
+                f_min_GHz = np.min(freqGHz)
+            delta_f_kHz = (freqGHz - f_min_GHz) * 1.0e6
+            input_data_linewidth = 1
+            input_data_alpha = 0.65
+            input_data_markersize = 10
+            plt.plot(currentuA, delta_f_kHz,
+                     color=color,
+                     linewidth=input_data_linewidth, ls=an_ls, marker=marker,
+                     markersize=input_data_markersize, markerfacecolor=color, alpha=input_data_alpha)
+            leglines.append(plt.Line2D(range(10), range(10), color=color, ls=an_ls,
+                                       linewidth=input_data_linewidth, marker=marker,
+                                       markersize=input_data_markersize,
+                                       markerfacecolor=color, alpha=input_data_alpha))
+            leglabels.append(F"Fit Input Data {series_type}:{label}")
+            if resfits_and_metadata is not None and show_text:
+                for single_uA, res_fit, single_metadata in resfits_and_metadata:
+                    single_delta_f_kHz = (res_fit.fcenter_ghz - f_min_GHz) * 1.0e6
+                    q_format_str = '%i'
+                    text_str = F"{single_uA} uA\n   Qi: {q_format_str % res_fit.q_i}\n   Qc: {q_format_str % res_fit.q_c}"
+                    plt.text(x=single_uA, y=single_delta_f_kHz, s=text_str, color="white", fontsize=6,
+                             bbox={"facecolor": color, "alpha": 0.5})
 
     # Whole plot options:
     plt.xlabel(F"Flux Ramp Current (uA)")
