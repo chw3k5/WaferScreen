@@ -503,7 +503,7 @@ def multi_lamb_plot(multi_resfits_and_metadata, series_type, res_num,
         for currentuA, freqGHz in multi_input_data:
             min_uA = np.min((min_uA, np.min(currentuA)))
             max_uA = np.max((max_uA, np.max(currentuA)))
-        current_axis_uA = np.linspace(max_uA, max_uA, current_axis_num_of_points)
+        current_axis_uA = np.linspace(min_uA, max_uA, current_axis_num_of_points)
 
     # get the loop variables ready
     loop_vars = []
@@ -556,10 +556,10 @@ def multi_lamb_plot(multi_resfits_and_metadata, series_type, res_num,
             input_data_markersize = 10
             plt.plot(currentuA, delta_f_kHz,
                      color=color,
-                     linewidth=input_data_linewidth, ls=an_ls, marker=marker,
+                     linewidth=input_data_linewidth, ls='None', marker=marker,
                      markersize=input_data_markersize, markerfacecolor=color, alpha=input_data_alpha)
-            leglines.append(plt.Line2D(range(10), range(10), color=color, ls=an_ls,
-                                       linewidth=input_data_linewidth, marker=marker,
+            leglines.append(plt.Line2D(range(10), range(10), color=color, ls='None',
+                                       marker=marker,
                                        markersize=input_data_markersize,
                                        markerfacecolor=color, alpha=input_data_alpha))
             leglabels.append(F"Fit Input Data {series_type}:{label}")
