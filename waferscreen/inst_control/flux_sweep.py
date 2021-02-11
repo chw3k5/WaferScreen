@@ -249,28 +249,29 @@ class JobAssignment:
         self.a_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='a',
                                                     vna_address=agilent8722es_address,
                                                     verbose=True, working_dir=None)
-        # self.b_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='b',
-        #                                             vna_address=agilent8722es_address,
-        #                                             verbose=True, working_dir=None)
+        self.b_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='b',
+                                                    vna_address=agilent8722es_address,
+                                                    verbose=True, working_dir=None)
 
     def __enter__(self):
         self.a_chain_flux_sweep.power_on()
-        # self.b_chain_flux_sweep.end()
+        self.b_chain_flux_sweep.power_on()
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.a_chain_flux_sweep.end()
-        # self.b_chain_flux_sweep.end()
+        self.b_chain_flux_sweep.end()
 
     def launch_hungry_for_jobs(self, chain_letter="a"):
         self.__getattribute__(F"{chain_letter}_chain_flux_sweep").hungry_for_jobs()
 
 
 if __name__ == "__main__":
+    rf_chain_letter = "a"  # choose either {"a", "b"}
     do_scan = False
     do_res_sweeps = not do_scan
 
     if do_scan:
-        abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter="a")
+        abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter=rf_chain_letter)
         with abstract_flux_sweep:
             abstract_flux_sweep.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz)
 
@@ -278,7 +279,9 @@ if __name__ == "__main__":
         # resonator sweeps based on an analyzed scan
         job_assign = JobAssignment()
         with job_assign:
-            job_assign.launch_hungry_for_jobs(chain_letter="a")
+            job_assign.launch_hungry_for_jobs(chain_letter=rf_chain_letter)
+            print("temp test point")
+
 
             # # Not ready for continuous use.
             # format = "%(asctime)s: %(message)s"

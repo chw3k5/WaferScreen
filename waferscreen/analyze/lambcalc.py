@@ -208,8 +208,8 @@ class LambCalc:
 
 
 if __name__ == "__main__":
-    test_folder = "C:\\Users\\chw3k5\\PycharmProjects\\WaferScreen\\waferscreen\\nist\\12\\2021-02-10\\pro\\" + \
-                  "res3_scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380_phase_windowbaselinesmoothedremoved"
+    test_folder = "D:\\waferscreen\\nist\\11\\2021-02-11\\pro\\" + \
+                  "res4_scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197_phase_windowbaselinesmoothedremoved"
     lamb_calc = LambCalc(lamb_dir=test_folder, auto_fit=False)
     lamb_calc.read_input()
     lamb_calc.sort_by_type()
