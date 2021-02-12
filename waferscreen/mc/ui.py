@@ -45,7 +45,7 @@ if __name__ == "__main__":
                            skip_interactive_plot=False, save_res_plots=True,
                            make_band_seeds=False, make_single_res_seeds=False)
     if do_res_sweeps:
-        dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=False,
+        dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=True,
                                 pro_res_dirs=test_pro_res_dirs, do_pro=True,
-                                do_lamb=False,
-                                save_res_plots=True, reprocess_res=True, lamb_plots=True)
+                                do_lamb=True,
+                                save_res_plots=True, reprocess_res=False, lamb_plots=True)

@@ -543,7 +543,8 @@ def multi_lamb_plot(multi_resfits_and_metadata, series_type, res_num,
                      linewidth=fit_linewidth)
             leglines.append(plt.Line2D(range(10), range(10), color=color, ls=an_ls,
                                        linewidth=fit_linewidth))
-            leglabels.append(F"Fitted Parameters {series_type}:{label}")
+            leglabels.append(F"Fitted Parameters {series_type}:{label} " +
+                             F"lambda={'%6.3f' % lamb_params_fit.lambfit} ({'%6.3f' % lamb_params_fit.lambfit_err})")
 
         # the raw data that is used as the basis for a fit/lambda parameter determination.
         if input_data is not None:

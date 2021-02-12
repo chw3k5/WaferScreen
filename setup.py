@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='WaferScreen',
-      version='1.0.0',
+      version='1.0.1',
       description='Testing and database infrastructure for the NIST-SO wafer production',
       author='Caleb Wheeler, Johannes Hubmayr, Jordan Wheeler, Jake Connors',
       author_email='chw3k5@gmail.com',
