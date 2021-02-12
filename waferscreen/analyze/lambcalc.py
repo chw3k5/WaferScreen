@@ -1,25 +1,14 @@
 import os
 import numpy as np
 from operator import itemgetter
-from typing import NamedTuple
 from scipy.optimize import curve_fit
 from waferscreen.analyze.lambfit import f0_of_I, guess_lamb_fit_params
 from waferscreen.data_io.s21_io import write_s21, read_s21
 from waferscreen.data_io.lamb_io import remove_processing_tags, prep_lamb_dirs, LambdaParams
 from waferscreen.data_io.s21_metadata import MetaDataDict
+from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.plot.s21_plots import lamb_plot, multi_lamb_plot
 import ref
-
-
-class LambTypeKey(NamedTuple):
-    port_power_dbm: float
-    if_bw_hz: float
-
-    def __str__(self):
-        return F"portPowerdBm{'%5.1f' % self.port_power_dbm}_ifbwHz{'%08i' % self.if_bw_hz}"
-
-
-lamb_type_key_header = list(LambTypeKey._fields)
 
 
 class LambCalc:
@@ -92,15 +81,19 @@ class LambCalc:
             = prep_lamb_dirs(pro_data_dir=self.pro_data_dir, report_parent_dir_str=self.report_parent_dir_str)
 
     def write(self):
-        lamb_basename = F"lambda_res{'%04i' % self.lamb_params_fit.res_num}_{self.report_parent_dir_str}.csv"
+        lamb_basename = F"lambda_res{'%04i' % self.lamb_params_fit.res_num}_{self.report_parent_dir_str}"
+        if self.lamb_type_key is None:
+            lamb_basename += ".csv"
+        else:
+            lamb_basename += F"_{self.lamb_type_key}.csv"
         self.lamb_output_path = os.path.join(self.lamb_outputs_dir, lamb_basename)
         res_fits = [a_tup[1] for a_tup in self.resfits_and_metadata]
         write_s21(output_file=self.lamb_output_path, metadata=self.unified_metadata,
                   fitted_resonators_parameters=res_fits, lamb_params_fits=[self.lamb_params_fit])
 
     def set_lamb_type_key(self):
-        self.lamb_type_key = LambTypeKey(port_power_dbm=self.unified_metadata["port_power_dbm"],
-                                         if_bw_hz=self.unified_metadata["if_bw_hz"])
+        self.lamb_type_key = SeriesKey(port_power_dbm=self.unified_metadata["port_power_dbm"],
+                                       if_bw_hz=self.unified_metadata["if_bw_hz"])
 
     def fit(self, currentuA=None, freqGHz=None, unified_metadata=None, lamb_plt_basename=None):
         if currentuA is None:
@@ -169,7 +162,8 @@ class LambCalc:
 
     def sort_by_type(self):
         self.by_type_resfits_and_metadata = {}
-        for metadata_type in lamb_type_key_header:
+        no_series_plots = True
+        for metadata_type in series_key_header:
             type_dict = {}
             for flux_current_ua, res_fit, metadata_this_file in self.resfits_and_metadata:
                 type_value = metadata_this_file[metadata_type]
@@ -182,6 +176,7 @@ class LambCalc:
                                                             lamb_dir=self.lamb_dir, plot=self.do_plot)
                  for type_value in type_values}
             if len(type_values) > 1 and self.do_plot:
+                no_series_plots = False
                 values_dict = self.by_type_resfits_and_metadata[metadata_type]
                 multi_resfits_and_metadata = [values_dict[type_value].resfits_and_metadata
                                               for type_value in type_values]
@@ -196,7 +191,10 @@ class LambCalc:
 
                     multi_lamb_params_fit.append(values_dict[type_value].lamb_params_fit)
                 type_plot_basename = F"res{'%04i' % self.unified_metadata['res_num']}_SeriesType{metadata_type}.png"
-                self.lamb_plot_path = os.path.join(self.lamb_plots_dir, type_plot_basename)
+                series_plot_dir = os.path.join(self.lamb_plots_dir, F"{metadata_type}")
+                if not os.path.isdir(series_plot_dir):
+                    os.mkdir(series_plot_dir)
+                self.lamb_plot_path = os.path.join(series_plot_dir, type_plot_basename)
                 multi_lamb_plot(multi_resfits_and_metadata=multi_resfits_and_metadata,
                                 series_type=metadata_type,
                                 res_num=self.unified_metadata['res_num'],
@@ -205,11 +203,13 @@ class LambCalc:
                                 multi_labels=multi_labels,
                                 current_axis_num_of_points=1000, show_text=False,
                                 output_filename=self.lamb_plot_path)
+        if no_series_plots and self.do_plot:
+            self.fit()
 
 
 if __name__ == "__main__":
-    test_folder = "D:\\waferscreen\\nist\\11\\2021-02-11\\pro\\" + \
-                  "res4_scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197_phase_windowbaselinesmoothedremoved"
+    test_folder = "C:\\Users\\chw3k5\\PycharmProjects\\WaferScreen\\waferscreen\\nist\\12\\2021-02-10\\pro\\" + \
+                  "res9_scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380_phase_windowbaselinesmoothedremoved"
     lamb_calc = LambCalc(lamb_dir=test_folder, auto_fit=False)
     lamb_calc.read_input()
     lamb_calc.sort_by_type()

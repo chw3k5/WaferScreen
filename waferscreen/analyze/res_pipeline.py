@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 from waferscreen.data_io.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag, \
     generate_output_filename
 from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
+from waferscreen.data_io.series_io import SeriesKey, series_key_header
 import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.data_io.res_io import ResParams
 from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
@@ -347,7 +348,14 @@ class ResPipe:
         self.fitted_resonators_parameters = [params_fit]
         self.write(output_file=self.path, freqs_ghz=self.unprocessed_freq_GHz, s21_complex=s21_complex)
         if save_res_plots:
-            basename = F"{'%04i' % self.metadata['res_num']}_cur{self.metadata['flux_current_ua']}uA.png"
+            # file name handling
+            basename = F"{'%04i' % self.metadata['res_num']}_cur{'%6.3f' % self.metadata['flux_current_ua']}uA.png"
+            series_name = F"{SeriesKey(port_power_dbm=self.metadata['port_power_dbm'], if_bw_hz=self.metadata['if_bw_hz'])}"
+            subplot_path = os.path.join(self.res_plot_dir, series_name)
+            if not os.path.isdir(subplot_path):
+                os.mkdir(subplot_path)
+            single_res_plot_path = os.path.join(subplot_path, basename)
+
             plot_res_fit(f_GHz_single_res=self.unprocessed_freq_GHz,
                          s21_mag_single_res=self.unprocessed_mags21,
                          not_smoothed_mag_single_res=None,
@@ -362,7 +370,7 @@ class ResPipe:
                                       (self.unprocessed_mags21[plot_data["left_margin"]],
                                        self.unprocessed_mags21[plot_data["right_margin"]])),
                          zero_line=False,
-                         output_filename=os.path.join(self.res_plot_dir, basename))
+                         output_filename=single_res_plot_path)
 
     def fit_resonators_jake(self):
         frs = jake_res_finder(unprocessed_freq_GHz=self.unprocessed_freq_GHz,

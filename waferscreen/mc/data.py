@@ -246,7 +246,9 @@ class DataManager:
 
     def calc_lamb(self, single_res_parent_dirs=None, lamb_plots=True):
         for lamb_dir in get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
-            single_lamb_calc = LambCalc(lamb_dir=lamb_dir, auto_fit=True, plot=lamb_plots)
+            single_lamb_calc = LambCalc(lamb_dir=lamb_dir, auto_fit=False, plot=lamb_plots)
+            single_lamb_calc.read_input()
+            single_lamb_calc.sort_by_type()
 
     def scans_to_seeds(self, pro_scan_paths=None, make_band_seeds=False, make_single_res_seeds=False):
         if pro_scan_paths is None:
