@@ -1,12 +1,13 @@
 import os
 import datetime
 import numpy as np
+from operator import attrgetter, itemgetter
 import matplotlib.pyplot as plt
-from waferscreen.data_io.s21_io import read_s21
+from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 from waferscreen.mc.data import get_all_lamb_files
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
-from waferscreen.plot.explore_plots import single_lamp_to_report_plot
+from waferscreen.plot.explore_plots import single_lamp_to_report_plot, report_plot_init, rug_plot, band_plot, report_key
 
 
 def wafer_num_to_str(wafer_num):
@@ -36,6 +37,10 @@ class SingleLamb:
         self.path = path
         self.lamb_dir, self.basename = os.path.split(self.path)
         self.report_dir, _lamb_foldername = os.path.split(self.lamb_dir)
+        self.pro_scan_dir, _rportt_foldername = os.path.split(self.report_dir)
+        self.pro_dir, _scan_foldername = os.path.split(self.pro_scan_dir)
+        self.date_str_dir, _pro_foldername = os.path.split(self.pro_dir)
+        self.seed_scan_path = None
 
         self.metadata = None
         self.res_fits = None
@@ -64,12 +69,21 @@ class SingleLamb:
             year_month_day, hour_min_sec = meas_utc.split(" ")
             datetime_str = F"{year_month_day} {hour_min_sec.replace('-', ':')}+00:00"
             self.meas_time = datetime.datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S.%f%z')
+            self.seed_scan_path = os.path.join(self.date_str_dir, 'raw', 'scans', F"{self.seed_name}.csv")
         if 'location' in self.metadata.keys():
             self.location = self.metadata.location
         if all([header_key in self.metadata.keys() for header_key in series_key_header]):
             self.series_key = SeriesKey(port_power_dbm=self.metadata.port_power_dbm,
                                         if_bw_hz=self.metadata.if_bw_hz)
         self.res_number = self.lamb_fit.res_num
+
+
+def set_if(thing, other_thing, type_of_thing='unknown'):
+    if thing is None:
+        return other_thing
+    elif thing != other_thing:
+        raise KeyError(F"Setting the {type_of_thing} a second time is not allowed")
+    return thing
 
 
 class ResLamb:
@@ -92,8 +106,9 @@ class ResLamb:
 class SeriesLamb:
     def __init__(self, single_lamb=None):
         self.plot_colors = ["seagreen", "crimson", "darkgoldenrod", "deepskyblue", "mediumblue", "rebeccapurple"]
-        self.band = self.wafer = self.report_dir = None
+        self.band = self.wafer = self.report_dir = self.seed_scan_path = None
         self.available_series_handles = set()
+        self.series_handle_to_key = {}
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
@@ -104,40 +119,54 @@ class SeriesLamb:
         else:
             self.__setattr__(series_handle, ResLamb(single_lamb=single_lamb))
         self.available_series_handles.add(series_handle)
-        if self.wafer is None:
-            self.wafer = single_lamb.wafer
-        elif self.wafer != single_lamb.wafer:
-            raise KeyError("Setting the wafer a second time is not allowed")
-        if self.band is None:
-            self.band = single_lamb.band
-        elif self.band != single_lamb.band:
-            raise KeyError("Setting the band a second time is not allowed")
-        if self.report_dir is None:
-            self.report_dir = single_lamb.report_dir
-        elif self.report_dir != single_lamb.report_dir:
-            raise KeyError("Setting the report_dir a second time is not allowed")
+        self.series_handle_to_key[series_handle] = single_lamb.series_key
+        self.wafer = set_if(thing=self.wafer, other_thing=single_lamb.wafer, type_of_thing='wafer')
+        self.band = set_if(thing=self.band, other_thing=single_lamb.band, type_of_thing='band')
+        self.report_dir = set_if(thing=self.report_dir, other_thing=single_lamb.report_dir, type_of_thing='report_dir')
+        self.seed_scan_path = set_if(thing=self.seed_scan_path, other_thing=single_lamb.seed_scan_path,
+                                     type_of_thing='seed_scan_path')
 
     def report(self):
-        # initialize the plot stuff
-        fig, axes = plt.subplots(nrows=6, ncols=2, figsize=(10, 15))
-        fig.subplots_adjust(left=0.125, bottom=0.02, right=0.9, top=0.98, wspace=0.25, hspace=0.25)
+        fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=3,
+                                                                        num_of_scatter_hist_y=2)
         wafer_str = wafer_num_to_str(self.wafer)
         fig.suptitle(F"{wafer_str}, {self.band} report:", y=0.995)
         leglines = []
         leglabels = []
         counter = 0
-
-        for series_handle in self.available_series_handles:
+        rug_y_increment = 1.0 / (len(self.available_series_handles) + 1.0)
+        handle_list = list(self.available_series_handles)
+        series_keys = [self.series_handle_to_key[handle] for handle in handle_list]
+        sorted_series_handles, *ordered_series_values = zip(*sorted([(handle, *series_key)
+                                                                     for handle, series_key
+                                                                     in zip(handle_list, series_keys)],
+                                                                    key=itemgetter(1, 2), reverse=True))
+        for series_handle in sorted_series_handles:
             res_set = self.__getattribute__(series_handle)
             color = self.plot_colors[counter % len(self.plot_colors)]
-            axes, leglines, leglabels = single_lamp_to_report_plot(axes=axes, res_set=res_set, color=color,
-                                                                   leglines=leglines, leglabels=leglabels)
+            axes_shist, leglines, leglabels, f_centers_ghz_all \
+                = single_lamp_to_report_plot(axes=axes_shist, res_set=res_set, color=color,
+                                             leglines=leglines, leglabels=leglabels)
+            y_max = 1.0 - (rug_y_increment * counter)
             counter += 1
-        for plot_pair in list(axes):
-            scatter_plot = plot_pair[0]
-            scatter_plot.legend(leglines, leglabels, loc=0, numpoints=2, handlelength=3, fontsize=7)
+            y_min = 1.0 - (rug_y_increment * counter)
+            ax_rug = rug_plot(ax=ax_rug, xdata=f_centers_ghz_all, y_min=y_min, y_max=y_max, color=color)
+
+        # Raw S21 Scan data
+        x_min, x_max = ax_rug.get_xlim()
+        formatted_s21_dict, metadata = read_s21(path=self.seed_scan_path)
+        f_ghz = formatted_s21_dict["freq_ghz"]
+        s21_mag, _s21_phase = ri_to_magphase(r=formatted_s21_dict["real"], i=formatted_s21_dict["imag"])
+        indexes_to_plot = np.where((f_ghz >= x_min) & (f_ghz <= x_max))
+        plot_s21_mag = s21_mag[indexes_to_plot] - np.mean(s21_mag[indexes_to_plot])
+        ax_res_spec = band_plot(ax=ax_res_spec, f_ghz=f_ghz[indexes_to_plot], mag_dbm=plot_s21_mag)
+        ax_res_spec.set_xlim(left=x_min, right=x_max)
+
+        # Plot KEY
+        ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels)
+
         # Display
-        scatter_plot_basename = F"ScatterHist_{self.band}_{wafer_str}.png"
+        scatter_plot_basename = F"ScatterHist_{self.band}_{wafer_str}.pdf"
         scatter_plot_path = os.path.join(self.report_dir, scatter_plot_basename)
         plt.draw()
         plt.savefig(scatter_plot_path)

@@ -185,14 +185,15 @@ class DataManager:
             if basename_prefix != "seed":
                 self.raw_process(path=raw_single_res_path)
 
-    def raw_process(self, path):
+    def raw_process(self, path, skip_phase_plot=False):
         inducts21 = InductS21(path, verbose=self.verbose)
         inducts21.induct()
         inducts21.remove_group_delay(user_input_group_delay=self.user_input_group_delay)
         inducts21.write()
         if inducts21.metadata["export_type"] == "scan":
             self.phase_corrected_scan_files.append(inducts21.output_file)
-        inducts21.plot()
+        if not skip_phase_plot:
+            inducts21.plot()
 
     def analyze_resonator_files(self, s21_files, cosine_filter=False,
                                  window_pad_factor=3, fitter_pad_factor=6,
@@ -283,13 +284,14 @@ class DataManager:
         self.scans_to_seeds(pro_scan_paths=self.windowbaselinesmoothedremoved_scan_files,
                             make_band_seeds=make_band_seeds, make_single_res_seeds=make_single_res_seeds)
 
-    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False,
+    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, skip_phase_plot=False,
                              pro_res_dirs=None, do_pro=False,
                              do_lamb=False,
                              save_res_plots=False, reprocess_res=True, lamb_plots=True):
         if do_raw:
             self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=raw_res_dirs)
-            [self.raw_process(path=raw_single_res) for raw_single_res in self.raw_single_res_files]
+            [self.raw_process(path=raw_single_res, skip_phase_plot=skip_phase_plot)
+             for raw_single_res in self.raw_single_res_files]
         if do_pro:
             self.analyze_single_res(single_res_parent_dirs=pro_res_dirs,
                                     save_res_plots=save_res_plots, reprocess=reprocess_res)
