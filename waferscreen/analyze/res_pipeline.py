@@ -372,21 +372,6 @@ class ResPipe:
                          zero_line=False,
                          output_filename=single_res_plot_path)
 
-    def fit_resonators_jake(self):
-        frs = jake_res_finder(unprocessed_freq_GHz=self.unprocessed_freq_GHz,
-                              unprocessed_reals21=self.unprocessed_reals21,
-                              unprocessed_imags21=self.unprocessed_reals21,
-                              edge_search_depth=50,
-                              smoothing_scale_kHz=25,
-                              smoothing_order=5,
-                              cutoff_rate=500,
-                              minimum_spacing_kHz=100.0,
-                              remove_baseline_ripple=True,
-                              baseline_scale_kHz=3000,
-                              baseline_order=3,
-                              verbose=self.verbose)
-        return frs
-
     def scan_to_band(self):
         f_centers_GHz = np.array([fit_params.fcenter_ghz for fit_params in self.fitted_resonators_parameters])
         res_nums = np.array([fit_params.res_number for fit_params in self.fitted_resonators_parameters])

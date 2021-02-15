@@ -271,7 +271,7 @@ class DataManager:
 
     def full_loop_scans(self, scan_paths=None, cosine_filter=False, window_pad_factor=3, fitter_pad_factor=6,
                         show_filter_plots=False,
-                        skip_interactive_plot=False, save_res_plots=False,
+                        do_interactive_plot=False, save_res_plots=False,
                         make_band_seeds=False, make_single_res_seeds=False):
         if scan_paths is None:
             self.raw_process_all_scans()
@@ -279,18 +279,19 @@ class DataManager:
             [self.raw_process(path=scan_path) for scan_path in scan_paths]
         self.analyze_scans_resonators(scan_paths=self.phase_corrected_scan_files, cosine_filter=cosine_filter,
                                       window_pad_factor=window_pad_factor, fitter_pad_factor=fitter_pad_factor,
-                                      show_filter_plots=show_filter_plots, skip_interactive_plot=skip_interactive_plot,
+                                      show_filter_plots=show_filter_plots,
+                                      skip_interactive_plot=not do_interactive_plot,
                                       save_res_plots=save_res_plots)
         self.scans_to_seeds(pro_scan_paths=self.windowbaselinesmoothedremoved_scan_files,
                             make_band_seeds=make_band_seeds, make_single_res_seeds=make_single_res_seeds)
 
-    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, skip_phase_plot=False,
+    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, save_phase_plot=False,
                              pro_res_dirs=None, do_pro=False,
                              do_lamb=False,
                              save_res_plots=False, reprocess_res=True, lamb_plots=True):
         if do_raw:
             self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=raw_res_dirs)
-            [self.raw_process(path=raw_single_res, skip_phase_plot=skip_phase_plot)
+            [self.raw_process(path=raw_single_res, skip_phase_plot=not save_phase_plot)
              for raw_single_res in self.raw_single_res_files]
         if do_pro:
             self.analyze_single_res(single_res_parent_dirs=pro_res_dirs,
