@@ -1,5 +1,6 @@
 import os
 import ref
+from multiprocessing import Pool
 from waferscreen.analyze.s21_inductor import InductS21
 from waferscreen.analyze.res_pipeline import ResPipe
 from waferscreen.analyze.lambcalc import LambCalc
@@ -100,6 +101,13 @@ def get_single_res_parent_dirs(pro_dirs):
     return single_res_parent_dirs
 
 
+def single_res_pro(single_res_file, verbose, reprocess, save_res_plots):
+    res_pipe = ResPipe(s21_path=single_res_file, verbose=verbose)
+    res_pipe.read()
+    if reprocess or res_pipe.fitted_resonators_parameters is None:
+        res_pipe.analyze_single_res(save_res_plots=save_res_plots)
+
+
 class DataManager:
     def __init__(self, user_input_group_delay=None, verbose=True):
         self.user_input_group_delay = user_input_group_delay
@@ -185,14 +193,14 @@ class DataManager:
             if basename_prefix != "seed":
                 self.raw_process(path=raw_single_res_path)
 
-    def raw_process(self, path, skip_phase_plot=False):
+    def raw_process(self, path, save_phase_plot=True):
         inducts21 = InductS21(path, verbose=self.verbose)
         inducts21.induct()
         inducts21.remove_group_delay(user_input_group_delay=self.user_input_group_delay)
         inducts21.write()
         if inducts21.metadata["export_type"] == "scan":
             self.phase_corrected_scan_files.append(inducts21.output_file)
-        if not skip_phase_plot:
+        if not save_phase_plot:
             inducts21.plot()
 
     def analyze_resonator_files(self, s21_files, cosine_filter=False,
@@ -226,7 +234,7 @@ class DataManager:
                                      show_filter_plots=show_filter_plots, skip_interactive_plot=skip_interactive_plot,
                                      save_res_plots=save_res_plots)
 
-    def analyze_single_res(self, single_res_parent_dirs=None, save_res_plots=False, reprocess=False):
+    def analyze_single_res(self, single_res_parent_dirs=None, save_res_plots=True, reprocess=False):
         for single_res_folder in get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
             single_res_files_this_folder = []
             for test_file in os.listdir(single_res_folder):
@@ -239,11 +247,18 @@ class DataManager:
                 # reset the plots folder
                 temp_res_pipe = ResPipe(s21_path=single_res_files_this_folder[0])
                 temp_res_pipe.prepare_res_pot_dir()
-            for single_res_file in single_res_files_this_folder:
-                res_pipe = ResPipe(s21_path=single_res_file, verbose=self.verbose)
-                res_pipe.read()
-                if reprocess or res_pipe.fitted_resonators_parameters is None:
-                    res_pipe.analyze_single_res(save_res_plots=save_res_plots)
+            # Start optional multiprocessing
+            if ref.multiprocessing_threads is None:
+                for single_res_file in single_res_files_this_folder:
+                    single_res_pro(single_res_file=single_res_file, verbose=self.verbose, reprocess=reprocess,
+                                   save_res_plots=save_res_plots)
+            else:
+                single_res_pro_args = zip(single_res_files_this_folder,
+                                          [self.verbose]*len(single_res_files_this_folder),
+                                          [reprocess]*len(single_res_files_this_folder),
+                                          [save_res_plots]*len(single_res_files_this_folder))
+                with Pool(ref.multiprocessing_threads) as p:
+                    p.starmap(single_res_pro, single_res_pro_args)
 
     def calc_lamb(self, single_res_parent_dirs=None, lamb_plots=True):
         for lamb_dir in get_pro_res_dirs_from_sin_res(single_res_parent_dirs):
@@ -285,13 +300,12 @@ class DataManager:
         self.scans_to_seeds(pro_scan_paths=self.windowbaselinesmoothedremoved_scan_files,
                             make_band_seeds=make_band_seeds, make_single_res_seeds=make_single_res_seeds)
 
-    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, save_phase_plot=False,
-                             pro_res_dirs=None, do_pro=False,
-                             do_lamb=False,
-                             save_res_plots=False, reprocess_res=True, lamb_plots=True):
+    def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, save_phase_plot=True,
+                             pro_res_dirs=None, do_pro=False, save_res_plots=True, reprocess_res=True,
+                             do_lamb=False, lamb_plots=True):
         if do_raw:
             self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=raw_res_dirs)
-            [self.raw_process(path=raw_single_res, skip_phase_plot=not save_phase_plot)
+            [self.raw_process(path=raw_single_res, save_phase_plot=save_phase_plot)
              for raw_single_res in self.raw_single_res_files]
         if do_pro:
             self.analyze_single_res(single_res_parent_dirs=pro_res_dirs,

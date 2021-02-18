@@ -1,13 +1,13 @@
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import os
+import sys
 from scipy import signal, fftpack
 import platform
 from submm_python_routines.KIDs import resonance_fitting as rf
 from matplotlib.backends.backend_pdf import PdfPages
 from typing import NamedTuple
-mpl.use(backend="TkAgg")
+
 
 
 """

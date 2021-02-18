@@ -4,6 +4,9 @@ import getpass
 from getpass import getuser
 from datetime import datetime
 
+# Debug mode
+debug_mode = False
+
 # Instrument addresses
 usbvna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
 agilent8722es_address = "GPIB1::19::INSTR"
@@ -11,7 +14,18 @@ flux_ramp_address = "GPIB0::17::INSTR"
 volt_source_port = 1
 
 # multiprocessing
-multiprocessing_threads = 1  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
+current_user = getpass.getuser()
+if debug_mode:
+    multiprocessing_threads = None
+elif current_user == "chw3k5":
+    multiprocessing_threads = 4  # Caleb's other computers
+elif current_user in "cwheeler":
+    multiprocessing_threads = 8  # Mac Pro 8-core intel core i9 processor 16 threads
+elif current_user == "uvwave":
+    multiprocessing_threads = 2  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
+else:
+    # this will do standard linear processing.
+    multiprocessing_threads = None
 
 # References used in the WaferScreen Catalog
 now = datetime.now()

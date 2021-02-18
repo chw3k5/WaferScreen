@@ -40,8 +40,8 @@ test_pro_res_dirs = [pro_dir]
 
 if __name__ == "__main__":
     do_quick_look = False
-    do_scan = True
-    do_res_sweeps = False
+    do_scan = False
+    do_res_sweeps = True
 
     if do_quick_look:
         do_scan = False
@@ -63,6 +63,6 @@ if __name__ == "__main__":
                            do_interactive_plot=True, save_res_plots=True,
                            make_band_seeds=False, make_single_res_seeds=False)
     if do_res_sweeps:
-        dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=True, save_phase_plot=False,
-                                pro_res_dirs=test_pro_res_dirs, do_pro=True, save_res_plots=True, reprocess_res=False,
+        dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=False, save_phase_plot=True,
+                                pro_res_dirs=test_pro_res_dirs, do_pro=True, save_res_plots=True, reprocess_res=True,
                                 do_lamb=True, lamb_plots=True)
