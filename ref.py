@@ -48,11 +48,12 @@ output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["n
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
 runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
-if not os.path.isfile(runtime_log):
-    f = open(runtime_log, 'w')
-    f.close()
-with open(runtime_log, "a") as f:
-    f.write(F"RunStart(utc):{str(datetime.utcnow())}\n")
+if current_user == 'uvwave':
+    if not os.path.isfile(runtime_log):
+        f = open(runtime_log, 'w')
+        f.close()
+    with open(runtime_log, "a") as f:
+        f.write(F"RunStart(utc):{str(datetime.utcnow())}\n")
 
 # data types
 file_extension_to_delimiter = {'csv': ",", 'psv': "|", 'txt': " ", "tsv": '\t'}

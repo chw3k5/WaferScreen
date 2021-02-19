@@ -377,6 +377,7 @@ class ResPipe:
         params_guess, plot_data = guess_res_params(freq_ghz=self.unprocessed_freq_ghz,
                                                    s21_mag_db=self.unprocessed_mags21,
                                                    s21_phase_rad=self.unprocessed_phases21)
+        file_prefix = ""
         try:
             popt, pcov = wrap_simple_res_gain_slope_complex(freqs_GHz=self.unprocessed_freq_ghz,
                                                             s21_complex=s21_complex,
@@ -390,8 +391,20 @@ class ResPipe:
                                                             tau_ns_guess=params_guess.tau_ns,
                                                             impedance_ratio_guess=params_guess.impedance_ratio)
         except RuntimeError:
+            file_prefix += "FAIL_"
+            save_res_plots = True
+            params_fit = None
+            print(F"\nFAILED FIT: {self.path}\n")
+        else:
+            params_fit = package_res_results(popt=popt, pcov=pcov, res_number=self.metadata["res_num"],
+                                             flux_ramp_current_ua=self.metadata["flux_current_ua"],
+                                             parent_file=self.path, verbose=self.verbose)
+            self.fitted_resonators_parameters = [params_fit]
+            self.write(output_file=self.path, freqs_ghz=self.unprocessed_freq_ghz, s21_complex=s21_complex)
+
+        if save_res_plots:
             # file name handling
-            basename = F"{'%04i' % self.metadata['res_num']}_cur{'%6.3f' % self.metadata['flux_current_ua']}uA.png"
+            basename = F"{file_prefix}{'%04i' % self.metadata['res_num']}_cur{'%6.3f' % self.metadata['flux_current_ua']}uA.png"
             series_name = F"{SeriesKey(port_power_dbm=self.metadata['port_power_dbm'], if_bw_hz=self.metadata['if_bw_hz'])}"
             subplot_path = os.path.join(self.res_plot_dir, series_name)
             if not os.path.isdir(subplot_path):
@@ -401,12 +414,11 @@ class ResPipe:
                 except FileExistsError:
                     pass
             single_res_plot_path = os.path.join(subplot_path, basename)
-
             plot_res_fit(f_GHz_single_res=self.unprocessed_freq_ghz,
                          s21_mag_single_res=self.unprocessed_mags21,
                          not_smoothed_mag_single_res=None,
                          s21_mag_single_res_highpass=None,
-                         params_guess=params_guess, params_fit=None,
+                         params_guess=params_guess, params_fit=params_fit,
                          minima_pair=(params_guess.fcenter_ghz, plot_data["minima_mag"]),
                          fwhm_pair=((plot_data["f_fwhm_left_ghz"], plot_data["f_fwhm_right_ghz"]),
                                     (plot_data["left_goal_depth"], plot_data["right_goal_depth"])),
@@ -417,40 +429,8 @@ class ResPipe:
                                        self.unprocessed_mags21[plot_data["right_margin"]])),
                          zero_line=False,
                          output_filename=single_res_plot_path)
-            raise
 
-        else:
-            params_fit = package_res_results(popt=popt, pcov=pcov, res_number=self.metadata["res_num"],
-                                             flux_ramp_current_ua=self.metadata["flux_current_ua"],
-                                             parent_file=self.path, verbose=self.verbose)
-            self.fitted_resonators_parameters = [params_fit]
-            self.write(output_file=self.path, freqs_ghz=self.unprocessed_freq_ghz, s21_complex=s21_complex)
-            if save_res_plots:
-                # file name handling
-                basename = F"{'%04i' % self.metadata['res_num']}_cur{'%6.3f' % self.metadata['flux_current_ua']}uA.png"
-                series_name = F"{SeriesKey(port_power_dbm=self.metadata['port_power_dbm'], if_bw_hz=self.metadata['if_bw_hz'])}"
-                subplot_path = os.path.join(self.res_plot_dir, series_name)
-                if not os.path.isdir(subplot_path):
-                    os.mkdir(subplot_path)
-                single_res_plot_path = os.path.join(subplot_path, basename)
-
-                plot_res_fit(f_GHz_single_res=self.unprocessed_freq_ghz,
-                             s21_mag_single_res=self.unprocessed_mags21,
-                             not_smoothed_mag_single_res=None,
-                             s21_mag_single_res_highpass=None,
-                             params_guess=params_guess, params_fit=params_fit,
-                             minima_pair=(params_guess.fcenter_ghz, plot_data["minima_mag"]),
-                             fwhm_pair=((plot_data["f_fwhm_left_ghz"], plot_data["f_fwhm_right_ghz"]),
-                                        (plot_data["left_goal_depth"], plot_data["right_goal_depth"])),
-                             window_pair=None,
-                             fitter_pair=((self.unprocessed_freq_ghz[plot_data["left_margin"]],
-                                           self.unprocessed_freq_ghz[plot_data["right_margin"]]),
-                                          (self.unprocessed_mags21[plot_data["left_margin"]],
-                                           self.unprocessed_mags21[plot_data["right_margin"]])),
-                             zero_line=False,
-                             output_filename=single_res_plot_path)
-
-    def scan_to_band(self):
+    def scan_to_band(self, connected_group_threshold_ghz=0.07):
         f_centers_ghz = np.array([fit_params.fcenter_ghz for fit_params in self.fitted_resonators_parameters])
         res_nums = np.array([fit_params.res_number for fit_params in self.fitted_resonators_parameters])
         # find the connected groups
@@ -459,7 +439,7 @@ class ResPipe:
         for f_index in range(len(f_centers_ghz) - 1):
             f_left_ghz = f_centers_ghz[f_index]
             f_right_ghz = f_centers_ghz[f_index + 1]
-            if 0.1 < f_right_ghz - f_left_ghz:
+            if connected_group_threshold_ghz < f_right_ghz - f_left_ghz:
                 connected_groups.append(current_group)
                 current_group = []
             current_group.append(self.fitted_resonators_parameters[f_index + 1])
@@ -470,8 +450,8 @@ class ResPipe:
         # make bins based on the band limits
         res_nums_per_band = {}
         for band_name_str in ref.band_names:
-            min_ghz = ref.band_params[band_name_str]["min_ghz"]
-            max_ghz = ref.band_params[band_name_str]["max_ghz"]
+            min_ghz = ref.band_params[band_name_str]["min_GHz"]
+            max_ghz = ref.band_params[band_name_str]["max_GHz"]
             # there is a dead space between bands, resonators in that space are not counted
             res_nums_over_min = set(res_nums[min_ghz <= f_centers_ghz])
             res_nums_below_max = set(res_nums[f_centers_ghz <= max_ghz])

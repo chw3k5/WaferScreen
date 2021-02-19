@@ -67,6 +67,9 @@ class LambCalc:
         for input_path in self.input_paths:
             _formatted_s21_dict, metadata_this_file, res_fits = read_s21(path=input_path, return_res_params=True)
             self.update_unified_metadata(metadata_this_file=metadata_this_file)
+            if res_fits is None:
+                raise ValueError(F"No res fits found for: {input_path}")
+
             for res_fit in res_fits:
                 self.res_fit_to_metadata[res_fit] = metadata_this_file
                 self.resfits_and_metadata.append((metadata_this_file['flux_current_ua'], res_fit, metadata_this_file))
