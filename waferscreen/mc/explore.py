@@ -1,13 +1,14 @@
 import os
+import ref
 import datetime
 import numpy as np
-from operator import attrgetter, itemgetter
-import matplotlib.pyplot as plt
+from operator import itemgetter
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 from waferscreen.mc.data import get_all_lamb_files
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.plot.explore_plots import single_lamp_to_report_plot, report_plot_init, rug_plot, band_plot, report_key
+import matplotlib.pyplot as plt
 
 
 def wafer_num_to_str(wafer_num):
@@ -130,22 +131,24 @@ class SeriesLamb:
         fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=3,
                                                                         num_of_scatter_hist_y=2)
         wafer_str = wafer_num_to_str(self.wafer)
-        fig.suptitle(F"{wafer_str}, {self.band} report:", y=0.995)
+        fig.suptitle(F"{wafer_str}, {self.band} report:", y=0.995, x=0.98, horizontalalignment='right')
         leglines = []
         leglabels = []
         counter = 0
-        rug_y_increment = 1.0 / (len(self.available_series_handles) + 1.0)
+        rug_y_increment = 1.0 / len(self.available_series_handles)
         handle_list = list(self.available_series_handles)
         series_keys = [self.series_handle_to_key[handle] for handle in handle_list]
         sorted_series_handles, *ordered_series_values = zip(*sorted([(handle, *series_key)
                                                                      for handle, series_key
                                                                      in zip(handle_list, series_keys)],
-                                                                    key=itemgetter(1, 2), reverse=True))
+                                                            key=itemgetter(1, 2), reverse=True))
+        f_centers_ghz_all = []
+        res_nums = []
         for series_handle in sorted_series_handles:
             res_set = self.__getattribute__(series_handle)
             color = self.plot_colors[counter % len(self.plot_colors)]
-            axes_shist, leglines, leglabels, f_centers_ghz_all \
-                = single_lamp_to_report_plot(axes=axes_shist, res_set=res_set, color=color,
+            axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info \
+                = single_lamp_to_report_plot(axes=axes_shist, res_set=res_set, color=color, band_str=self.band,
                                              leglines=leglines, leglabels=leglabels)
             y_max = 1.0 - (rug_y_increment * counter)
             counter += 1
@@ -158,12 +161,12 @@ class SeriesLamb:
         f_ghz = formatted_s21_dict["freq_ghz"]
         s21_mag, _s21_phase = ri_to_magphase(r=formatted_s21_dict["real"], i=formatted_s21_dict["imag"])
         indexes_to_plot = np.where((f_ghz >= x_min) & (f_ghz <= x_max))
-        plot_s21_mag = s21_mag[indexes_to_plot] - np.mean(s21_mag[indexes_to_plot])
-        ax_res_spec = band_plot(ax=ax_res_spec, f_ghz=f_ghz[indexes_to_plot], mag_dbm=plot_s21_mag)
+        ax_res_spec = band_plot(ax=ax_res_spec, f_ghz=f_ghz[indexes_to_plot], mag_dbm=s21_mag[indexes_to_plot],
+                                f_centers_ghz_all=f_centers_ghz_all, res_nums=res_nums, band_str=self.band)
         ax_res_spec.set_xlim(left=x_min, right=x_max)
 
         # Plot KEY
-        ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels)
+        ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels, summary_info=summary_info)
 
         # Display
         scatter_plot_basename = F"ScatterHist_{self.band}_{wafer_str}.pdf"
@@ -171,6 +174,7 @@ class SeriesLamb:
         plt.draw()
         plt.savefig(scatter_plot_path)
         print("Saved Plot to:", scatter_plot_path)
+        plt.show(block=True)
         plt.close(fig=fig)
 
 

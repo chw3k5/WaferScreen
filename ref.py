@@ -1,8 +1,13 @@
 import os
 import sys
 import getpass
-from getpass import getuser
+import matplotlib as mpl
 from datetime import datetime
+# To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
+if sys.platform == "win32":
+    mpl.use(backend="TkAgg")
+elif sys.platform == 'darwin':
+    mpl.use(backend="MacOSX")
 
 # Debug mode
 debug_mode = False
@@ -37,7 +42,7 @@ nist_users = ["uvwave", 'chw3k5']
 # directory tree used by WaferScreen Database, including folder creation for things in .gitignore
 ref_file_path = os.path.dirname(os.path.realpath(__file__))
 parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
-if getuser() == 'uvwave':
+if getpass.getuser() == 'uvwave':
     working_dir = os.path.join("D:\\", "waferscreen")
 else:
     working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")

@@ -1,17 +1,11 @@
-import sys
 import os
+import ref
+import sys
 # Add the top level repositories to sys.path so that waferscreen, gluerobot, and submm_python_routines modules are found
 ref_file_path = os.path.dirname(os.path.realpath(__file__))
 parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
 sys.path.append(os.path.join(parent_dir, 'WaferScreen'))
-# To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
-import matplotlib as mpl
-if sys.platform == "win32":
-    mpl.use(backend="TkAgg")
-elif sys.platform == 'darwin':
-    mpl.use(backend="MacOSX")
 # these are modules that have been written specifically for the wafer screen project.
-import ref
 from waferscreen.mc.data import DataManager
 from waferscreen.analyze.s21_inductor import InductS21
 
