@@ -1,30 +1,12 @@
 import os
-import ref
 import datetime
-import numpy as np
 from operator import itemgetter
-from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 from waferscreen.mc.data import get_all_lamb_files
 from waferscreen.data_io.lamb_io import remove_processing_tags
+from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
-from waferscreen.plot.explore_plots import single_lamp_to_report_plot, report_plot_init, rug_plot, band_plot, report_key
-import matplotlib.pyplot as plt
-
-
-def wafer_num_to_str(wafer_num):
-    return F"Wafer{'%03i' % wafer_num}"
-
-
-def wafer_str_to_num(wafer_str):
-    return int(wafer_str.lower().replace("wafer", ""))
-
-
-def res_num_to_str(res_num):
-    return F"Res{'%04i' % res_num}"
-
-
-def seed_name_to_handle(seed_base):
-    return seed_base.replace("-", "_").replace(".", "point")
+from waferscreen.data_io.explore_io import wafer_num_to_str, res_num_to_str, seed_name_to_handle
+from waferscreen.plot.explore_plots import report_plot
 
 
 class AttrDict(dict):
@@ -106,7 +88,6 @@ class ResLamb:
 
 class SeriesLamb:
     def __init__(self, single_lamb=None):
-        self.plot_colors = ["seagreen", "crimson", "darkgoldenrod", "deepskyblue", "mediumblue", "rebeccapurple"]
         self.band = self.wafer = self.report_dir = self.seed_scan_path = None
         self.available_series_handles = set()
         self.series_handle_to_key = {}
@@ -127,55 +108,21 @@ class SeriesLamb:
         self.seed_scan_path = set_if(thing=self.seed_scan_path, other_thing=single_lamb.seed_scan_path,
                                      type_of_thing='seed_scan_path')
 
-    def report(self):
-        fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=3,
-                                                                        num_of_scatter_hist_y=2)
+    def report(self, show=False, omit_flagged=True):
         wafer_str = wafer_num_to_str(self.wafer)
-        fig.suptitle(F"{wafer_str}, {self.band} report:", y=0.995, x=0.98, horizontalalignment='right')
-        leglines = []
-        leglabels = []
-        counter = 0
-        rug_y_increment = 1.0 / len(self.available_series_handles)
+        band_str = self.band
         handle_list = list(self.available_series_handles)
         series_keys = [self.series_handle_to_key[handle] for handle in handle_list]
         sorted_series_handles, *ordered_series_values = zip(*sorted([(handle, *series_key)
                                                                      for handle, series_key
                                                                      in zip(handle_list, series_keys)],
-                                                            key=itemgetter(1, 2), reverse=True))
-        f_centers_ghz_all = []
-        res_nums = []
-        for series_handle in sorted_series_handles:
-            res_set = self.__getattribute__(series_handle)
-            color = self.plot_colors[counter % len(self.plot_colors)]
-            axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info \
-                = single_lamp_to_report_plot(axes=axes_shist, res_set=res_set, color=color, band_str=self.band,
-                                             leglines=leglines, leglabels=leglabels)
-            y_max = 1.0 - (rug_y_increment * counter)
-            counter += 1
-            y_min = 1.0 - (rug_y_increment * counter)
-            ax_rug = rug_plot(ax=ax_rug, xdata=f_centers_ghz_all, y_min=y_min, y_max=y_max, color=color)
-
-        # Raw S21 Scan data
-        x_min, x_max = ax_rug.get_xlim()
-        formatted_s21_dict, metadata = read_s21(path=self.seed_scan_path)
-        f_ghz = formatted_s21_dict["freq_ghz"]
-        s21_mag, _s21_phase = ri_to_magphase(r=formatted_s21_dict["real"], i=formatted_s21_dict["imag"])
-        indexes_to_plot = np.where((f_ghz >= x_min) & (f_ghz <= x_max))
-        ax_res_spec = band_plot(ax=ax_res_spec, f_ghz=f_ghz[indexes_to_plot], mag_dbm=s21_mag[indexes_to_plot],
-                                f_centers_ghz_all=f_centers_ghz_all, res_nums=res_nums, band_str=self.band)
-        ax_res_spec.set_xlim(left=x_min, right=x_max)
-
-        # Plot KEY
-        ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels, summary_info=summary_info)
-
-        # Display
-        scatter_plot_basename = F"ScatterHist_{self.band}_{wafer_str}.pdf"
-        scatter_plot_path = os.path.join(self.report_dir, scatter_plot_basename)
-        plt.draw()
-        plt.savefig(scatter_plot_path)
-        print("Saved Plot to:", scatter_plot_path)
-        plt.show(block=True)
-        plt.close(fig=fig)
+                                                                    key=itemgetter(1, 2), reverse=True))
+        series_res_sets = {series_handle: self.__getattribute__(series_handle) for series_handle in
+                           sorted_series_handles}
+        seed_scan_path = self.seed_scan_path
+        report_dir = self.report_dir
+        report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, seed_scan_path, report_dir, show=show,
+                    omit_flagged=omit_flagged)
 
 
 class SeedsWBS:

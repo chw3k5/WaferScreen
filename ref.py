@@ -53,6 +53,8 @@ output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["n
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
 runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
+flag_file_path = os.path.join(working_dir, "res_flags.csv")
+
 if current_user == 'uvwave':
     if not os.path.isfile(runtime_log):
         f = open(runtime_log, 'w')
@@ -68,6 +70,7 @@ s21_file_extensions = {"txt", "csv"}
 h = 6.6260755E-34  # Js
 c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
+phi_0 = 2.068e-15  # magnetic flux quantum
 
 # Simons Observatory Frequency Band definitions
 band_names = ["Band00", "Band01", "Band02", "Band03", "Band04", "Band05", "Band06",

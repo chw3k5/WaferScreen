@@ -1,0 +1,18 @@
+wafer,band,res_num,type,note,seed_res_num,seed_name,user
+11,0,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,1,scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736,chw3k5
+11,0,5,anomalous lambda,This resonator has an anomalous lambda curve,5,scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736,chw3k5
+11,0,65,weak flux ramp,This resonator is weakly connected to the flux ramp line and is unusually out of band. This unfortunate space means that it will likely interfere with the resonators in band01,65,scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736,chw3k5
+11,2,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,66,scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736,chw3k5
+11,2,52,collision,This resonator is too close to its neighbor res 53,117,scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736,chw3k5
+11,2,53,collision,This resonator is too close to its neighbor res 52,118,scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736,chw3k5
+11,11,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,1,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,11,2,no flux ramp,This resonator is not connected to the flux ramp line.,2,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,11,33,no flux ramp,This resonator is not connected to the flux ramp line.,33,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,11,34,weak flux ramp,This resonator is only weakly connected to the flux ramp line.,34,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,11,49,no flux ramp,This resonator is not connected to the flux ramp line.,49,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,11,51,collision,This resonator is too close to its neighbor res 52,51,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,11,52,collision,This resonator is too close to its neighbor res 51,52,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,13,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,66,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,13,15,collision,The resonator required several upgrades to the proceeding code. It seems to be a double resonator| where one resonator is connected to the flux ramp and one resonator (or resonate feature) is static as the flux ramp is sweeped.,80,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,13,53,anomalous lambda,Produced Lambda Fit curves that looked over powered| even at the nominal low input power. The plot below shows the failure of the fitter for such a resonator.,118,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+11,13,65,no flux ramp|isolated,This resonator is not connected to the flux ramp.,130,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5

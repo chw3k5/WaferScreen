@@ -1,12 +1,17 @@
+import os
 import ref
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
-from waferscreen.analyze.lambfit import phi_0
+from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, band_str_to_num, res_num_to_str
+from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
+
 
 
 report_markers = ["*", "v", "s", "<", "X",
                   "p", "^", "D", ">", "P"]
+report_colors = ["seagreen", "crimson", "darkgoldenrod", "deepskyblue", "mediumblue", "rebeccapurple"]
+
 
 
 def error_bar_report_plot(ax, xdata, ydata, yerr, res_nums_int, color="black", ls='None', markersize=10, alpha=0.7,
@@ -123,7 +128,7 @@ def band_plot(ax, f_ghz, mag_dbm, f_centers_ghz_all, res_nums, band_str):
     return ax
 
 
-def report_key(ax, leglines, leglabels, summary_info):
+def report_key(ax, leglines, leglabels, summary_info, res_flags=None):
     ax.tick_params(axis='x',  # changes apply to the x-axis
                    which='both',  # both major and minor ticks are affected
                    bottom=False,  # ticks along the bottom edge are off
@@ -135,11 +140,16 @@ def report_key(ax, leglines, leglabels, summary_info):
                    right=False,  # ticks along the top edge are off
                    labelleft=False)
     ax.text(0.5, 1, summary_info, color='black',
-            horizontalalignment='center', verticalalignment='top', fontsize=10)
+            horizontalalignment='center', verticalalignment='top', multialignment='left', fontsize=10)
     ax.set_xlim(left=0, right=1)
     ax.set_ylim(bottom=0, top=1)
     # ax.set_title("KEY")
     ax.legend(leglines, leglabels, loc=8, numpoints=5, handlelength=3, fontsize=10)
+    if res_flags is not None:
+        omitted_res = []
+        for res_flag in res_flags:
+            omitted_res.append([res_num_to_str(res_flag.seed_res_num), res_flag.type])
+        ax.table(omitted_res, loc='center', fontsize=10)
     return ax
 
 
@@ -231,8 +241,12 @@ def report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2):
     return fig, ax_key, ax_res_spec, ax_rug, axes_shist
 
 
-def single_lamp_to_report_plot(axes, res_set, color, leglines, leglabels, band_str, markersize=8, alpha=0.5):
-    available_res_nums = res_set.available_res_nums
+def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_str, markersize=8, alpha=0.5, 
+                               omitted_res_nums=None):
+    if omitted_res_nums is None:
+        available_res_nums = res_set.available_res_nums
+    else:
+        available_res_nums = res_set.available_res_nums - {res_num_to_str(res_num) for res_num in omitted_res_nums}
     # do some data analysis
     ordered_res_strs = sorted(available_res_nums)
     lamb_values = np.array([res_set.__getattribute__(res_str).lamb_fit.lambfit for res_str in ordered_res_strs])
@@ -242,7 +256,7 @@ def single_lamp_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                  for res_str in ordered_res_strs])
     flux_ramp_pp_khz_errs = np.array([res_set.__getattribute__(res_str).lamb_fit.pfit_err * 1.0e6
                                       for res_str in ordered_res_strs])
-    conversion_factor = (phi_0 / (2.0 * np.pi)) * 1.0e12
+    conversion_factor = (ref.phi_0 / (2.0 * np.pi)) * 1.0e12
     fr_squid_mi_pH = np.array([res_set.__getattribute__(res_str).lamb_fit.mfit * conversion_factor
                                for res_str in ordered_res_strs])
     fr_squid_mi_pH_err = np.array([res_set.__getattribute__(res_str).lamb_fit.mfit_err * conversion_factor
@@ -362,9 +376,17 @@ def single_lamp_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     band_min_ghz = ref.band_params[band_str]['min_GHz']
     band_max_ghz = ref.band_params[band_str]['max_GHz']
     num_in_band = len([f_center for f_center in f_centers_ghz_mean if band_min_ghz <= f_center <= band_max_ghz])
-    found_str = F"{num_found}/65 found, {num_in_band} in-band"
+    if omitted_res_nums is None:
+        total_res = 65
+        yield_str = ""
+    else:
+        total_res = 64
+        yield_percent = 100.0 * num_found / total_res
+        yield_str = F"Yield:{'%5.1f' % yield_percent}% "
+    found_str = F"{yield_str}{num_found}/{total_res} found"
+    in_band_str = F"{num_in_band} in-band"
     spacing = F"Mean Spacing{'%6.3f' % f_spacings_mhz_mean} MHz"
-    summary_info = F"{found_str}\n{spacing}"
+    summary_info = F"{found_str}\n{in_band_str}\n{spacing}"
     leglines.append(plt.Line2D(range(10), range(10), color=color, ls='None',
                                marker='o', markersize=markersize, markerfacecolor=color, alpha=alpha))
     power = res_set.series_key.port_power_dbm
@@ -372,6 +394,67 @@ def single_lamp_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     leglabels.append(F"{'%3i' % power} dBm")
 
     return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info
+
+
+def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, seed_scan_path, report_dir,
+                show=False, omit_flagged=False):
+    fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2)
+    fig.suptitle(F"{wafer_str}, {band_str} report:", y=0.995, x=0.98, horizontalalignment='right')
+    leglines = []
+    leglabels = []
+    counter = 0
+    rug_y_increment = 1.0 / len(sorted_series_handles)
+
+    f_centers_ghz_all = []
+    res_nums = []
+    wafer_num = wafer_str_to_num(wafer_str)
+    band_num = band_str_to_num(band_str)
+    if omit_flagged and wafer_num in flagged_data.wafer_band_flags.keys() \
+            and band_num in flagged_data.wafer_band_flags[wafer_num].keys():
+        res_flags = flagged_data.wafer_band_flags[wafer_num][band_num]
+        omitted_res_nums = {res_flag.seed_res_num for res_flag in res_flags}
+    else:
+        res_flags = None
+        omitted_res_nums = None
+    summary_info = ""
+    for series_handle in sorted_series_handles:
+        res_set = series_res_sets[series_handle]
+        color = report_colors[counter % len(report_colors)]
+        axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info \
+            = single_lamb_to_report_plot(axes=axes_shist, res_set=res_set, color=color, band_str=band_str,
+                                         leglines=leglines, leglabels=leglabels, omitted_res_nums=omitted_res_nums)
+        y_max = 1.0 - (rug_y_increment * counter)
+        counter += 1
+        y_min = 1.0 - (rug_y_increment * counter)
+        ax_rug = rug_plot(ax=ax_rug, xdata=f_centers_ghz_all, y_min=y_min, y_max=y_max, color=color)
+
+    # Raw S21 Scan data
+    x_min, x_max = ax_rug.get_xlim()
+    formatted_s21_dict, metadata = read_s21(path=seed_scan_path)
+    f_ghz = formatted_s21_dict["freq_ghz"]
+    s21_mag, _s21_phase = ri_to_magphase(r=formatted_s21_dict["real"], i=formatted_s21_dict["imag"])
+    indexes_to_plot = np.where((f_ghz >= x_min) & (f_ghz <= x_max))
+    ax_res_spec = band_plot(ax=ax_res_spec, f_ghz=f_ghz[indexes_to_plot], mag_dbm=s21_mag[indexes_to_plot],
+                            f_centers_ghz_all=f_centers_ghz_all, res_nums=res_nums, band_str=band_str)
+    ax_res_spec.set_xlim(left=x_min, right=x_max)
+
+    # Plot KEY
+    ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels,
+                        summary_info=summary_info, res_flags=res_flags)
+
+    # Display
+    if omitted_res_nums is None:
+        scatter_plot_basename = F"ScatterHist_{band_str}_{wafer_str}"
+    else:
+        scatter_plot_basename = F"ScatterHist_{band_str}_{wafer_str}_curated"
+    scatter_plot_path = os.path.join(report_dir, scatter_plot_basename)
+    plt.draw()
+    for extension in [".pdf", ".png"]:
+        plt.savefig(scatter_plot_path + extension)
+    print("Saved Plot to:", scatter_plot_path)
+    if show:
+        plt.show(block=True)
+    plt.close(fig=fig)
 
 
 if __name__ == "__main__":

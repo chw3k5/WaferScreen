@@ -4,8 +4,6 @@ from scipy.optimize import fsolve
 
 # Note: lambda is a reserved word, so lamb is used instead
 
-phi_0 = 2.068e-15  # magnetic flux quantum
-
 
 def phie_of_phi(phi, lamb):
     phie = phi + lamb * np.sin(phi)
