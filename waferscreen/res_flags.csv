@@ -16,3 +16,7 @@ wafer,band,res_num,type,note,seed_res_num,seed_name,user
 11,13,15,collision,The resonator required several upgrades to the proceeding code. It seems to be a double resonator| where one resonator is connected to the flux ramp and one resonator (or resonate feature) is static as the flux ramp is sweeped.,80,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
 11,13,53,anomalous lambda,Produced Lambda Fit curves that looked over powered| even at the nominal low input power. The plot below shows the failure of the fitter for such a resonator.,118,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
 11,13,65,no flux ramp|isolated,This resonator is not connected to the flux ramp.,130,scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197,chw3k5
+12,0,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,1,scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380,chw3k5
+12,2,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,66,scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380,chw3k5
+12,11,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,1,scan5.500GHz-6.100GHz_2021-02-11 03-21-55.604930,chw3k5
+12,13,1,expected no flux ramp,As designed| this resonator is not connected to the flux ramp.,67,scan5.500GHz-6.100GHz_2021-02-11 03-21-55.604930,chw3k5
