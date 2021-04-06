@@ -248,6 +248,10 @@ class VacuumControlLJ(U3):
 
 
 class VacuumInterface:
+    exchange_cycle_time = 0.5
+    button_width = 30
+    button_height = 6
+
     def __init__(self, root, debug_mode=False):
         self.debug_mode = debug_mode
         if self.debug_mode:
@@ -268,24 +272,25 @@ class VacuumInterface:
 
         # Initialize variables to track the valve states
         self.valve1_is_open = BooleanVar(value=False)
-        self.valve2_is_open = BooleanVar(value=False)
+        self.exchange_valve_was_opened = BooleanVar(value=False)
         self.text_valve1_label = StringVar()
         self.text_valve2_label = StringVar()
         self.text_valve1_button = StringVar()
-        self.text_valve2_button = StringVar()
 
-        # Valve 1
+        # Valve 1 - The vent valve
         self.valve1_label = ttk.Label(self.mainframe, textvariable=self.text_valve1_label)
         self.valve1_label.grid(column=0, row=0, sticky=W)
         self.valve1_button = ttk.Button(self.mainframe, textvariable=self.text_valve1_button,
-                                        command=self.change_valve1)
+                                        command=self.change_vent_valve,
+                                        width=self.button_width)
         self.valve1_button.grid(column=0, row=1, sticky=W)
 
-        # Valve 2
+        # Valve 2 - the heat exchange valve
         self.valve2_label = ttk.Label(self.mainframe, textvariable=self.text_valve2_label)
         self.valve2_label.grid(column=1, row=0, sticky=E)
-        self.valve2_button = ttk.Button(self.mainframe, textvariable=self.text_valve2_button,
-                                        command=self.change_valve2)
+        self.valve2_button = ttk.Button(self.mainframe, text="Cycle Exchange Gas Valve",
+                                        command=self.exchange_valve_confirm,
+                                        width=self.button_width)
         self.valve2_button.grid(column=1, row=1, sticky=E)
 
         # add some padding for each cell in the mainframe's grid
@@ -293,27 +298,38 @@ class VacuumInterface:
             child.grid_configure(padx=5, pady=5)
 
         # make sure the valves are close by default
-        self.close_valve1()
-        self.close_valve2()
+        self.close_vent_valve()
+        self.close_exchange_valve()
 
-    def change_valve1(self):
+    def change_vent_valve(self):
         if self.valve1_is_open.get():
-            self.close_valve1()
+            self.close_vent_valve()
         else:
-            self.open_valve1()
+            self.vent_valve_confirmation()
 
-    def open_vent_valve(self, vacuum_control_lj, root_vv_popup, debug_mode=False):
-        if debug_mode:
-            print("Debug Mode:\n  Simulated Valve1 Open Command")
+    def close_vent_valve(self):
+        if self.debug_mode:
+            print("Debug Mode:\n  Simulated Vent Close Command")
         else:
-            vacuum_control_lj.move_valve(user_valve_name='valve1', open_valve=True)
+            self.vacuum_control_lj.move_valve(user_valve_name='valve1', open_valve=False)
+        self.text_valve1_label.set("The Vent Valve is Closed")
+        self.text_valve1_button.set("Open Vent Valve")
+        self.valve1_is_open.set(value=False)
+        if not self.exchange_valve_was_opened.get():
+            self.valve2_button.state(['!disabled'])
+
+    def open_vent_valve(self, root_vv_popup):
+        if self.debug_mode:
+            print("Debug Mode:\n  Simulated Vent Open Command")
+        else:
+            self.vacuum_control_lj.move_valve(user_valve_name='valve1', open_valve=True)
         root_vv_popup.destroy()
-        self.text_valve1_label.set("Valve 1 is Open")
-        self.text_valve1_button.set("Close Valve 1")
+        self.text_valve1_label.set("The Vent Valve is Open")
+        self.text_valve1_button.set("Close Vent Valve")
         self.valve1_is_open.set(value=True)
         self.valve2_button.state(['disabled'])
 
-    def open_valve1(self):
+    def vent_valve_confirmation(self):
         root_vv_popup = Toplevel()
         mainframe_vv_popup = ttk.Frame(root_vv_popup, padding=(3, 3, 12, 12))
         mainframe_vv_popup.grid(column=0, row=0, sticky=(N, W, E, S))
@@ -321,45 +337,66 @@ class VacuumInterface:
         root_vv_popup.rowconfigure(0, weight=1)
 
         vv_text = "Confirm that you want to open the Vent Valve.\n"
-        vv_text += "Opening this valve to start/continue pumping the cryostat\n"
+        vv_text += "Open this valve to start/continue pumping the cryostat\n"
         vv_text += "or to vent the cryostat to atmosphere."
         vv_label = ttk.Label(mainframe_vv_popup, text=vv_text)
         vv_label.grid(column=0, row=0, columnspan=2)
-        cancel_button = ttk.Button(mainframe_vv_popup, text="cancel", command=root_vv_popup.destroy)
+        cancel_button = ttk.Button(mainframe_vv_popup, text="\nCancel", command=root_vv_popup.destroy,
+                                   width=self.button_width)
         cancel_button.grid(column=0, row=1)
         cancel_button.state(['active'])
         confirm_button = ttk.Button(mainframe_vv_popup, text="Confirm\nOpen",
-                                    command=partial(self.open_vent_valve, self.vacuum_control_lj,
-                                                    root_vv_popup, self.debug_mode))
+                                    command=partial(self.open_vent_valve, root_vv_popup),
+                                    width=self.button_width)
         confirm_button.grid(column=1, row=1)
 
-    def close_valve1(self):
-        self.text_valve1_label.set("Valve 1 is Closed")
-        self.text_valve1_button.set("Open Valve 1")
-        self.valve1_is_open.set(value=False)
-        self.valve2_button.state(['!disabled'])
-
-    def change_valve2(self):
-        if self.valve2_is_open.get():
-            self.close_valve2()
+    def close_exchange_valve(self):
+        if self.debug_mode:
+            print("Debug Mode:\n  Simulated Exchange Valve Closed Command")
         else:
-            self.open_valve2()
-
-    def open_valve2(self):
-        self.text_valve2_label.set("Valve 2 is Open")
-        self.text_valve2_button.set("Close Valve 2")
-        self.valve2_is_open.set(value=True)
-        self.valve1_button.state(['disabled'])
-
-    def close_valve2(self):
-        self.text_valve2_label.set("Valve 2 is Closed")
-        self.text_valve2_button.set("Open Valve 2")
-        self.valve2_is_open.set(value=False)
+            self.vacuum_control_lj.move_valve(user_valve_name='valve2', open_valve=False)
+        self.text_valve2_label.set("Gas Exchange Valve is Closed")
         self.valve1_button.state(['!disabled'])
 
+    def cycle_exchange_valve(self, root_ex_popup):
+        # open the valve to let exchange gas into the cryostat
+        if self.debug_mode:
+            print("Debug Mode:\n  Simulated Exchange Valve Open Command")
+        else:
+            self.vacuum_control_lj.move_valve(user_valve_name='valve2', open_valve=True)
+        # kill the pop up window and record the current valve state, and disable the valve 1 open button
+        root_ex_popup.destroy()
+        self.text_valve2_label.set("Gas Exchange Valve is Open")
+        self.exchange_valve_was_opened.set(value=True)
+        self.valve1_button.state(['disabled'])
+        # sleep for the cycle time
+        time.sleep(self.exchange_cycle_time)
+        # close the valve to complete the exchange gas cycle and disable the valve 2 button from being used again.
+        self.close_exchange_valve()
+        self.valve2_button.state(['disabled'])
 
+    def exchange_valve_confirm(self):
+        root_ex_popup = Toplevel()
+        mainframe_ex_popup = ttk.Frame(root_ex_popup, padding=(3, 3, 12, 12))
+        mainframe_ex_popup.grid(column=0, row=0, sticky=(N, W, E, S))
+        root_ex_popup.columnconfigure(0, weight=1)
+        root_ex_popup.rowconfigure(0, weight=1)
 
-
+        ex_text = "Confirm that you want to Cycle the Thermal Exchange Gas Valve.\n"
+        ex_text += F"The Cycle will last Open the Exchange Gas Valve for:\n"
+        ex_text += F"   {self.exchange_cycle_time} seconds and then close.\n"
+        ex_text += "It is expected that this valve has been filled with gas phase Helium\n"
+        ex_text += "    and the valve is currently capped.\n"
+        ex_label = ttk.Label(mainframe_ex_popup, text=ex_text)
+        ex_label.grid(column=0, row=0, columnspan=2)
+        cancel_button = ttk.Button(mainframe_ex_popup, text="\nCancel", command=root_ex_popup.destroy,
+                                   width=self.button_width)
+        cancel_button.grid(column=0, row=1)
+        cancel_button.state(['active'])
+        confirm_button = ttk.Button(mainframe_ex_popup, text="Confirm\nCycle",
+                                    command=partial(self.cycle_exchange_valve, root_ex_popup),
+                                    width=self.button_width)
+        confirm_button.grid(column=1, row=1)
 
 
 if __name__ == "__main__":
