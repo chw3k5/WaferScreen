@@ -8,7 +8,13 @@ if sys.platform == "win32":
     mpl.use(backend="TkAgg")
 elif sys.platform == 'darwin':
     mpl.use(backend="MacOSX")
-
+import matplotlib as mpl
+from datetime import datetime
+# To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
+if sys.platform == "win32":
+    mpl.use(backend="TkAgg")
+elif sys.platform == 'darwin':
+    mpl.use(backend="MacOSX")
 # Debug mode
 debug_mode = False
 
