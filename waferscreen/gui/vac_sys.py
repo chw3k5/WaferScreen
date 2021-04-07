@@ -401,5 +401,5 @@ class VacuumInterface:
 
 if __name__ == "__main__":
     a_root = Tk()
-    vac_interface = VacuumInterface(root=a_root, debug_mode=True)
+    vac_interface = VacuumInterface(root=a_root, debug_mode=False)
     a_root.mainloop()

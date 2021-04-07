@@ -267,7 +267,7 @@ class JobAssignment:
 
 if __name__ == "__main__":
     rf_chain_letter = "a"  # choose either {"a", "b"}
-    do_scan = False
+    do_scan = True
     do_res_sweeps = not do_scan
 
     if do_scan:
@@ -280,7 +280,6 @@ if __name__ == "__main__":
         job_assign = JobAssignment()
         with job_assign:
             job_assign.launch_hungry_for_jobs(chain_letter=rf_chain_letter)
-            print("temp test point")
 
 
             # # Not ready for continuous use.

@@ -502,7 +502,11 @@ class ResPipe:
                   output_filename=os.path.join(self.report_dir, "band_report.pdf"))
 
     def prep_seed_dirs(self, seed_type):
-        date_str_path, _ = self.dirname.rsplit("pro", 1)
+        if "pro" in self.dirname:
+            split_on = "pro"
+        else:
+            split_on = 'raw'
+        date_str_path, _ = self.dirname.rsplit(split_on, 1)
         single_res_dir = os.path.join(date_str_path, 'raw', seed_type)
         if not os.path.exists(single_res_dir):
             os.mkdir(single_res_dir)

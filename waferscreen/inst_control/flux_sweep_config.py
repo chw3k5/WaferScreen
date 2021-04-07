@@ -5,19 +5,19 @@ import os
 output_base_dir = os.path.join("D:\\", "waferscreen")
 
 # Test Information
-wafer = 11
+wafer = "14"
 location = 'nist'
 
 # VNA Configuration
 probe_power_dBm = -20
-power_sweep_dBm = [-20, -10, 0]  # dBm
+power_sweep_dBm = [-40, -20]  # dBm
 sweeptype = 'lin'
 if_bw_Hz = 300
 vna_avg = None
 
 # Scan configuration (A Scan searches the entire RF band)
-scan_f_min_GHz = 5.6 # 4
-scan_f_max_GHz = 6.1 # 4.5
+scan_f_min_GHz = 4
+scan_f_max_GHz = 6
 scan_stepsize_kHz = 10
 
 

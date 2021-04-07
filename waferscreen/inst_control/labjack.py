@@ -248,3 +248,4 @@ if __name__ == "__main__":
     vc = VacuumControlLJ()
     vc.move_valve(user_valve_name='valve1', open_valve=False)
 
+

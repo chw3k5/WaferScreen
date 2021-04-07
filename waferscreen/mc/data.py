@@ -239,9 +239,7 @@ class DataManager:
             # by default, get all the scans files
             self.phase_corrected_scan_files = get_pro_s21_scans(process_type="phase")
             phase_corrected_scan_files = self.phase_corrected_scan_files
-        else:
-            phase_corrected_scan_files = scan_paths
-        self.analyze_resonator_files(s21_files=phase_corrected_scan_files, cosine_filter=cosine_filter,
+        self.analyze_resonator_files(s21_files=scan_paths, cosine_filter=cosine_filter,
                                      window_pad_factor=window_pad_factor, fitter_pad_factor=fitter_pad_factor,
                                      show_filter_plots=show_filter_plots, skip_interactive_plot=skip_interactive_plot,
                                      save_res_plots=save_res_plots)
@@ -301,13 +299,13 @@ class DataManager:
 
     def full_loop_scans(self, scan_paths=None, cosine_filter=False, window_pad_factor=3, fitter_pad_factor=6,
                         show_filter_plots=False,
-                        do_interactive_plot=False, save_res_plots=False,
-                        make_band_seeds=False, make_single_res_seeds=False):
+                        do_interactive_plot=True, save_res_plots=True,
+                        make_band_seeds=False, make_single_res_seeds=True):
         if scan_paths is None:
             self.raw_process_all_scans()
         else:
             [raw_process(path=scan_path) for scan_path in scan_paths]
-        self.analyze_scans_resonators(scan_paths=self.phase_corrected_scan_files, cosine_filter=cosine_filter,
+        self.analyze_scans_resonators(scan_paths=phase_corrected_scan_files, cosine_filter=cosine_filter,
                                       window_pad_factor=window_pad_factor, fitter_pad_factor=fitter_pad_factor,
                                       show_filter_plots=show_filter_plots,
                                       skip_interactive_plot=not do_interactive_plot,
