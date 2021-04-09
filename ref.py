@@ -59,7 +59,7 @@ output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["n
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
 runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
-flag_file_path = os.path.join(working_dir, "res_flags.csv")
+flag_file_path = os.path.join(parent_dir, "WaferScreen", "waferscreen", "res_flags.csv")
 
 if current_user == 'uvwave':
     if not os.path.isfile(runtime_log):

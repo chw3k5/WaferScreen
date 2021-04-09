@@ -17,7 +17,7 @@ def to_raw_path(seed_name):
 # edit these to look at existing measurements
 location = "nist"
 wafer = "14"  # str(8)
-date_str = "2021-04-06"  # ref.today_str # "2021-02-11"
+date_str = ref.today_str # "2021-04-07"
 
 raw_dir = os.path.join(ref.working_dir, location, wafer, date_str, "raw")
 raw_scans_dir = os.path.join(raw_dir, "scans")
@@ -26,7 +26,7 @@ raw_single_res_dir = os.path.join(raw_dir, "single_res")
 # seed_names = ["scan4.000GHz-4.500GHz_2021-02-12 05-48-00.492736",  # "scan3.900GHz-4.500GHz_2021-02-10 19-04-56.938380"
 #               "scan5.600GHz-6.100GHz_2021-02-11 19-12-14.079197"]
 
-seed_names = ["scan4.030GHz-4.190GHz_2021-04-06 22-12-09.099966"]
+seed_names = ["scan5.750GHz-5.950GHz_2021-04-09 01-37-17.657322"]
 
 test_scan_files = [os.path.join(raw_scans_dir, to_raw_path(seed_name)) for seed_name in seed_names]
 test_raw_res_dirs = [raw_single_res_dir]

@@ -83,7 +83,8 @@ class AbstractFluxSweep:
             self.ramp = SRS_SIM928(srs_port=1, srs_connect=self.flux_ramp_srs_connect)
             self.rf_chain = "a"
         elif test_letter == "b":
-            self.ramp = SRS_SIM928(srs_port=2, srs_connect=self.flux_ramp_srs_connect)
+            # self.ramp = SRS_SIM928(srs_port=2, srs_connect=self.flux_ramp_srs_connect)
+            self.ramp = SRS_SIM928(srs_port=1, srs_connect=self.flux_ramp_srs_connect)
             self.rf_chain = "b"
         else:
             self.ramp = SRS_SIM928(srs_port=rf_chain_letter, srs_connect=self.flux_ramp_srs_connect)
@@ -230,7 +231,7 @@ class AbstractFluxSweep:
                 attempts_count += 1
                 now = time.time()
                 delta_t_minutes = (last_job_found_time - now) / 60.0
-                print(F"No new data for {delta_t_minutes} minutes, " +
+                print(F"No new sweep jobs for {delta_t_minutes} minutes, " +
                       F"sleeping for {self.hungry_for_jobs_retry_time_s} seconds, " +
                       F"attempt {'%4i' % attempts_count} of {max_try_attempts}.")
                 time.sleep(self.hungry_for_jobs_retry_time_s)
@@ -266,8 +267,8 @@ class JobAssignment:
 
 
 if __name__ == "__main__":
-    rf_chain_letter = "a"  # choose either {"a", "b"}
-    do_scan = True
+    rf_chain_letter = "b"  # choose either {"a", "b"}
+    do_scan = False
     do_res_sweeps = not do_scan
 
     if do_scan:
