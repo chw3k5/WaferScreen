@@ -6,7 +6,7 @@ ref_file_path = os.path.dirname(os.path.realpath(__file__))
 parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
 sys.path.append(os.path.join(parent_dir, 'WaferScreen'))
 # these are modules that have been written specifically for the wafer screen project.
-from waferscreen.mc.data import DataManager
+from waferscreen.data_io.data_pro import DataManager
 from waferscreen.analyze.s21_inductor import InductS21
 
 

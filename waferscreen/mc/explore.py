@@ -1,7 +1,7 @@
 import os
 import datetime
 from operator import itemgetter
-from waferscreen.mc.data import get_all_lamb_files
+from waferscreen.data_io.data_pro import get_all_lamb_files
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header

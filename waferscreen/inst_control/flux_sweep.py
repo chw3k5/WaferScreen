@@ -38,22 +38,6 @@ def dirname_create_raw(sweep_type="scan", res_id=None):
     return path_str
 
 
-def get_job(chain_letter):
-    job_filename = os.path.join(ref.working_dir, F"{chain_letter}_chain_job.csv")
-    if os.path.isfile(job_filename):
-        with open(job_filename, "r") as f:
-            lines = f.readlines()
-        job_type = lines[0].strip()
-        seed_files = [filename.strip() for filename in lines[1:]]
-        return job_type, seed_files
-    else:
-        return None
-
-
-def get_jobs():
-    return get_job(chain_letter='a'), get_job(chain_letter="b")
-
-
 def thread_function(name):
     """
     A simple test function to practice on
@@ -74,8 +58,6 @@ class AbstractFluxSweep:
     """
     # one connection is shared by all instances of this class
     flux_ramp_srs_connect = SRS_Connect(address=ref.flux_ramp_address)
-    hungry_for_jobs_retry_time_s = 20
-    hungry_for_jobs_timeout_hours = 0.01
 
     def __init__(self, rf_chain_letter, vna_address=agilent8722es_address, verbose=True, working_dir=None):
         test_letter = rf_chain_letter.lower().strip()
@@ -216,84 +198,6 @@ class AbstractFluxSweep:
                                           "so_band": metadata["so_band"], "seed_base": seed_base}
                     self.survey_power_ramp(resonator_metadata)
 
-    def hungry_for_jobs(self):
-        max_try_attempts = int(np.ceil(2 * (self.hungry_for_jobs_timeout_hours * 3600) /
-                                       self.hungry_for_jobs_retry_time_s))
-        last_job_found_time = time.time()
-        attempts_count = 0
-        while attempts_count < max_try_attempts:
-            job = get_job(chain_letter=self.rf_chain)
-            if job is not None:
-                self.survey_from_job_file(job=job)
-                last_job_found_time = time.time()
-                attempts_count = 0
-            else:
-                attempts_count += 1
-                now = time.time()
-                delta_t_minutes = (last_job_found_time - now) / 60.0
-                print(F"No new sweep jobs for {delta_t_minutes} minutes, " +
-                      F"sleeping for {self.hungry_for_jobs_retry_time_s} seconds, " +
-                      F"attempt {'%4i' % attempts_count} of {max_try_attempts}.")
-                time.sleep(self.hungry_for_jobs_retry_time_s)
-
-    def survey_from_job_file(self, job):
-        job_type, seed_files = job
-        if job_type == "single_res":
-            self.single_res_survey_from_job_file(seed_files=seed_files)
-        else:
-            raise TypeError(F"Job type: {job_type} is not recognized.")
-
-
-class JobAssignment:
-    def __init__(self):
-        self.a_jobs, self.b_job = None, None
-        self.a_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='a',
-                                                    vna_address=agilent8722es_address,
-                                                    verbose=True, working_dir=None)
-        self.b_chain_flux_sweep = AbstractFluxSweep(rf_chain_letter='b',
-                                                    vna_address=agilent8722es_address,
-                                                    verbose=True, working_dir=None)
-
-    def __enter__(self):
-        self.a_chain_flux_sweep.power_on()
-        self.b_chain_flux_sweep.power_on()
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.a_chain_flux_sweep.end()
-        self.b_chain_flux_sweep.end()
-
-    def launch_hungry_for_jobs(self, chain_letter="a"):
-        self.__getattribute__(F"{chain_letter}_chain_flux_sweep").hungry_for_jobs()
-
-
-if __name__ == "__main__":
-    rf_chain_letter = "b"  # choose either {"a", "b"}
-    do_scan = False
-    do_res_sweeps = not do_scan
-
-    if do_scan:
-        abstract_flux_sweep = AbstractFluxSweep(rf_chain_letter=rf_chain_letter)
-        with abstract_flux_sweep:
-            abstract_flux_sweep.scan_for_resonators(fmin_GHz=fsc.scan_f_min_GHz, fmax_GHz=fsc.scan_f_max_GHz)
-
-    if do_res_sweeps:
-        # resonator sweeps based on an analyzed scan
-        job_assign = JobAssignment()
-        with job_assign:
-            job_assign.launch_hungry_for_jobs(chain_letter=rf_chain_letter)
-
-
-            # # Not ready for continuous use.
-            # format = "%(asctime)s: %(message)s"
-            # logging.basicConfig(format=format, level=logging.INFO,
-            #                     datefmt="%H:%M:%S")
-            # logging.info("Main    : before creating thread")
-            # x = threading.Thread(target=job_assign.launch_hungry_for_jobs, args=("a",))
-            # logging.info("Main    : before running thread")
-            # x.start()
-            # logging.info("Main    : wait for the thread to finish")
-            # # x.join()
-            # logging.info("Main    : all done")
 
 
 

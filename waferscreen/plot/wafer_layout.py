@@ -1,3 +1,5 @@
+# Not working
+"""
 #example of chip_pos_label
 chip_pos_label = [[-1,0],[1,3],[0,5],....]
 
@@ -62,3 +64,4 @@ ax51.text(-35,35,"Wafer " + str(wafer_number), fontsize = 14)
 ax51.set_xlim([-25.4*3.0/2*1.1, 25.4*3.0/2*1.1])
 ax51.set_ylim([-25.4*3.0/2*1.1, 25.4*3.0/2*1.1])
 ax51.set_aspect('equal')
+"""
