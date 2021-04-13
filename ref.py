@@ -103,6 +103,17 @@ for band in band_params.keys():
     params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
     params_dict["band_num"] = int(band.lower().replace("band", ""))
 
+
+smurf_keepout_zones_ghz = [(3.981 + 0.5 * zone_number, 4.019 + 0.5 * zone_number) for zone_number in range(5)]
+
+
+def in_smurf_keepout(f_ghz):
+    for keep_out_min, keep_out_max in smurf_keepout_zones_ghz:
+        if keep_out_min < f_ghz < keep_out_max:
+            return True
+    return False
+
+
 s21_processing_types = {"phase", "windowbaselinesmoothedremoved"}
 
 google_drive_api_key = "AIzaSyAJBe0g27WNUhsjSBLoLSNlT4WIdDgUJ_U"
