@@ -10,14 +10,14 @@ location = 'nist'
 
 # VNA Configuration
 probe_power_dBm = -20
-power_sweep_dBm = [-40, -20]  # dBm
+power_sweep_dBm = [-30]  # dBm
 sweeptype = 'lin'
 if_bw_Hz = 300
 vna_avg = None
 
 # Scan configuration (A Scan searches the entire RF band)
-scan_f_min_GHz = 5.75
-scan_f_max_GHz = 5.95
+scan_f_min_GHz = 4.35
+scan_f_max_GHz = 4.65
 scan_stepsize_kHz = 10
 
 

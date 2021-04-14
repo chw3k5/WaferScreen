@@ -32,7 +32,7 @@ class JobDispatch:
     def hungry_for_jobs(self, rf_chain_letter):
         calculated_job_search_attempts = int(np.ceil(self.hungry_for_jobs_timeout_hours * 3600 /
                                                      self.hungry_for_jobs_retry_time_s))
-        max_job_search_attempts = np.max(self.minimum_failed_job_search_attempts, calculated_job_search_attempts)
+        max_job_search_attempts = np.max((self.minimum_failed_job_search_attempts, calculated_job_search_attempts))
         last_job_found_time = time.time()
         failed_attempts_count = 0
         this_chain_flux_sweep = self.__getattribute__(F"{rf_chain_letter}_chain_flux_sweep")

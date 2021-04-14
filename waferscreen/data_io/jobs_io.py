@@ -12,10 +12,12 @@ class JobOrganizer:
     b_chain_new_job_int = 1
     job_file_matching_expression = re.compile("._chain_jobs_....\.csv")
 
-    def __init__(self):
+    def __init__(self, check_for_old_jobs=True):
         self.check_for_jobs()
-        self.a_chain_job_deque = sorted(self.a_chain_job_deque)
-        self.b_chain_job_deque = sorted(self.b_chain_job_deque)
+        self.check_for_old_jobs = check_for_old_jobs
+        if check_for_old_jobs:
+            self.a_chain_job_deque = sorted(self.a_chain_job_deque)
+            self.b_chain_job_deque = sorted(self.b_chain_job_deque)
 
     def get_seed_files_from_job(self, job_basename):
         job_full_path = os.path.join(self.working_dir, job_basename)
@@ -47,9 +49,10 @@ class JobOrganizer:
 
     def get_new_job_name(self, rf_chain_letter):
         this_chain_new_job_int = self.__getattribute__(F"{rf_chain_letter}_chain_new_job_int")
-        path = os.path.join(self.working_dir, F"{rf_chain_letter}_chain_jobs_{'%04i' % this_chain_new_job_int}.csv")
+        job_basename = F"{rf_chain_letter}_chain_jobs_{'%04i' % this_chain_new_job_int}.csv"
+        self.add_job_file_to_deque(job_basename=job_basename)
         self.__setattr__(F"{rf_chain_letter}_chain_new_job_int", this_chain_new_job_int + 1)
-        return path
+        return os.path.join(self.working_dir, job_basename)
 
     def get_next_job_to_process(self, rf_chain_letter):
         this_chain_job_deque = self.__getattribute__(F"{rf_chain_letter}_chain_job_deque")
@@ -65,9 +68,10 @@ class JobOrganizer:
         this_chain_new_job_int = self.__getattribute__(F"{rf_chain_letter}_chain_new_job_int")
         # increment the next_job_int, this only happens here when the job processing was interrupted and restarted
         if job_int >= this_chain_new_job_int:
-            self.__setattr__(F"{rf_chain_letter}_chain_lowest_number_job_int", job_int + 1)
-        # add the file to the deque
-        this_chain_job_deque.append(job_basename)
+            self.__setattr__(F"{rf_chain_letter}_chain_new_job_int", job_int + 1)
+        # add the file to the deque, if it is not there already from another instance of this class
+        if job_basename not in this_chain_job_deque:
+            this_chain_job_deque.append(job_basename)
         return
 
     def check_for_jobs(self):

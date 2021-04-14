@@ -1,7 +1,7 @@
-import numpy as np
 import os
-from shutil import rmtree
 import copy
+from shutil import rmtree
+import numpy as np
 from scipy.signal import savgol_filter
 from scipy.interpolate import interp1d
 from waferscreen.data_io.s21_io import read_s21, write_s21, ri_to_magphase, magphase_to_realimag, \
@@ -10,7 +10,8 @@ from waferscreen.plot.s21_plots import plot_filter, plot_res_fit, band_plot
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.data_io.res_io import ResParams
-from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results, jake_res_finder
+from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results
+from waferscreen.data_io.jobs_io import JobOrganizer
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 import ref
 
@@ -139,6 +140,8 @@ class ResPipe:
 
         self.res_plot_dir = os.path.join(self.dirname, F"resonator_plots")
         self.report_dir = os.path.join(self.dirname, F"report")
+
+        self.job_organizer = JobOrganizer(check_for_old_jobs=False)
 
         self.verbose = verbose
         self.metadata = None
@@ -513,7 +516,7 @@ class ResPipe:
         scan_basename_dir = os.path.join(single_res_dir, self.basename_prefix)
         if not os.path.exists(scan_basename_dir):
             os.mkdir(scan_basename_dir)
-        job_file_name = os.path.join(ref.working_dir, F"{self.metadata['rf_chain']}_chain_job.csv")
+        job_file_name = self.job_organizer.get_new_job_name(rf_chain_letter=self.metadata['rf_chain'])
         return scan_basename_dir, job_file_name
 
     def make_res_seeds(self):
