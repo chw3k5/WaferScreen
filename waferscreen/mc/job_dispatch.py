@@ -39,6 +39,10 @@ class JobDispatch:
         while failed_attempts_count < max_job_search_attempts:
             job_basename = self.job_organizer.get_next_job_to_process(rf_chain_letter=rf_chain_letter)
             if job_basename is None:
+                # refresh and see if new job files were written to the disk
+                self.job_organizer = JobOrganizer()
+            job_basename = self.job_organizer.get_next_job_to_process(rf_chain_letter=rf_chain_letter)
+            if job_basename is None:
                 # Case: there a not jobs available for this RF chain
                 failed_attempts_count += 1
                 now = time.time()
