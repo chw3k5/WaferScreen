@@ -16,8 +16,8 @@ class JobOrganizer:
         self.check_for_jobs()
         self.check_for_old_jobs = check_for_old_jobs
         if check_for_old_jobs:
-            self.a_chain_job_deque = sorted(self.a_chain_job_deque)
-            self.b_chain_job_deque = sorted(self.b_chain_job_deque)
+            self.a_chain_job_deque = deque(sorted(self.a_chain_job_deque))
+            self.b_chain_job_deque = deque(sorted(self.b_chain_job_deque))
 
     def get_seed_files_from_job(self, job_basename):
         job_full_path = os.path.join(self.working_dir, job_basename)
