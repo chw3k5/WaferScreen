@@ -78,6 +78,14 @@ c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
 phi_0 = 2.068e-15  # magnetic flux quantum
 
+
+# processing types
+s21_processing_types = {"phase", "windowbaselinesmoothedremoved"}
+
+# Google drive api key
+google_drive_api_key = "AIzaSyAJBe0g27WNUhsjSBLoLSNlT4WIdDgUJ_U"
+
+
 # Simons Observatory Frequency Band definitions
 band_names = ["Band00", "Band01", "Band02", "Band03", "Band04", "Band05", "Band06",
               "Band07", "Band08", "Band09", "Band10", "Band11", "Band12", "Band13"]
@@ -103,7 +111,7 @@ for band in band_params.keys():
     params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
     params_dict["band_num"] = int(band.lower().replace("band", ""))
 
-
+# smurf (FPGA readout) definitions
 smurf_keepout_zones_ghz = [(3.981 + 0.5 * zone_number, 4.019 + 0.5 * zone_number) for zone_number in range(5)]
 
 
@@ -114,6 +122,6 @@ def in_smurf_keepout(f_ghz):
     return False
 
 
-s21_processing_types = {"phase", "windowbaselinesmoothedremoved"}
+# wafer acceptance criteria
+min_q_i = 1.2e5
 
-google_drive_api_key = "AIzaSyAJBe0g27WNUhsjSBLoLSNlT4WIdDgUJ_U"

@@ -7,23 +7,53 @@ from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, band_
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 
 
-
 report_markers = ["*", "v", "s", "<", "X",
                   "p", "^", "D", ">", "P"]
 report_colors = ["seagreen", "crimson", "darkgoldenrod", "deepskyblue", "mediumblue", "rebeccapurple"]
 
 
-
 def error_bar_report_plot(ax, xdata, ydata, yerr, res_nums_int, color="black", ls='None', markersize=10, alpha=0.7,
-                          x_label=None, y_label=None, x_ticks_on=True):
+                          x_label=None, y_label=None, x_ticks_on=True,
+                          min_y=None, max_y=None, average_y=None):
+    # calculate when the values are outside of the acceptance range
+    if min_y is None:
+        lower_bound = float("-inf")
+    else:
+        lower_bound = float(min_y)
+    if max_y is None:
+        upper_bound = float("inf")
+    else:
+        upper_bound = float(max_y)
+    res_nums_too_low = set()
+    res_nums_too_high = set()
+    # turn on/off tick marks
     if not x_ticks_on:
         ax.tick_params(axis="x", labelbottom=False)
+    # loop to plot data one point at a time (add a identifying marker for each data point)
     counter = 0
     for x_datum, y_datum, y_datum_err in zip(xdata, ydata, yerr):
-        marker = report_markers[res_nums_int[counter] % len(report_markers)]
-        ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
-                    color=color, ls=ls, marker=marker, markersize=markersize, alpha=alpha)
+        res_num = res_nums_int[counter]
+        marker = report_markers[res_num % len(report_markers)]
+        if y_datum < lower_bound:
+            res_nums_too_low.add(res_num)
+            ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
+                        color="black", ls=ls, marker=marker, markersize=markersize, alpha=1.0)
+        elif upper_bound < y_datum:
+            res_nums_too_high.add(res_num)
+            ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
+                        color="black", ls=ls, marker=marker, markersize=markersize, alpha=1.0)
+        else:
+            ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
+                        color=color, ls=ls, marker=marker, markersize=markersize, alpha=alpha)
         counter += 1
+    # boundary and average lines
+    if min_y is not None:
+        ax.axhline(y=min_y, xmin=0, xmax=1, color='red', linestyle='dashed')
+    if average_y is not None:
+        ax.axhline(y=average_y, xmin=0, xmax=1, color='green', linestyle='dotted')
+    if max_y is not None:
+        ax.axhline(y=max_y, xmin=0, xmax=1, color='red', linestyle='dashdot')
+    # tick marks and axis labels
     if x_label is None:
         if x_ticks_on:
             ax.set_xlabel("Average Resonator Center Frequency (GHz)")
@@ -31,8 +61,9 @@ def error_bar_report_plot(ax, xdata, ydata, yerr, res_nums_int, color="black", l
         ax.set_xlabel(x_label)
     if y_label is not None:
         ax.set_ylabel(y_label)
+    # grid on major tick marks
     ax.grid(b=True)
-    return ax
+    return ax, res_nums_too_low, res_nums_too_high
 
 
 def hist_report_plot(ax, data, bins=10, color="blue", x_label=None, y_label=None, alpha=0.5):
@@ -93,6 +124,10 @@ def band_plot(ax, f_ghz, mag_dbm, f_centers_ghz_all, res_nums, band_str):
     right_of_band = [band_dict['max_GHz'] < one_f for one_f in f_ghz]
     ax.fill_between((band_dict['min_GHz'], band_dict['max_GHz']), 0, 1,
                     facecolor='cornflowerblue', alpha=0.5, transform=trans)
+    # the smurf keep out zones
+    for keepout_min, keepout_max in ref.smurf_keepout_zones_ghz:
+        ax.fill_between((keepout_min, keepout_max), 0, 1, facecolor='black', alpha=0.5, transform=trans)
+
     # the spectrum part of the plot
     ax.plot(f_ghz[in_band], plot_s21_mag[in_band], color="darkorchid", linewidth=1)
     ax.plot(f_ghz[left_of_band], plot_s21_mag[left_of_band], color="black", linewidth=1)
@@ -230,7 +265,7 @@ def report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2):
         shist_top = shist_bottom - scatter_hist_bigger_vspace
 
     # initialize the plot
-    fig = plt.figure(figsize=(17, 10))
+    fig = plt.figure(figsize=(25, 10))
     ax_key = fig.add_axes(key_cood, frameon=False)
     ax_res_spec = fig.add_axes(res_spec_cood, frameon=False)
     ax_rug = fig.add_axes(rug_cood, sharex=ax_res_spec, frameon=False)
@@ -261,6 +296,20 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                for res_str in ordered_res_strs])
     fr_squid_mi_pH_err = np.array([res_set.__getattribute__(res_str).lamb_fit.mfit_err * conversion_factor
                                    for res_str in ordered_res_strs])
+    port_powers_dbm = np.array([res_set.__getattribute__(res_str).metadata["port_power_dbm"]
+                                for res_str in ordered_res_strs])
+    # This should be a real calibration not this hacky one size fits all subtraction, I hate that I wrote this
+    at_res_power_dbm = []
+    for res_str, port_power_dbm in zip(ordered_res_strs, port_powers_dbm):
+        wafer_num = res_set.__getattribute__(res_str).metadata["wafer"]
+        if wafer_num < 12.5:
+            # with warm 20 dBm attenuator that make the VNA output unleveled
+            at_res_power_dbm.append(port_power_dbm - 75.0)
+        else:
+            # no warm 20 dBm attenuator on the input
+            at_res_power_dbm.append(port_power_dbm - 55.0)
+    at_res_power_dbm_mean = np.mean(at_res_power_dbm)
+
     # initialize some useful parameters
     f_centers_ghz_all = []
     f_centers_ghz_mean = []
@@ -271,6 +320,8 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     q_c_std = []
     impedance_ratio_mean = []
     impedance_ratio_std = []
+    non_linear_mean = []
+    non_linear_std = []
     for res_str in ordered_res_strs:
         single_lamb = res_set.__getattribute__(res_str)
         f_centers_this_lamb = np.array([res_params.fcenter_ghz for res_params in single_lamb.res_fits])
@@ -289,6 +340,11 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
         impedance_ratios_this_lamb = np.array([res_params.impedance_ratio for res_params in single_lamb.res_fits])
         impedance_ratio_mean.append(np.mean(impedance_ratios_this_lamb))
         impedance_ratio_std.append(np.std(impedance_ratios_this_lamb))
+
+        non_linear_this_lamb = np.array([res_params.base_amplitude_slope for res_params in single_lamb.res_fits])
+        non_linear_mean.append(np.mean(non_linear_this_lamb))
+        non_linear_std.append(np.std(non_linear_this_lamb))
+
     f_centers_ghz_mean = np.array(f_centers_ghz_mean)
     f_centers_ghz_std = np.array(f_centers_ghz_std)
     q_i_mean = np.array(q_i_mean)
@@ -305,10 +361,21 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Qi
     q_i_label = F"Qi (Quality Factor)"
     ax_scatter_q_i, ax_hist_q_i = axes[0]
-    error_bar_report_plot(ax=ax_scatter_q_i, xdata=f_centers_ghz_mean, ydata=q_i_mean, yerr=q_i_std,
-                          res_nums_int=res_nums_int,
-                          color=color, ls='None', markersize=markersize, alpha=alpha,
-                          x_label=None, y_label=q_i_label, x_ticks_on=False)
+    if at_res_power_dbm_mean >= -78.0:
+        ax_scatter_q_i, res_nums_too_low_q_i,  res_nums_too_high_q_i = \
+            error_bar_report_plot(ax=ax_scatter_q_i, xdata=f_centers_ghz_mean, ydata=q_i_mean, yerr=q_i_std,
+                                  res_nums_int=res_nums_int,
+                                  color=color, ls='None', markersize=markersize, alpha=alpha,
+                                  x_label=None, y_label=q_i_label, x_ticks_on=False,
+                                  min_y=ref.min_q_i, max_y=None, average_y=None)
+    else:
+        ax_scatter_q_i, res_nums_too_low_q_i, res_nums_too_high_q_i = \
+            error_bar_report_plot(ax=ax_scatter_q_i, xdata=f_centers_ghz_mean, ydata=q_i_mean, yerr=q_i_std,
+                                  res_nums_int=res_nums_int,
+                                  color=color, ls='None', markersize=markersize, alpha=alpha,
+                                  x_label=None, y_label=q_i_label, x_ticks_on=False,
+                                  min_y=None, max_y=None, average_y=None)
+
     hist_report_plot(ax=ax_hist_q_i, data=q_i_mean, bins=10, color=color, x_label=None, y_label=None, alpha=alpha)
     ax_scatter_q_i.tick_params(axis='x',  # changes apply to the x-axis
                                which='both',  # both major and minor ticks are affected
@@ -318,10 +385,11 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Qc
     q_c_label = F"Qc (Quality Factor)"
     ax_scatter_q_c, ax_hist_q_c = axes[1]
-    error_bar_report_plot(ax=ax_scatter_q_c, xdata=f_centers_ghz_mean, ydata=q_c_mean, yerr=q_c_std,
-                          res_nums_int=res_nums_int,
-                          color=color, ls='None', markersize=markersize, alpha=alpha,
-                          x_label=None, y_label=q_c_label, x_ticks_on=False)
+    ax_scatter_q_c, res_nums_too_low_q_c,  res_nums_too_high_q_c = \
+        error_bar_report_plot(ax=ax_scatter_q_c, xdata=f_centers_ghz_mean, ydata=q_c_mean, yerr=q_c_std,
+                              res_nums_int=res_nums_int,
+                              color=color, ls='None', markersize=markersize, alpha=alpha,
+                              x_label=None, y_label=q_c_label, x_ticks_on=False)
     hist_report_plot(ax=ax_hist_q_c, data=q_c_mean, bins=10, color=color, x_label=None, y_label=None, alpha=alpha)
     ax_scatter_q_c.tick_params(axis='x',  # changes apply to the x-axis
                                which='both',  # both major and minor ticks are affected
@@ -331,10 +399,11 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Impedance Ratio (Z ratio)
     zratio_label = F"Impedance Ratio (Z ratio)"
     ax_scatter_zratio, ax_hist_zratio = axes[2]
-    error_bar_report_plot(ax=ax_scatter_zratio, xdata=f_centers_ghz_mean,
-                          ydata=impedance_ratio_mean, yerr=impedance_ratio_std, res_nums_int=res_nums_int,
-                          color=color, ls='None', markersize=markersize, alpha=alpha,
-                          x_label=None, y_label=zratio_label, x_ticks_on=False)
+    ax_scatter_zratio, res_nums_too_low_zratio, res_nums_too_high_zratio = \
+        error_bar_report_plot(ax=ax_scatter_zratio, xdata=f_centers_ghz_mean,
+                              ydata=impedance_ratio_mean, yerr=impedance_ratio_std, res_nums_int=res_nums_int,
+                              color=color, ls='None', markersize=markersize, alpha=alpha,
+                              x_label=None, y_label=zratio_label, x_ticks_on=False)
     hist_report_plot(ax=ax_hist_zratio, data=impedance_ratio_mean, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
     ax_scatter_zratio.tick_params(axis='x',  # changes apply to the x-axis
@@ -345,60 +414,103 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Lambda (SQUID parameter lambda)
     lamb_label = F"SQUID parameter lambda"
     ax_scatter_lamb, ax_hist_lamb = axes[3]
-    error_bar_report_plot(ax=ax_scatter_lamb, xdata=f_centers_ghz_mean,
-                          ydata=lamb_values, yerr=lamb_value_errs, res_nums_int=res_nums_int,
-                          color=color, ls='None', markersize=markersize, alpha=alpha,
-                          x_label=None, y_label=lamb_label, x_ticks_on=True)
+    ax_scatter_lamb, res_nums_too_low_lamb, res_nums_too_high_lamb = \
+        error_bar_report_plot(ax=ax_scatter_lamb, xdata=f_centers_ghz_mean,
+                              ydata=lamb_values, yerr=lamb_value_errs, res_nums_int=res_nums_int,
+                              color=color, ls='None', markersize=markersize, alpha=alpha,
+                              x_label=None, y_label=lamb_label, x_ticks_on=True)
     hist_report_plot(ax=ax_hist_lamb, data=lamb_values, bins=10, color=color, x_label=None, y_label=None, alpha=alpha)
 
     # Flux Ramp Span (peak-to-peak fit parameter)
     flux_ramp_label = F"Flux Ramp Span (kHz)"
     ax_scatter_flux_ramp, ax_hist_flux_ramp = axes[4]
-    error_bar_report_plot(ax=ax_scatter_flux_ramp, xdata=f_centers_ghz_mean,
-                          ydata=flux_ramp_pp_khz, yerr=flux_ramp_pp_khz_errs, res_nums_int=res_nums_int,
-                          color=color, ls='None', markersize=markersize, alpha=alpha,
-                          x_label=None, y_label=flux_ramp_label, x_ticks_on=True)
+    ax_scatter_flux_ramp, res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp = \
+        error_bar_report_plot(ax=ax_scatter_flux_ramp, xdata=f_centers_ghz_mean,
+                              ydata=flux_ramp_pp_khz, yerr=flux_ramp_pp_khz_errs, res_nums_int=res_nums_int,
+                              color=color, ls='None', markersize=markersize, alpha=alpha,
+                              x_label=None, y_label=flux_ramp_label, x_ticks_on=True)
     hist_report_plot(ax=ax_hist_flux_ramp, data=flux_ramp_pp_khz, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
     # fr_squid_mi_pH
     fr_squid_mi_pH_label = F"FR - SQUID Mutual Inductance (pH)"
     ax_scatter_fr_squid, ax_hist_fr_squid = axes[5]
-    error_bar_report_plot(ax=ax_scatter_fr_squid, xdata=f_centers_ghz_mean,
-                          ydata=fr_squid_mi_pH, yerr=fr_squid_mi_pH_err, res_nums_int=res_nums_int,
-                          color=color, ls='None', markersize=markersize, alpha=alpha,
-                          x_label=None, y_label=fr_squid_mi_pH_label, x_ticks_on=True)
+    ax_scatter_fr_squid, res_nums_too_low_fr_squid, res_nums_too_high_fr_squid = \
+        error_bar_report_plot(ax=ax_scatter_fr_squid, xdata=f_centers_ghz_mean,
+                              ydata=fr_squid_mi_pH, yerr=fr_squid_mi_pH_err, res_nums_int=res_nums_int,
+                              color=color, ls='None', markersize=markersize, alpha=alpha,
+                              x_label=None, y_label=fr_squid_mi_pH_label, x_ticks_on=True)
     hist_report_plot(ax=ax_hist_fr_squid, data=fr_squid_mi_pH, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
+    # Nonlinear Parameter
+    non_linear_parameter_label = F"A - Nonlinear Parameter?"
+    ax_scatter_non_linear_parameter, ax_hist_non_linear_parameter = axes[6]
+    ax_scatter_non_linear_parameter, res_nums_too_low_non_linear_parameter, res_nums_too_high_non_linear_parameter = \
+        error_bar_report_plot(ax=ax_scatter_non_linear_parameter, xdata=f_centers_ghz_mean,
+                              ydata=non_linear_mean, yerr=non_linear_std, res_nums_int=res_nums_int,
+                              color=color, ls='None', markersize=markersize, alpha=alpha,
+                              x_label=None, y_label=non_linear_parameter_label, x_ticks_on=True)
+    hist_report_plot(ax=ax_hist_non_linear_parameter, data=non_linear_mean, bins=10, color=color,
+                     x_label=None, y_label=None, alpha=alpha)
+
+    # Unused plot box
+    ax_scatter_unused, ax_hist_unused = axes[7]
+    ax_scatter_unused.tick_params(axis='x',  # changes apply to the x-axis
+                                  which='both',  # both major and minor ticks are affected
+                                  bottom=False,  # ticks along the bottom edge are off
+                                  top=False,  # ticks along the top edge are off
+                                  labelbottom=False)
+    ax_scatter_unused.tick_params(axis='y',  # changes apply to the x-axis
+                                  which='both',  # both major and minor ticks are affected
+                                  left=False,  # ticks along the bottom edge are off
+                                  right=False,  # ticks along the top edge are off
+                                  labelleft=False)
+    ax_hist_unused.tick_params(axis='x',  # changes apply to the x-axis
+                               which='both',  # both major and minor ticks are affected
+                               bottom=False,  # ticks along the bottom edge are off
+                               top=False,  # ticks along the top edge are off
+                               labelbottom=False)
+    ax_hist_unused.tick_params(axis='y',  # changes apply to the x-axis
+                               which='both',  # both major and minor ticks are affected
+                               left=False,  # ticks along the bottom edge are off
+                               right=False,  # ticks along the top edge are off
+                               labelleft=False)
     # legend
-    num_found = len(f_centers_ghz_mean)
+    num_working = len(f_centers_ghz_mean)
     band_min_ghz = ref.band_params[band_str]['min_GHz']
     band_max_ghz = ref.band_params[band_str]['max_GHz']
     num_in_band = len([f_center for f_center in f_centers_ghz_mean if band_min_ghz <= f_center <= band_max_ghz])
+    # resonators in the smurf keepout zones
+    num_in_keepout_zones = 0
+    for keepout_min, keepout_max in ref.smurf_keepout_zones_ghz:
+        num_in_keepout_zones += len([f_center for f_center in f_centers_ghz_mean
+                                     if keepout_min <= f_center <= keepout_max])
+    num_usable = num_working - num_in_keepout_zones
+
     if omitted_res_nums is None:
         total_res = 65
         yield_str = ""
     else:
         total_res = 64
-        yield_percent = 100.0 * num_found / total_res
+        yield_percent = 100.0 * num_usable / total_res
         yield_str = F"Yield:{'%5.1f' % yield_percent}% "
-    found_str = F"{yield_str}{num_found}/{total_res} found"
+    found_str = F"{yield_str}{num_usable}/{total_res} usable"
     in_band_str = F"{num_in_band} in-band"
     spacing = F"Mean Spacing{'%6.3f' % f_spacings_mhz_mean} MHz"
-    summary_info = F"{found_str}\n{in_band_str}\n{spacing}"
-    leglines.append(plt.Line2D(range(10), range(10), color=color, ls='None',
+    in_keepout = F"In SMURF Keepout: {num_in_keepout_zones}"
+    summary_info = F"{found_str}\n{in_band_str}\n{spacing}\n{in_keepout}"
+    leglines.append(plt.Line2D(range(12), range(12), color=color, ls='None',
                                marker='o', markersize=markersize, markerfacecolor=color, alpha=alpha))
     power = res_set.series_key.port_power_dbm
-
-    leglabels.append(F"{'%3i' % power} dBm")
-
+    leglabels.append(F"{'%4i' %  at_res_power_dbm_mean} est., {'%4i' % power} port (dBm)")
     return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info
 
 
 def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, seed_scan_path, report_dir,
+                markersize=8, alpha=0.5,
                 show=False, omit_flagged=False):
-    fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2)
+    fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=4, num_of_scatter_hist_y=2)
     fig.suptitle(F"{wafer_str}, {band_str} report:", y=0.995, x=0.98, horizontalalignment='right')
     leglines = []
     leglabels = []
@@ -422,7 +534,8 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
         color = report_colors[counter % len(report_colors)]
         axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info \
             = single_lamb_to_report_plot(axes=axes_shist, res_set=res_set, color=color, band_str=band_str,
-                                         leglines=leglines, leglabels=leglabels, omitted_res_nums=omitted_res_nums)
+                                         leglines=leglines, leglabels=leglabels, omitted_res_nums=omitted_res_nums,
+                                         markersize=markersize, alpha=alpha,)
         y_max = 1.0 - (rug_y_increment * counter)
         counter += 1
         y_min = 1.0 - (rug_y_increment * counter)
@@ -439,6 +552,17 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
     ax_res_spec.set_xlim(left=x_min, right=x_max)
 
     # Plot KEY
+    # add the out-of-bounds legend key
+    leglabels.append("Flagged")
+    leglines.append(plt.Line2D(range(10), range(10), color="black", ls='None',
+                               marker='o', markersize=markersize, markerfacecolor="black", alpha=1.0))
+    # add the boundary and average lines to the legend
+    leglabels.append("Maximum")
+    leglines.append(plt.Line2D(range(10), range(10), color='red', ls='dashdot'))
+    leglabels.append("Target")
+    leglines.append(plt.Line2D(range(10), range(10), color='green', ls='dotted'))
+    leglabels.append("Minimum")
+    leglines.append(plt.Line2D(range(10), range(10), color='red', ls='dashed'))
     ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels,
                         summary_info=summary_info, res_flags=res_flags)
 

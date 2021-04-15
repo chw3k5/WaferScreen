@@ -174,7 +174,7 @@ def quick_plotter(plot_dict):
         ErrorCapSize = extract_plot_val(plot_dict, 'ErrorCapSize', listIndex, keys=keys)
         # extract the error marker line style
         Errorls = extract_plot_val(plot_dict, 'Errorls', listIndex, keys=keys)
-        # extract the erro marker line width
+        # extract the error marker line width
         Errorliw = extract_plot_val(plot_dict, 'Errorliw', listIndex, keys=keys)
 
         if do_legend:
