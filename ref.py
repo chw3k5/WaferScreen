@@ -122,6 +122,14 @@ def in_smurf_keepout(f_ghz):
     return False
 
 
-# wafer acceptance criteria
+"""wafer acceptance criteria"""
+# Qi Quality Factor
 min_q_i = 1.2e5
+
+# Lambda
+min_lambda = 0.2
+max_lambda = 0.6
+average_lambda = 0.3
+
+
 

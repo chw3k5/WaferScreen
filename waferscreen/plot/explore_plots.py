@@ -361,7 +361,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Qi
     q_i_label = F"Qi (Quality Factor)"
     ax_scatter_q_i, ax_hist_q_i = axes[0]
-    if at_res_power_dbm_mean >= -78.0:
+    if -78.0 <= at_res_power_dbm_mean <= -72.0:
         ax_scatter_q_i, res_nums_too_low_q_i,  res_nums_too_high_q_i = \
             error_bar_report_plot(ax=ax_scatter_q_i, xdata=f_centers_ghz_mean, ydata=q_i_mean, yerr=q_i_std,
                                   res_nums_int=res_nums_int,
@@ -414,11 +414,20 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Lambda (SQUID parameter lambda)
     lamb_label = F"SQUID parameter lambda"
     ax_scatter_lamb, ax_hist_lamb = axes[3]
-    ax_scatter_lamb, res_nums_too_low_lamb, res_nums_too_high_lamb = \
-        error_bar_report_plot(ax=ax_scatter_lamb, xdata=f_centers_ghz_mean,
-                              ydata=lamb_values, yerr=lamb_value_errs, res_nums_int=res_nums_int,
-                              color=color, ls='None', markersize=markersize, alpha=alpha,
-                              x_label=None, y_label=lamb_label, x_ticks_on=True)
+    if -98.0 <= at_res_power_dbm_mean <= -92.0:
+        ax_scatter_lamb, res_nums_too_low_lamb, res_nums_too_high_lamb = \
+            error_bar_report_plot(ax=ax_scatter_lamb, xdata=f_centers_ghz_mean,
+                                  ydata=lamb_values, yerr=lamb_value_errs, res_nums_int=res_nums_int,
+                                  color=color, ls='None', markersize=markersize, alpha=alpha,
+                                  x_label=None, y_label=lamb_label, x_ticks_on=True,
+                                  min_y=ref.min_lambda, max_y=ref.max_lambda, average_y=ref.average_lambda)
+    else:
+        ax_scatter_lamb, res_nums_too_low_lamb, res_nums_too_high_lamb = \
+            error_bar_report_plot(ax=ax_scatter_lamb, xdata=f_centers_ghz_mean,
+                                  ydata=lamb_values, yerr=lamb_value_errs, res_nums_int=res_nums_int,
+                                  color=color, ls='None', markersize=markersize, alpha=alpha,
+                                  x_label=None, y_label=lamb_label, x_ticks_on=True,
+                                  min_y=None, max_y=None, average_y=None)
     hist_report_plot(ax=ax_hist_lamb, data=lamb_values, bins=10, color=color, x_label=None, y_label=None, alpha=alpha)
 
     # Flux Ramp Span (peak-to-peak fit parameter)

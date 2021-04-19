@@ -1,7 +1,7 @@
 import os
 import datetime
 from operator import itemgetter
-from waferscreen.data_io.data_pro import get_all_lamb_files
+from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_between_dates
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
@@ -193,17 +193,39 @@ class WafersSWB:
 
 
 class LambExplore:
-    def __init__(self, auto_load=True):
+    def __init__(self, start_date=None, end_date=None):
+        """
+        :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
+                           or None. None will set the minimum date for data retrieval to be 0001-01-01
+        :param end_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
+                         or None. None will set the maximum date for data to be retrieved as 9999-12-31
+        """
+        if start_date is None:
+            self.start_date = datetime.date.min
+        else:
+            self.start_date = start_date
+        if end_date is None:
+            self.end_date = datetime.date.max
+        else:
+            self.end_date = end_date
+
         self.lamb_params_data = None
         self.available_seed_handles = set()
         self.available_bands = set()
         self.available_wafers = set()
-        if auto_load:
+        if start_date is None and end_date is None:
             self.readall()
+        else:
+            self.read_between_dates()
 
     def readall(self):
         self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
                                  for lamb_path in get_all_lamb_files()}
+
+    def read_between_dates(self):
+        self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
+                                 for lamb_path in get_lamb_files_between_dates(start_date=self.start_date,
+                                                                               end_date=self.end_date)}
 
     def update_loops_vars(self, single_lamb):
         self.available_seed_handles.add(seed_name_to_handle(single_lamb.seed_name))
@@ -247,7 +269,7 @@ class LambExplore:
 
 
 if __name__ == "__main__":
-    lamb_explore = LambExplore(auto_load=True)
+    lamb_explore = LambExplore(start_date=None, end_date=datetime.date(year=2021, month=4, day=1))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.band_swbr_reports()

@@ -1,5 +1,6 @@
 import os
 import ref
+import datetime
 from multiprocessing import Pool
 from waferscreen.analyze.s21_inductor import InductS21
 from waferscreen.analyze.res_pipeline import ResPipe
@@ -42,6 +43,38 @@ def get_lamb_dirs():
     return lamb_data_dirs
 
 
+def get_lamb_dirs_between_dates(start_date, end_date):
+    lamb_data_dirs = []
+    for location_dir in ref.output_dirs:
+        # get all the wafer-number directories
+        wafer_number_dirs = []
+        for wafer_number_dir_name in os.listdir(location_dir):
+            wafer_number_dir_test = os.path.join(location_dir, wafer_number_dir_name)
+            if os.path.isdir(wafer_number_dir_test):
+                # wafer number directory name can be converted to and integer, ignore calibration directories and others
+                try:
+                    int(wafer_number_dir_name)
+                except ValueError:
+                    pass
+                else:
+                    wafer_number_dirs.append(wafer_number_dir_test)
+        # get all the date name directory directories between the start and end dates
+        date_dirs_in_range = []
+        for wafer_number_dir in wafer_number_dirs:
+            for date_string_dir in os.listdir(wafer_number_dir):
+                # move on if the directory is not in date format (like hidden directories i.e. .DS_Store)
+                try:
+                    dt_this_dir = datetime.datetime.strptime(date_string_dir, "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+                else:
+                    if start_date <= dt_this_dir <= end_date:
+                        date_dirs_in_range.append(os.path.join(wafer_number_dir, date_string_dir))
+        # within the available date dirs, get the lambda dirs
+        [lamb_data_dirs.extend(get_subdirs(rootdir=date_dir, matching_str="lambda")) for date_dir in date_dirs_in_range]
+    return lamb_data_dirs
+
+
 def get_pro_s21_scans(process_type):
     pro_data_dirs = get_pro_data_dirs()
     scan_dirs = []
@@ -63,6 +96,17 @@ def get_pro_s21_scans(process_type):
 def get_all_lamb_files():
     lamb_files = []
     for lamb_data_dir in get_lamb_dirs():
+        for basename in os.listdir(lamb_data_dir):
+            if "." in basename:
+                test_basename_prefix, extension = basename.rsplit(".", 1)
+                if extension in ref.s21_file_extensions and "lambda_" == test_basename_prefix[:7]:
+                    lamb_files.append(os.path.join(lamb_data_dir, basename))
+    return lamb_files
+
+
+def get_lamb_files_between_dates(start_date, end_date):
+    lamb_files = []
+    for lamb_data_dir in get_lamb_dirs_between_dates(start_date=start_date, end_date=end_date):
         for basename in os.listdir(lamb_data_dir):
             if "." in basename:
                 test_basename_prefix, extension = basename.rsplit(".", 1)
@@ -315,21 +359,23 @@ class DataManager:
 
     def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, save_phase_plot=True,
                              pro_res_dirs=None, do_pro=False, save_res_plots=True, reprocess_res=True,
-                             do_lamb=False, lamb_plots=True):
+                             do_lamb=False, lamb_plots=True, do_multiprocessing=False):
+        if do_multiprocessing:
+            multiprocessing_threads = ref.multiprocessing_threads
+        else:
+            multiprocessing_threads = None
         if do_raw:
             self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=raw_res_dirs)
-            if ref.multiprocessing_threads is None:
+            if multiprocessing_threads is None:
                 [raw_process(path=raw_single_res, save_phase_plot=save_phase_plot)
                  for raw_single_res in self.raw_single_res_files]
             else:
                 raw_process_args = zip(self.raw_single_res_files,
-                                       [save_res_plots] * len(self.raw_single_res_files))
-                with Pool(ref.multiprocessing_threads) as p:
+                                       [save_phase_plot] * len(self.raw_single_res_files))
+                with Pool(multiprocessing_threads) as p:
                     p.starmap(raw_process, raw_process_args)
         if do_pro:
             self.analyze_single_res(single_res_parent_dirs=pro_res_dirs,
                                     save_res_plots=save_res_plots, reprocess=reprocess_res)
         if do_lamb:
             self.calc_lamb(single_res_parent_dirs=pro_res_dirs, lamb_plots=lamb_plots)
-
-
