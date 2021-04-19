@@ -269,7 +269,8 @@ class LambExplore:
 
 
 if __name__ == "__main__":
-    lamb_explore = LambExplore(start_date=None, end_date=datetime.date(year=2021, month=4, day=1))
+    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=3, day=1),
+                               end_date=datetime.date(year=9999, month=3, day=1))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.band_swbr_reports()

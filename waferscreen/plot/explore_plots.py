@@ -12,6 +12,21 @@ report_markers = ["*", "v", "s", "<", "X",
 report_colors = ["seagreen", "crimson", "darkgoldenrod", "deepskyblue", "mediumblue", "rebeccapurple"]
 
 
+def criteria_flagged_summary(flag_table_info, criteria_name, res_numbers, too_low=True):
+    for res_label in res_numbers:
+        summary_str = F"Criteria Flag: {criteria_name}"
+        if too_low:
+            summary_str += " too low."
+        else:
+            summary_str += " too high."
+        # if the resonator was flagged already for another reason we need to add a new line to the summary.
+        if res_label in flag_table_info:
+            flag_table_info[res_label] += "\n" + summary_str
+        else:
+            flag_table_info[res_label] = summary_str
+    return flag_table_info
+
+
 def error_bar_report_plot(ax, xdata, ydata, yerr, res_nums_int, color="black", ls='None', markersize=10, alpha=0.7,
                           x_label=None, y_label=None, x_ticks_on=True,
                           min_y=None, max_y=None, average_y=None):
@@ -34,17 +49,14 @@ def error_bar_report_plot(ax, xdata, ydata, yerr, res_nums_int, color="black", l
     for x_datum, y_datum, y_datum_err in zip(xdata, ydata, yerr):
         res_num = res_nums_int[counter]
         marker = report_markers[res_num % len(report_markers)]
+        ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
+                    color=color, ls=ls, marker=marker, markersize=markersize, alpha=alpha)
         if y_datum < lower_bound:
-            res_nums_too_low.add(res_num)
-            ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
-                        color="black", ls=ls, marker=marker, markersize=markersize, alpha=1.0)
+            res_nums_too_low.add(res_num_to_str(res_num))
+            ax.plot(x_datum, y_datum, color="black", ls=ls, marker="x", markersize=markersize + 2, alpha=1.0)
         elif upper_bound < y_datum:
-            res_nums_too_high.add(res_num)
-            ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
-                        color="black", ls=ls, marker=marker, markersize=markersize, alpha=1.0)
-        else:
-            ax.errorbar(x_datum, y_datum, yerr=y_datum_err,
-                        color=color, ls=ls, marker=marker, markersize=markersize, alpha=alpha)
+            res_nums_too_high.add(res_num_to_str(res_num))
+            ax.plot(x_datum, y_datum, color="black", ls=ls, marker="x", markersize=markersize + 2, alpha=1.0)
         counter += 1
     # boundary and average lines
     if min_y is not None:
@@ -276,14 +288,9 @@ def report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2):
     return fig, ax_key, ax_res_spec, ax_rug, axes_shist
 
 
-def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_str, markersize=8, alpha=0.5, 
-                               omitted_res_nums=None):
-    if omitted_res_nums is None:
-        available_res_nums = res_set.available_res_nums
-    else:
-        available_res_nums = res_set.available_res_nums - {res_num_to_str(res_num) for res_num in omitted_res_nums}
+def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_str, flag_table_info, ordered_res_strs,
+                               markersize=8, alpha=0.5):
     # do some data analysis
-    ordered_res_strs = sorted(available_res_nums)
     lamb_values = np.array([res_set.__getattribute__(res_str).lamb_fit.lambfit for res_str in ordered_res_strs])
     lamb_value_errs = np.array([res_set.__getattribute__(res_str).lamb_fit.lambfit_err
                                 for res_str in ordered_res_strs])
@@ -354,8 +361,6 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     impedance_ratio_mean = np.array(impedance_ratio_mean)
     impedance_ratio_std = np.array(impedance_ratio_std)
     f_spacings_ghz = f_centers_ghz_mean[1:] - f_centers_ghz_mean[:-1]
-    f_spacings_mhz_mean = np.mean(f_spacings_ghz) * 1.0e3
-    f_spacings_mhz_std = np.std(f_spacings_ghz) * 1.0e3
     res_nums_int = [int(res_str.replace("Res", "")) for res_str in ordered_res_strs]
 
     # Qi
@@ -433,11 +438,19 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # Flux Ramp Span (peak-to-peak fit parameter)
     flux_ramp_label = F"Flux Ramp Span (kHz)"
     ax_scatter_flux_ramp, ax_hist_flux_ramp = axes[4]
-    ax_scatter_flux_ramp, res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp = \
-        error_bar_report_plot(ax=ax_scatter_flux_ramp, xdata=f_centers_ghz_mean,
-                              ydata=flux_ramp_pp_khz, yerr=flux_ramp_pp_khz_errs, res_nums_int=res_nums_int,
-                              color=color, ls='None', markersize=markersize, alpha=alpha,
-                              x_label=None, y_label=flux_ramp_label, x_ticks_on=True)
+    if -78.0 <= at_res_power_dbm_mean <= -72.0:
+        ax_scatter_flux_ramp, res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp = \
+            error_bar_report_plot(ax=ax_scatter_flux_ramp, xdata=f_centers_ghz_mean,
+                                  ydata=flux_ramp_pp_khz, yerr=flux_ramp_pp_khz_errs, res_nums_int=res_nums_int,
+                                  color=color, ls='None', markersize=markersize, alpha=alpha,
+                                  x_label=None, y_label=flux_ramp_label, x_ticks_on=True,
+                                  min_y=ref.peak_to_peak_shift_hz, max_y=None, average_y=None)
+    else:
+        ax_scatter_flux_ramp, res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp = \
+            error_bar_report_plot(ax=ax_scatter_flux_ramp, xdata=f_centers_ghz_mean,
+                                  ydata=flux_ramp_pp_khz, yerr=flux_ramp_pp_khz_errs, res_nums_int=res_nums_int,
+                                  color=color, ls='None', markersize=markersize, alpha=alpha,
+                                  x_label=None, y_label=flux_ramp_label, x_ticks_on=True)
     hist_report_plot(ax=ax_hist_flux_ramp, data=flux_ramp_pp_khz, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
@@ -485,35 +498,49 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                left=False,  # ticks along the bottom edge are off
                                right=False,  # ticks along the top edge are off
                                labelleft=False)
-    # legend
-    num_working = len(f_centers_ghz_mean)
+    # legend and Yield calculations
+    summary_info = {"f_spacings_ghz": list(f_spacings_ghz)}
+
+    # in-band calculations (not counted against yield)
     band_min_ghz = ref.band_params[band_str]['min_GHz']
     band_max_ghz = ref.band_params[band_str]['max_GHz']
-    num_in_band = len([f_center for f_center in f_centers_ghz_mean if band_min_ghz <= f_center <= band_max_ghz])
-    # resonators in the smurf keepout zones
-    num_in_keepout_zones = 0
+    summary_info["res_nums_in_band"] = {res_num_str for f_center, res_num_str
+                                        in zip(f_centers_ghz_mean, ordered_res_strs)
+                                        if band_min_ghz <= f_center <= band_max_ghz}
+    # resonators in the smurf keepout zones (counts against yield)
+    res_nums_in_keepout_zones = set()
     for keepout_min, keepout_max in ref.smurf_keepout_zones_ghz:
-        num_in_keepout_zones += len([f_center for f_center in f_centers_ghz_mean
-                                     if keepout_min <= f_center <= keepout_max])
-    num_usable = num_working - num_in_keepout_zones
+        [res_nums_in_keepout_zones.add(res_num_str)
+         for f_center, res_num_str in zip(f_centers_ghz_mean, ordered_res_strs)
+         if keepout_min <= f_center <= keepout_max]
+    summary_info["res_nums_in_keepout_zones"] = res_nums_in_keepout_zones
 
-    if omitted_res_nums is None:
-        total_res = 65
-        yield_str = ""
-    else:
-        total_res = 64
-        yield_percent = 100.0 * num_usable / total_res
-        yield_str = F"Yield:{'%5.1f' % yield_percent}% "
-    found_str = F"{yield_str}{num_usable}/{total_res} usable"
-    in_band_str = F"{num_in_band} in-band"
-    spacing = F"Mean Spacing{'%6.3f' % f_spacings_mhz_mean} MHz"
-    in_keepout = F"In SMURF Keepout: {num_in_keepout_zones}"
-    summary_info = F"{found_str}\n{in_band_str}\n{spacing}\n{in_keepout}"
+    # Screening Criteria Flags (counts against yield)
+    for res_nums_too_low, res_nums_too_high, criteria_name in [(res_nums_too_low_q_i, res_nums_too_high_q_i, "Qi"),
+                                                               (res_nums_too_low_q_c, res_nums_too_high_q_c, "Qc"),
+                                                               (res_nums_too_low_zratio, res_nums_too_high_zratio, "Z ratio"),
+                                                               (res_nums_too_low_lamb, res_nums_too_high_lamb, "Lambda"),
+                                                               (res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp, "peak-to-peak"),
+                                                               (res_nums_too_low_fr_squid, res_nums_too_high_fr_squid, "FR squid"),
+                                                               (res_nums_too_low_non_linear_parameter, res_nums_too_high_non_linear_parameter, "A")]:
+        flag_table_info = criteria_flagged_summary(flag_table_info=flag_table_info, criteria_name=criteria_name,
+                                                   res_numbers=res_nums_too_low, too_low=True)
+        flag_table_info = criteria_flagged_summary(flag_table_info=flag_table_info, criteria_name=criteria_name,
+                                                   res_numbers=res_nums_too_high, too_low=False)
+    # Combined criteria for yield calculation
+    summary_info["criteria_flagged_resonator_numbers"] = res_nums_too_low_q_i | res_nums_too_high_q_i | \
+                                                         res_nums_too_low_q_c | res_nums_too_high_q_c | \
+                                                         res_nums_too_low_zratio | res_nums_too_high_zratio | \
+                                                         res_nums_too_low_lamb | res_nums_too_high_lamb | \
+                                                         res_nums_too_low_flux_ramp | res_nums_too_high_flux_ramp | \
+                                                         res_nums_too_low_fr_squid | res_nums_too_high_fr_squid | \
+                                                         res_nums_too_low_non_linear_parameter | res_nums_too_high_non_linear_parameter
+    # legend lines and label
     leglines.append(plt.Line2D(range(12), range(12), color=color, ls='None',
                                marker='o', markersize=markersize, markerfacecolor=color, alpha=alpha))
     power = res_set.series_key.port_power_dbm
-    leglabels.append(F"{'%4i' %  at_res_power_dbm_mean} est., {'%4i' % power} port (dBm)")
-    return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info
+    leglabels.append(F"{'%4i' % at_res_power_dbm_mean} est., {'%4i' % power} port (dBm)")
+    return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info, flag_table_info
 
 
 def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, seed_scan_path, report_dir,
@@ -533,22 +560,44 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
     if omit_flagged and wafer_num in flagged_data.wafer_band_flags.keys() \
             and band_num in flagged_data.wafer_band_flags[wafer_num].keys():
         res_flags = flagged_data.wafer_band_flags[wafer_num][band_num]
-        omitted_res_nums = {res_flag.seed_res_num for res_flag in res_flags}
+        res_nums_user_flagged = {res_flag.seed_res_num for res_flag in res_flags}
     else:
         res_flags = None
-        omitted_res_nums = None
-    summary_info = ""
+        res_nums_user_flagged = None
+
+    # total resonators identified
+    available_res_nums = set()
+    for series_handle in sorted_series_handles:
+        available_res_nums.update(series_res_sets[series_handle].available_res_nums)
+    # load the user flagged data
+    if res_nums_user_flagged is None:
+        res_nums_user_flagged = set()
+    else:
+        res_nums_user_flagged = {res_num_to_str(res_num) for res_num in res_nums_user_flagged}
+
+    # error bar plots and histograms with dynamic criteria flagging
+    flag_table_info = {}
+    total_summary_info = {}
     for series_handle in sorted_series_handles:
         res_set = series_res_sets[series_handle]
         color = report_colors[counter % len(report_colors)]
-        axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info \
+        axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info, flag_table_info \
             = single_lamb_to_report_plot(axes=axes_shist, res_set=res_set, color=color, band_str=band_str,
-                                         leglines=leglines, leglabels=leglabels, omitted_res_nums=omitted_res_nums,
-                                         markersize=markersize, alpha=alpha,)
+                                         leglines=leglines, leglabels=leglabels, flag_table_info=flag_table_info,
+                                         ordered_res_strs=sorted(available_res_nums - res_nums_user_flagged),
+                                         markersize=markersize, alpha=alpha)
         y_max = 1.0 - (rug_y_increment * counter)
         counter += 1
         y_min = 1.0 - (rug_y_increment * counter)
         ax_rug = rug_plot(ax=ax_rug, xdata=f_centers_ghz_all, y_min=y_min, y_max=y_max, color=color)
+        for summary_key in summary_info.keys():
+            if summary_key in total_summary_info.keys():
+                if summary_key in {"f_spacings_ghz"}:
+                    total_summary_info[summary_key].extend(summary_info[summary_key])
+                else:
+                    total_summary_info[summary_key].update(summary_info[summary_key])
+            else:
+                total_summary_info[summary_key] = summary_info[summary_key]
 
     # Raw S21 Scan data
     x_min, x_max = ax_rug.get_xlim()
@@ -562,9 +611,32 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
 
     # Plot KEY
     # add the out-of-bounds legend key
-    leglabels.append("Flagged")
+    # Total Yield calculations
+    res_nums_flagged = res_nums_user_flagged | total_summary_info["res_nums_in_keepout_zones"] | \
+                       total_summary_info["criteria_flagged_resonator_numbers"]
+    res_nums_passed = available_res_nums - res_nums_flagged
+    num_usable = len(res_nums_passed)
+
+    # build the strings for the report summary
+    if res_nums_user_flagged is None:
+        num_expected = 65
+        yield_str = ""
+    else:
+        num_expected = 64
+        yield_percent = 100.0 * num_usable / num_expected
+        yield_str = F"Yield:{'%5.1f' % yield_percent}% "
+    yield_str = F"{yield_str}{num_usable}/{num_expected} accepted"
+    found_str = F"{len(available_res_nums)} identified, {len(res_nums_user_flagged)} user flagged"
+    in_band_str = F"{len(total_summary_info['res_nums_in_band'])} in-band"
+    in_keepout = F"{len(total_summary_info['res_nums_in_keepout_zones'])} in SMURF Keepout"
+    f_spacings_mhz_median = np.median(np.array(total_summary_info["f_spacings_ghz"])) * 1.0e3
+    spacing = F"{'%5.3f' % f_spacings_mhz_median} MHz median spacing"
+    yield_criteria_flagged = F"{len(total_summary_info['criteria_flagged_resonator_numbers'])} outside yield criteria"
+    summary_paragraph = F"{yield_str}\n{found_str}\n{in_band_str}, {in_keepout}\n{spacing}\n{yield_criteria_flagged}"
+    # legend lines and labels
+    leglabels.append("Criteria Flag")
     leglines.append(plt.Line2D(range(10), range(10), color="black", ls='None',
-                               marker='o', markersize=markersize, markerfacecolor="black", alpha=1.0))
+                               marker='x', markersize=markersize - 2, markerfacecolor="black", alpha=1.0))
     # add the boundary and average lines to the legend
     leglabels.append("Maximum")
     leglines.append(plt.Line2D(range(10), range(10), color='red', ls='dashdot'))
@@ -573,10 +645,9 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
     leglabels.append("Minimum")
     leglines.append(plt.Line2D(range(10), range(10), color='red', ls='dashed'))
     ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels,
-                        summary_info=summary_info, res_flags=res_flags)
-
+                        summary_info=summary_paragraph, res_flags=res_flags)
     # Display
-    if omitted_res_nums is None:
+    if res_nums_user_flagged is None:
         scatter_plot_basename = F"ScatterHist_{band_str}_{wafer_str}"
     else:
         scatter_plot_basename = F"ScatterHist_{band_str}_{wafer_str}_curated"

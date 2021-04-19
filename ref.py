@@ -131,5 +131,5 @@ min_lambda = 0.2
 max_lambda = 0.6
 average_lambda = 0.3
 
-
-
+# Peak-to-peak shift (Flux Ramp Span) in Hertz (Hz)
+peak_to_peak_shift_hz = 60.0
