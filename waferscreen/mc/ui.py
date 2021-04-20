@@ -69,4 +69,4 @@ if __name__ == "__main__":
     if do_res_sweeps:
         dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=True, save_phase_plot=False,
                                 pro_res_dirs=test_pro_res_dirs, do_pro=True, save_res_plots=True, reprocess_res=True,
-                                do_lamb=True, lamb_plots=True, do_multiprocessing=False)
+                                do_lamb=True, lamb_plots=True)

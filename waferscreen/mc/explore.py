@@ -12,6 +12,7 @@ from waferscreen.data_io.explore_io import wafer_num_to_str, res_num_to_str, see
 from waferscreen.plot.explore_plots import report_plot
 
 
+# Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
 class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)

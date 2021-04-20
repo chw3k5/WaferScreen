@@ -362,20 +362,17 @@ class DataManager:
 
     def full_loop_single_res(self, raw_res_dirs=None, do_raw=False, save_phase_plot=True,
                              pro_res_dirs=None, do_pro=False, save_res_plots=True, reprocess_res=True,
-                             do_lamb=False, lamb_plots=True, do_multiprocessing=False):
-        if do_multiprocessing:
-            multiprocessing_threads = ref.multiprocessing_threads
-        else:
-            multiprocessing_threads = None
+                             do_lamb=False, lamb_plots=True):
+
         if do_raw:
             self.get_band_or_res_from_dir(file_type="single_res", bands_or_res_dirs=raw_res_dirs)
-            if multiprocessing_threads is None:
+            if ref.multiprocessing_threads is None:
                 [raw_process(path=raw_single_res, save_phase_plot=save_phase_plot)
                  for raw_single_res in self.raw_single_res_files]
             else:
                 raw_process_args = zip(self.raw_single_res_files,
                                        [save_phase_plot] * len(self.raw_single_res_files))
-                with Pool(multiprocessing_threads) as p:
+                with Pool(ref.multiprocessing_threads) as p:
                     p.starmap(raw_process, raw_process_args)
         if do_pro:
             self.analyze_single_res(single_res_parent_dirs=pro_res_dirs,

@@ -18,8 +18,7 @@ if sys.platform == "win32":
     mpl.use(backend="TkAgg")
 elif sys.platform == 'darwin':
     mpl.use(backend="MacOSX")
-# Debug mode
-debug_mode = False
+
 
 # Instrument addresses
 usbvna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
@@ -27,10 +26,13 @@ agilent8722es_address = "GPIB1::19::INSTR"
 flux_ramp_address = "GPIB0::17::INSTR"
 volt_source_port = 1
 
+# Debug mode
+debug_mode = True
 # multiprocessing
 current_user = getpass.getuser()
 if debug_mode:
     multiprocessing_threads = None
+    mpl.use(backend='module://backend_interagg')
 elif current_user == "chw3k5":
     multiprocessing_threads = 4  # Caleb's other computers
 elif current_user in "cwheeler":
