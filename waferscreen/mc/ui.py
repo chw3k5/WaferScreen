@@ -68,5 +68,5 @@ if __name__ == "__main__":
                            make_band_seeds=False, make_single_res_seeds=True)
     if do_res_sweeps:
         dm.full_loop_single_res(raw_res_dirs=test_raw_res_dirs, do_raw=True, save_phase_plot=False,
-                                pro_res_dirs=test_pro_res_dirs, do_pro=True, save_res_plots=True, reprocess_res=True,
+                                pro_res_dirs=test_pro_res_dirs, do_pro=True, save_res_plots=True, reprocess_res=False,
                                 do_lamb=True, lamb_plots=True)

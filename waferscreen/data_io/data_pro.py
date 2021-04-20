@@ -3,12 +3,18 @@
 
 import os
 import ref
+import logging
 import datetime
 from multiprocessing import Pool
 from waferscreen.analyze.s21_inductor import InductS21
 from waferscreen.analyze.res_pipeline import ResPipe
 from waferscreen.analyze.lambcalc import LambCalc
 from waferscreen.data_io.s21_io import input_to_output_filename
+from waferscreen.data_io.exceptions import ResProcessingError
+
+
+# initialize resonator processing log settings
+logging.basicConfig(filename=ref.processing_log, level=logging.INFO)
 
 
 def get_subdirs(rootdir, matching_str):
@@ -152,7 +158,10 @@ def single_res_pro(single_res_file, verbose, reprocess, save_res_plots):
     res_pipe = ResPipe(s21_path=single_res_file, verbose=verbose)
     res_pipe.read()
     if reprocess or res_pipe.fitted_resonators_parameters is None:
-        res_pipe.analyze_single_res(save_res_plots=save_res_plots)
+        try:
+            res_pipe.analyze_single_res(save_res_plots=save_res_plots)
+        except ResProcessingError:
+            logging.exception(F'File: {single_res_file} | Proceeding Exception: {ResProcessingError}')
 
 
 phase_corrected_scan_files = []
@@ -260,7 +269,6 @@ class DataManager:
             basename_prefix, _extension = basename.rsplit(".", 1)
             if basename_prefix != "seed":
                 raw_process(path=raw_single_res_path, save_phase_plot=True, user_input_group_delay=False)
-
 
     def analyze_resonator_files(self, s21_files, cosine_filter=False,
                                  window_pad_factor=3, fitter_pad_factor=6,

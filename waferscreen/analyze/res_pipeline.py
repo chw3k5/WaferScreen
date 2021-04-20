@@ -15,6 +15,7 @@ import waferscreen.analyze.res_pipeline_config as rpc
 from waferscreen.data_io.res_io import ResParams
 from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, package_res_results
 from waferscreen.data_io.jobs_io import JobOrganizer
+from waferscreen.data_io.exceptions import ResMinIsLeftMost, ResMinIsRightMost
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 import ref
 
@@ -58,8 +59,12 @@ def fwhm(frequency_array, s21_linear_mag, minima_index, left_goal_depth, right_g
             f_fwhm_mag_now_left = single_linear_mag_left
             if f_fwhm_mag_now_left > left_goal_depth:
                 break
-        slope = (f_fwhm_now_left - f_fwhm_last_left) / (f_fwhm_mag_now_left - f_fwhm_mag_last_left)
-        f_fwhm_left = ((left_goal_depth - f_fwhm_mag_last_left) * slope) + f_fwhm_last_left
+        if f_fwhm_last_left is None:
+            # this happens when the minima of the trace is the left most point
+            raise ResMinIsLeftMost
+        else:
+            slope = (f_fwhm_now_left - f_fwhm_last_left) / (f_fwhm_mag_now_left - f_fwhm_mag_last_left)
+            f_fwhm_left = ((left_goal_depth - f_fwhm_mag_last_left) * slope) + f_fwhm_last_left
     # do the same thing for the right side, a lot of repeated code
     if minima_index == len(s21_linear_mag):
         # this is what happens if there is nothing to the right of the minima, i.e. the minima is the right most point
@@ -79,8 +84,12 @@ def fwhm(frequency_array, s21_linear_mag, minima_index, left_goal_depth, right_g
             f_fwhm_mag_now_right = single_linear_mag_right
             if f_fwhm_mag_now_right > right_goal_depth:
                 break
-        slope = (f_fwhm_now_right - f_fwhm_last_right) / (f_fwhm_mag_now_right - f_fwhm_mag_last_right)
-        f_fwhm_right = ((right_goal_depth - f_fwhm_mag_last_right) * slope) + f_fwhm_last_right
+        if f_fwhm_last_right is None:
+            # this happens when the minima of the trace is the right most point
+            raise ResMinIsRightMost
+        else:
+            slope = (f_fwhm_now_right - f_fwhm_last_right) / (f_fwhm_mag_now_right - f_fwhm_mag_last_right)
+            f_fwhm_right = ((right_goal_depth - f_fwhm_mag_last_right) * slope) + f_fwhm_last_right
     return f_fwhm_left, f_fwhm_right
 
 
