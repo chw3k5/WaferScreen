@@ -1,3 +1,4 @@
+# derived of code by Jake Conners
 from scipy.signal import savgol_filter
 from scipy.optimize import curve_fit
 import numpy as np

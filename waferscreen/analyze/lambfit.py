@@ -1,3 +1,5 @@
+# derived from  Jake Conners 2020
+
 import numpy as np
 from numpy import pi
 from scipy.optimize import fsolve

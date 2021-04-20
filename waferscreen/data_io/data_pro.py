@@ -1,3 +1,6 @@
+# Copyright (C) 2018 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
+
 import os
 import ref
 import datetime

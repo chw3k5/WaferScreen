@@ -1,3 +1,6 @@
+# Copyright (C) 2021 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
+
 from typing import NamedTuple
 
 

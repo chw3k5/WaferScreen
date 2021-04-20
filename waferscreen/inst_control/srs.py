@@ -25,11 +25,13 @@ def srs_parse(raw_string):
             parse_trigger = True
     return message
 
+
 def get_srs(address):
     if isinstance(address, str):
         return SRS_Connect(address=address)
     else:
         return SRS_Connect(com_num=address)
+
 
 def get_star_srs(is_gpib=False):
     if is_gpib:
