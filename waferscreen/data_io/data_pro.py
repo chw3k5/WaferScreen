@@ -12,9 +12,14 @@ from waferscreen.analyze.lambcalc import LambCalc
 from waferscreen.data_io.s21_io import input_to_output_filename
 from waferscreen.data_io.exceptions import ResProcessingError
 
-
 # initialize resonator processing log settings
 logging.basicConfig(filename=ref.processing_log, level=logging.INFO)
+
+
+def get_seed_files_between_dates(start_date=datetime.date.min, end_date=datetime.date.max):
+    seed_paths = []
+
+    return seed_paths
 
 
 def get_subdirs(rootdir, matching_str):
@@ -52,8 +57,17 @@ def get_lamb_dirs():
     return lamb_data_dirs
 
 
-def get_lamb_dirs_between_dates(start_date, end_date):
-    lamb_data_dirs = []
+def get_dirs_between_dates(start_date, end_date):
+    """
+    At the "date" level of directory hierarchy (the folder names ar in the format (YYYY-MM-DD)
+    Get all the directory names between the date arguments
+
+    :param start_date: use datetime.date()
+    :param end_date: use datetime.date()
+    :return: list - empty or elements that are the full paths (str) for 'date'
+                    directories (YYYY-MM-DD) between the date arguments
+    """
+    date_dirs_in_range = []
     for location_dir in ref.output_dirs:
         # get all the wafer-number directories
         wafer_number_dirs = []
@@ -68,7 +82,6 @@ def get_lamb_dirs_between_dates(start_date, end_date):
                 else:
                     wafer_number_dirs.append(wafer_number_dir_test)
         # get all the date name directory directories between the start and end dates
-        date_dirs_in_range = []
         for wafer_number_dir in wafer_number_dirs:
             for date_string_dir in os.listdir(wafer_number_dir):
                 # move on if the directory is not in date format (like hidden directories i.e. .DS_Store)
@@ -79,9 +92,70 @@ def get_lamb_dirs_between_dates(start_date, end_date):
                 else:
                     if start_date <= dt_this_dir <= end_date:
                         date_dirs_in_range.append(os.path.join(wafer_number_dir, date_string_dir))
-        # within the available date dirs, get the lambda dirs
-        [lamb_data_dirs.extend(get_subdirs(rootdir=date_dir, matching_str="lambda")) for date_dir in date_dirs_in_range]
+    return date_dirs_in_range
+
+
+def get_lamb_dirs_between_dates(start_date, end_date):
+    """
+    Get all the directory names where processed Lambda parameter data is stored between
+    the date arguments.
+
+    :param start_date: use datetime.date()
+    :param end_date: use datetime.date()
+    :return: list - empty or elements that are the full paths (str) for Lambda data directories
+                    between the date arguments.
+    """
+    lamb_data_dirs = []
+    #  within the available date dirs, get the lambda dirs
+    [lamb_data_dirs.extend(get_subdirs(rootdir=date_dir, matching_str="lambda"))
+     for date_dir in get_dirs_between_dates(start_date, end_date)]
     return lamb_data_dirs
+
+
+def get_raw_scan_dirs_between_dates(start_date, end_date):
+    """
+    Between the date arguments, get all the full paths for the directories for raw scan files.
+
+    A seed filename is taken from 'scan' type files, where resonators are
+    initially identified. This can be used to find all 'scan' and 'resonator' data,
+    both raw and processed,
+
+    :param start_date: use datetime.date()
+    :param end_date: use datetime.date()
+    :return: list - empty or elements are the full paths (str) for raw scan (seed) data
+                    directories between the date arguments.
+    """
+    return [os.path.join(date_dir, "raw", "scan")
+            for date_dir in get_dirs_between_dates(start_date, end_date)]
+
+
+def get_raw_res_dirs_between_dates(start_date, end_date):
+    """
+    Between the date arguments, get all the full paths for the directories for raw
+    single resonator directories.
+
+
+    :param start_date: use datetime.date()
+    :param end_date: use datetime.date()
+    :return: list - empty or elements are the full paths (str) for raw single_res data
+                    directories between the date arguments.
+    """
+    return [os.path.join(date_dir, "raw", "single_res")
+            for date_dir in get_dirs_between_dates(start_date, end_date)]
+
+
+def get_pro_res_dirs_between_dates(start_date, end_date):
+    """
+    Between the date arguments, get all the full paths for the directories for pro (processed)
+    data directories.
+
+    :param start_date: use datetime.date()
+    :param end_date: use datetime.date()
+    :return: list - empty or elements are the full paths (str) for pro (processed) data
+                    directories between the date arguments.
+    """
+    return [os.path.join(date_dir, "pro")
+            for date_dir in get_dirs_between_dates(start_date, end_date)]
 
 
 def get_pro_s21_scans(process_type):
@@ -271,9 +345,9 @@ class DataManager:
                 raw_process(path=raw_single_res_path, save_phase_plot=True, user_input_group_delay=False)
 
     def analyze_resonator_files(self, s21_files, cosine_filter=False,
-                                 window_pad_factor=3, fitter_pad_factor=6,
-                                 show_filter_plots=False, skip_interactive_plot=False,
-                                 save_res_plots=False):
+                                window_pad_factor=3, fitter_pad_factor=6,
+                                show_filter_plots=False, skip_interactive_plot=False,
+                                save_res_plots=False):
         for s21_file in s21_files:
             res_pipe = ResPipe(s21_path=s21_file, verbose=self.verbose)
             res_pipe.read()
@@ -319,9 +393,9 @@ class DataManager:
                                    save_res_plots=save_res_plots)
             else:
                 single_res_pro_args = zip(single_res_files_this_folder,
-                                          [self.verbose]*len(single_res_files_this_folder),
-                                          [reprocess]*len(single_res_files_this_folder),
-                                          [save_res_plots]*len(single_res_files_this_folder))
+                                          [self.verbose] * len(single_res_files_this_folder),
+                                          [reprocess] * len(single_res_files_this_folder),
+                                          [save_res_plots] * len(single_res_files_this_folder))
                 with Pool(ref.multiprocessing_threads) as p:
                     p.starmap(single_res_pro, single_res_pro_args)
 
@@ -330,7 +404,7 @@ class DataManager:
         if ref.multiprocessing_threads is None:
             [lamb_process(lamb_dir=lamb_dir, lamb_plots=lamb_plots) for lamb_dir in lamb_dirs]
         else:
-            lamb_process_args = zip(lamb_dirs, [lamb_plots]*len(lamb_dirs))
+            lamb_process_args = zip(lamb_dirs, [lamb_plots] * len(lamb_dirs))
             with Pool(ref.multiprocessing_threads) as p:
                 p.starmap(lamb_process, lamb_process_args)
 
