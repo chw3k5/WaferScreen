@@ -89,9 +89,6 @@ phi_0 = 2.068e-15  # magnetic flux quantum
 # processing types
 s21_processing_types = {"phase", "windowbaselinesmoothedremoved"}
 
-# Google drive api key
-google_drive_api_key = "AIzaSyAJBe0g27WNUhsjSBLoLSNlT4WIdDgUJ_U"
-
 
 # Simons Observatory Frequency Band definitions
 band_names = ["Band00", "Band01", "Band02", "Band03", "Band04", "Band05", "Band06",
