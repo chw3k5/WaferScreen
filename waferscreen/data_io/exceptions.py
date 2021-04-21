@@ -11,3 +11,8 @@ class ResMinIsLeftMost(ResProcessingError):
 class ResMinIsRightMost(ResProcessingError):
     """Raised when the RWHM definition detects that the resonator's minima is the right-most point"""
     pass
+
+
+class FailedResFit(ResProcessingError):
+    """Raised when the curvefit has a runtime error and a the resonator fit fails to converge"""
+    pass

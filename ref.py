@@ -27,7 +27,7 @@ flux_ramp_address = "GPIB0::17::INSTR"
 volt_source_port = 1
 
 # Debug mode
-debug_mode = False
+debug_mode = True
 # multiprocessing
 current_user = getpass.getuser()
 if debug_mode:

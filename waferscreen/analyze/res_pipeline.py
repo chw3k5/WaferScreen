@@ -17,6 +17,7 @@ from waferscreen.analyze.resfit import wrap_simple_res_gain_slope_complex, packa
 from waferscreen.data_io.jobs_io import JobOrganizer
 from waferscreen.data_io.exceptions import ResMinIsLeftMost, ResMinIsRightMost
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
+from waferscreen.data_io.exceptions import FailedResFit
 import ref
 
 
@@ -410,6 +411,7 @@ class ResPipe:
             save_res_plots = True
             params_fit = None
             print(F"\nFAILED FIT: {self.path}\n")
+            raise FailedResFit
         else:
             params_fit = package_res_results(popt=popt, pcov=pcov, res_number=self.metadata["res_num"],
                                              flux_ramp_current_ua=self.metadata["flux_current_ua"],
