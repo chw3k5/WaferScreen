@@ -2,3 +2,4 @@ waferscreen/nist/
 venv/
 .idea/
 downloads/
+*.json
