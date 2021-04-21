@@ -27,14 +27,14 @@ flux_ramp_address = "GPIB0::17::INSTR"
 volt_source_port = 1
 
 # Debug mode
-debug_mode = False
+debug_mode = True
 # multiprocessing
 current_user = getpass.getuser()
 if debug_mode:
     multiprocessing_threads = None
     mpl.use(backend='module://backend_interagg')
 elif current_user == "chw3k5":
-    multiprocessing_threads = 4  # Caleb's other computers
+    multiprocessing_threads = 3  # Caleb's other computers
 elif current_user in "cwheeler":
     multiprocessing_threads = 8  # Mac Pro 8-core intel core i9 processor 16 threads
 elif current_user == "uvwave":
