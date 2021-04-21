@@ -293,6 +293,16 @@ def report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2):
 
 def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_str, flag_table_info, ordered_res_strs,
                                markersize=8, alpha=0.5):
+    summary_info = {}
+    # check to make sure we have date for all the requested resonator numbers
+    for res_str in list(ordered_res_strs):
+        if not hasattr(res_set, res_str):
+            ordered_res_strs.remove(res_str)
+            if "lost_res_nums" in summary_info.keys():
+                summary_info["lost_res_nums"].add(res_str)
+            else:
+                summary_info["lost_res_nums"] = {res_str}
+
     # do some data analysis
     lamb_values = np.array([res_set.__getattribute__(res_str).lamb_fit.lambfit for res_str in ordered_res_strs])
     lamb_value_errs = np.array([res_set.__getattribute__(res_str).lamb_fit.lambfit_err
@@ -502,7 +512,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                right=False,  # ticks along the top edge are off
                                labelleft=False)
     # legend and Yield calculations
-    summary_info = {"f_spacings_ghz": list(f_spacings_ghz)}
+    summary_info["f_spacings_ghz"] =  list(f_spacings_ghz)
 
     # in-band calculations (not counted against yield)
     band_min_ghz = ref.band_params[band_str]['min_GHz']

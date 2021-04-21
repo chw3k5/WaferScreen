@@ -11,6 +11,7 @@ from waferscreen.data_io.lamb_io import remove_processing_tags, prep_lamb_dirs, 
 from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.plot.s21_plots import lamb_plot, multi_lamb_plot
+from waferscreen.data_io.exceptions import NotEnoughDataForCurveFit
 import ref
 
 
@@ -120,46 +121,50 @@ class LambCalc:
         self.lamb_params_guess = LambdaParams(i0fit=i0fit_guess, mfit=mfit_guess, f2fit=f2fit_guess, pfit=pfit_guess,
                                               lambfit=lambfit_guess, res_num=unified_metadata["res_num"],
                                               parent_dir=self.lamb_dir)
+        try:
+            popt, pcov = curve_fit(f0_of_I, currentA, freqGHz, (i0fit_guess, mfit_guess, f2fit_guess, pfit_guess,
+                                                                lambfit_guess))
+        except TypeError:
+            print("\nCurve Fit for lambda fitting has more free parameters then data points, fit failed\n")
+            raise NotEnoughDataForCurveFit
+        else:
+            i0fit, mfit, f2fit, pfit, lambfit = popt
+            i0fit_err = pcov[0, 0]
+            mfit_err = pcov[1, 1]
+            f2fit_err = pcov[2, 2]
+            pfit_err = pcov[3, 3]
+            lambfit_err = pcov[4, 4]
+            self.lamb_params_fit = LambdaParams(i0fit=i0fit, mfit=mfit, f2fit=f2fit, pfit=pfit, lambfit=lambfit,
+                                                res_num=unified_metadata["res_num"], parent_dir=self.lamb_dir,
+                                                i0fit_err=i0fit_err, mfit_err=mfit_err, f2fit_err=f2fit_err,
+                                                pfit_err=pfit_err, lambfit_err=lambfit_err)
 
-        popt, pcov = curve_fit(f0_of_I, currentA, freqGHz, (i0fit_guess, mfit_guess, f2fit_guess, pfit_guess,
-                                                            lambfit_guess))
-        i0fit, mfit, f2fit, pfit, lambfit = popt
-        i0fit_err = pcov[0, 0]
-        mfit_err = pcov[1, 1]
-        f2fit_err = pcov[2, 2]
-        pfit_err = pcov[3, 3]
-        lambfit_err = pcov[4, 4]
-        self.lamb_params_fit = LambdaParams(i0fit=i0fit, mfit=mfit, f2fit=f2fit, pfit=pfit, lambfit=lambfit,
-                                            res_num=unified_metadata["res_num"], parent_dir=self.lamb_dir,
-                                            i0fit_err=i0fit_err, mfit_err=mfit_err, f2fit_err=f2fit_err,
-                                            pfit_err=pfit_err, lambfit_err=lambfit_err)
+            # output the fit data
+            self.write()
 
-        # output the fit data
-        self.write()
-
-        # make a showing the fit input and results.
-        if self.do_plot:
-            # calculations for the plot's title string
-            q_i_array = np.array([res_param.q_i for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
-            q_i_mean = np.mean(q_i_array)
-            q_i_std = np.std(q_i_array)
-            q_c_array = np.array([res_param.q_c for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
-            q_c_mean = np.mean(q_c_array)
-            q_c_std = np.std(q_c_array)
-            lamb_format_str = '%8.6f'
-            q_format_str = "%i"
-            title_str = F"Resonator Number: {self.lamb_params_fit.res_num},  "
-            title_str += F"{unified_metadata['so_band']},  "
-            title_str += F"lambda: {lamb_format_str % self.lamb_params_fit.lambfit} "
-            title_str += F"({lamb_format_str % self.lamb_params_fit.lambfit_err})  "
-            title_str += F"mean Qi: {q_format_str % q_i_mean} "
-            title_str += F"({q_format_str % q_i_std})  "
-            title_str += F"mean Qc: {q_format_str % q_c_mean} "
-            title_str += F"({q_format_str % q_c_std})"
-            self.lamb_plot_path = os.path.join(self.lamb_plots_dir, lamb_plt_basename)
-            lamb_plot(input_data=(currentuA, freqGHz), lamb_params_guess=self.lamb_params_guess,
-                      lamb_params_fit=self.lamb_params_fit, resfits_and_metadata=self.resfits_and_metadata,
-                      title_str=title_str, output_filename=self.lamb_plot_path)
+            # make a showing the fit input and results.
+            if self.do_plot:
+                # calculations for the plot's title string
+                q_i_array = np.array([res_param.q_i for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
+                q_i_mean = np.mean(q_i_array)
+                q_i_std = np.std(q_i_array)
+                q_c_array = np.array([res_param.q_c for res_param in [a_tuple[1] for a_tuple in self.resfits_and_metadata]])
+                q_c_mean = np.mean(q_c_array)
+                q_c_std = np.std(q_c_array)
+                lamb_format_str = '%8.6f'
+                q_format_str = "%i"
+                title_str = F"Resonator Number: {self.lamb_params_fit.res_num},  "
+                title_str += F"{unified_metadata['so_band']},  "
+                title_str += F"lambda: {lamb_format_str % self.lamb_params_fit.lambfit} "
+                title_str += F"({lamb_format_str % self.lamb_params_fit.lambfit_err})  "
+                title_str += F"mean Qi: {q_format_str % q_i_mean} "
+                title_str += F"({q_format_str % q_i_std})  "
+                title_str += F"mean Qc: {q_format_str % q_c_mean} "
+                title_str += F"({q_format_str % q_c_std})"
+                self.lamb_plot_path = os.path.join(self.lamb_plots_dir, lamb_plt_basename)
+                lamb_plot(input_data=(currentuA, freqGHz), lamb_params_guess=self.lamb_params_guess,
+                          lamb_params_fit=self.lamb_params_fit, resfits_and_metadata=self.resfits_and_metadata,
+                          title_str=title_str, output_filename=self.lamb_plot_path)
 
     @classmethod
     def from_resfits_and_metadata(cls, resfits_and_metadata, lamb_dir, plot):

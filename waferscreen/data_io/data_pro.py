@@ -10,7 +10,7 @@ from waferscreen.analyze.s21_inductor import InductS21
 from waferscreen.analyze.res_pipeline import ResPipe
 from waferscreen.analyze.lambcalc import LambCalc
 from waferscreen.data_io.s21_io import input_to_output_filename
-from waferscreen.data_io.exceptions import ResProcessingError
+from waferscreen.data_io.exceptions import ResProcessingError, LambdaProcessingError
 
 # initialize resonator processing log settings
 logging.basicConfig(filename=ref.processing_log, level=logging.INFO)
@@ -255,7 +255,10 @@ def raw_process(path, save_phase_plot=True, user_input_group_delay=None):
 def lamb_process(lamb_dir, lamb_plots=True):
     single_lamb_calc = LambCalc(lamb_dir=lamb_dir, auto_fit=False, plot=lamb_plots)
     single_lamb_calc.read_input()
-    single_lamb_calc.sort_by_type()
+    try:
+        single_lamb_calc.sort_by_type()
+    except LambdaProcessingError:
+        logging.exception(F'File: {lamb_dir} | Proceeding Exception: {LambdaProcessingError}')
 
 
 class DataManager:

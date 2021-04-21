@@ -16,3 +16,14 @@ class ResMinIsRightMost(ResProcessingError):
 class FailedResFit(ResProcessingError):
     """Raised when the curvefit has a runtime error and a the resonator fit fails to converge"""
     pass
+
+
+# Lambda processing
+class LambdaProcessingError(Exception):
+    """The base class for exceptions the occur during lambda curve fitting and processing."""
+    pass
+
+
+class NotEnoughDataForCurveFit(LambdaProcessingError):
+    """Curve Fit for lambda fitting has more free parameters then data points"""
+    pass
