@@ -23,10 +23,9 @@ wafer screen data structure is organized by microwave chain, is a dictionary wit
 Notes:
 1) wafer screen data structure assumes that 4 ports of a umux screener package are
 always ganged together.
-2) switched 'x(y)_position' to 'row' 'column' to synch with nist QSG standard
-3) add keys to metadata:
+2) add keys to metadata:
     'electricalprobing':{'a':'cpw thru','fr','fr_to_gnd','cpw_to_gnd'}
-4) currently only handles one package in one file.
+3) currently only handles one package in one file.
 
 '''
 import datetime
@@ -79,8 +78,8 @@ def parse_device_box_assembly(devbox_raw_lines):
     for ii in range(1,2): # rows
         devbox_row = make_lower_case(d_list[1][0])
         for jj in range(1,5): # columns
-            row, column, wafer, band = parse_chip_id(d_list[ii][jj])
-            positions_dicts[devbox_row+str(jj)] = {'wafer':wafer, 'row':row, 'column':column, 'band':band, 'boxposition':devbox_row+str(jj)}
+            x_position, y_position, wafer, band = parse_chip_id(d_list[ii][jj])
+            positions_dicts[devbox_row+str(jj)] = {'wafer':wafer, 'x_position':x_position, 'y_position':y_position, 'band':band, 'boxposition':devbox_row+str(jj)}
     eprobe_dict = parse_electrical_probing(d_list) # parse the room temp electrical probing separately
 
     return rf_chain, positions_dicts, eprobe_dict, # in future may wish to return devbox_row_a and devbox_row_b separately if on different microwave chains
