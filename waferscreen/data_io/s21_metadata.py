@@ -15,7 +15,6 @@ def num_format(a_string):
         return a_string
     elif isinstance(a_string, float):
         # it is either and float or a string
-
         int_version = int(a_string)
         float_version = float(a_string)
         if int_version == float_version:
