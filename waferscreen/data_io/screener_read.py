@@ -1,3 +1,6 @@
+# Copyright (C) 2021 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
+
 import datetime
 import math
 from ref import umux_screener_assembly_path
@@ -122,7 +125,6 @@ class ScreenerSheet:
         return self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
 
 
-if __name__ == "__main__":
-    # full_path = "/Users/cwheeler/PycharmProjects/WaferScreen/waferscreen/umux_screener_assembly.csv"
-    screener_sheet = ScreenerSheet()
+# full_path = "/Users/cwheeler/PycharmProjects/WaferScreen/waferscreen/umux_screener_assembly.csv"
+screener_sheet = ScreenerSheet()
 

@@ -8,11 +8,8 @@ from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.s21_io import write_s21, dirname_create, read_s21
 import waferscreen.inst_control.flux_sweep_config as fsc
-from waferscreen.data_io.screener_read import ScreenerSheet
+from waferscreen.data_io.screener_read import screener_sheet
 import ref
-
-
-screener_sheet = ScreenerSheet()
 
 
 def ramp_name_parse(basename):

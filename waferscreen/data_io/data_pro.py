@@ -16,12 +16,6 @@ from waferscreen.data_io.exceptions import ResProcessingError, LambdaProcessingE
 logging.basicConfig(filename=ref.processing_log, level=logging.INFO)
 
 
-def get_seed_files_between_dates(start_date=datetime.date.min, end_date=datetime.date.max):
-    seed_paths = []
-
-    return seed_paths
-
-
 def get_subdirs(rootdir, matching_str):
     folder_list = []
     for root, subdirs, files in os.walk(rootdir):

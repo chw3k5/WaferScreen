@@ -1,4 +1,4 @@
-# Copyright (C) 2018 Members of the Simons Observatory collaboration.
+# Copyright (C) 2021 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
 
 import os
@@ -18,6 +18,8 @@ from waferscreen.data_io.jobs_io import JobOrganizer
 from waferscreen.data_io.exceptions import ResMinIsLeftMost, ResMinIsRightMost
 from submm_python_routines.KIDs import find_resonances_interactive as fr_interactive
 from waferscreen.data_io.exceptions import FailedResFit
+from waferscreen.data_io.screener_read import screener_sheet
+from waferscreen.data_io.explore_io import band_str_to_num
 import ref
 
 
@@ -545,6 +547,12 @@ class ResPipe:
                     seed_metadata["seed_base"] = self.basename_prefix
                     seed_metadata["seed_base_path"] = self.path
                     seed_metadata["res_number"] = res_fit.res_number
+                    # screener worksheet data on device package
+                    package_data = \
+                        screener_sheet.chain_and_band_to_package_data(rf_chain_letter=self.metadata['rf_chain'],
+                                                                      band_int=band_str_to_num(band_str))
+                    seed_metadata.update(package_data)
+
                     # make the correct output file in the 'raw' directory
                     res_dir = os.path.join(scan_basename_dir, F"{'%04i' % res_fit.res_number}")
                     if not os.path.exists(res_dir):
