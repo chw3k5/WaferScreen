@@ -1,0 +1,10 @@
+# Fill out header infomation and chip unique identifier in format (row:column:wafer:band),,,,,,,,,
+# date format expected: YYYY-MM-DD,,,,,,,,,
+,,,,,,,,,
+Assembly Date:,2021-04-21,,,,,,,,
+Packaged by:,Zach,,,,,,,,
+Device box #:,3,,,,,,,,
+Mux version:,umux100k_v3.3,,,,,,,,
+!!!!!,1,2,3,4,rf chain (a or b),cpw thru,fr ,fr_to_gnd,cpw_to_gnd
+A,-2:-2:14:01,-1:-1:14:03,0:0:14:5,2:2:14:07,a,1,1,open,open
+B,thru,-3:-3:14:09,-5:-5:14:11,3:3:14:13,a,1,1,open,open
