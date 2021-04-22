@@ -119,8 +119,18 @@ def get_raw_scan_dirs_between_dates(start_date, end_date):
     :return: list - empty or elements are the full paths (str) for raw scan (seed) data
                     directories between the date arguments.
     """
-    return [os.path.join(date_dir, "raw", "scan")
+    return [os.path.join(date_dir, "raw", "scans")
             for date_dir in get_dirs_between_dates(start_date, end_date)]
+
+
+def get_raw_scan_files_between_dates(start_date, end_date):
+    raw_scan_files = []
+    for scan_dir in get_raw_scan_dirs_between_dates(start_date, end_date):
+        for test_scan_file in os.listdir(scan_dir):
+            full_path = os.path.join(scan_dir, test_scan_file)
+            if os.path.isfile(full_path) and test_scan_file[0:4] == "scan":
+                raw_scan_files.append(full_path)
+    return raw_scan_files
 
 
 def get_raw_res_dirs_between_dates(start_date, end_date):

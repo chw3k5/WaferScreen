@@ -9,7 +9,7 @@ ref_file_path = os.path.dirname(os.path.realpath(__file__))
 parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
 sys.path.append(os.path.join(parent_dir, 'WaferScreen'))
 # these are modules that have been written specifically for the wafer screen project.
-from waferscreen.data_io.data_pro import DataManager, get_raw_scan_dirs_between_dates
+from waferscreen.data_io.data_pro import DataManager, get_raw_scan_files_between_dates
 from waferscreen.data_io.data_pro import get_raw_res_dirs_between_dates, get_pro_res_dirs_between_dates
 from waferscreen.analyze.s21_inductor import InductS21
 
@@ -19,16 +19,16 @@ def to_raw_path(seed_name):
 
 
 # edit these to look at existing measurements
-start_date = datetime.date(year=2020, month=4, day=7)
+start_date = datetime.date(year=2021, month=4, day=22)
 end_date = datetime.date(year=2022, month=4, day=7)
 
-scan_files = get_raw_scan_dirs_between_dates(start_date=start_date, end_date=end_date)
+scan_files = get_raw_scan_files_between_dates(start_date=start_date, end_date=end_date)
 raw_res_dirs = get_raw_res_dirs_between_dates(start_date=start_date, end_date=end_date)
 pro_dirs = get_pro_res_dirs_between_dates(start_date=start_date, end_date=end_date)
 
 
 if __name__ == "__main__":
-    do_quick_look = False
+    do_quick_look = True
     do_scan = False
     do_res_sweeps = not do_scan
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # this statement is true if this file is run direct, it is false if this file imported from another file.
     # multithreading requires this statement to avoid infinite thread recursion.
     if do_quick_look:
-        for test_scan_file in scan_files:
+        for test_scan_file in reversed(scan_files):
             induct_s21 = InductS21(path=test_scan_file)
             induct_s21.induct()
             induct_s21.remove_group_delay()

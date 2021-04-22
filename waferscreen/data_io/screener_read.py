@@ -112,12 +112,17 @@ class ScreenerSheet:
         wafers_this_cool_down = set()
         for rf_chain_letter in {"a", "b"}:
             wafers_this_chain = self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
-            if isinstance(wafers_this_chain, set):
-                [wafers_this_cool_down.add(a_wafer) for a_wafer in wafers_this_chain]
-            else:
-                wafers_this_cool_down.add(wafers_this_chain)
-        if len(wafers_this_cool_down) == 1:
+            if wafers_this_chain is not None:
+                if isinstance(wafers_this_chain, set):
+                    [wafers_this_cool_down.add(a_wafer) for a_wafer in wafers_this_chain]
+                else:
+                    wafers_this_cool_down.add(wafers_this_chain)
+        if len(wafers_this_cool_down) == 0:
+            self.wafers_this_cool_down = None
+        elif len(wafers_this_cool_down) == 1:
             self.wafers_this_cool_down = list(wafers_this_cool_down)[0]
+        else:
+            self.wafers_this_cool_down = wafers_this_cool_down
 
     def chain_and_band_to_package_data(self, rf_chain_letter, band_int):
         return self.__getattribute__(F"{rf_chain_letter.lower()}_chain_packaging")[band_int]
