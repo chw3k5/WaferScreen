@@ -71,8 +71,8 @@ class JobDispatch:
 
 
 if __name__ == "__main__":
-    rf_chain = "b"  # choose either {"a", "b"}
-    do_scan = False
+    rf_chain = "a"  # choose either {"a", "b"}
+    do_scan = True
     do_res_sweeps = not do_scan
 
     if do_scan:

@@ -89,24 +89,25 @@ class ScreenerSheet:
         self.b_chain_by_band = None
         # resort the data for method calls
         for chain_packaging in [self.a_chain_packaging, self.b_chain_packaging]:
-            box_metadata = chain_packaging["boxmetadata"]
-            rf_chain_letter = box_metadata["rfchain"]
-            self.__setattr__(F"{rf_chain_letter}_chain_by_band", {})
-            del box_metadata["rfchain"]
-            positions_dicts = chain_packaging["positions_dicts"]
-            self.__setattr__(F"{rf_chain_letter}_chain_wafers", set())
-            wafers_this_chain = self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
-            for box_position in positions_dicts.keys():
-                position_dict = positions_dicts[box_position]
-                band = position_dict["band"]
-                del position_dict["band"]
-                box_and_pos_metadata = MetaDataDict(box_metadata)
-                box_and_pos_metadata.update(position_dict)
-                self.__getattribute__(F"{rf_chain_letter}_chain_by_band")[band] = box_and_pos_metadata
-                wafers_this_chain.add(box_and_pos_metadata["wafer"])
-            else:
-                if len(wafers_this_chain) == 1:
-                    self.__setattr__(F"{rf_chain_letter}_chain_wafers", list(wafers_this_chain)[0])
+            if chain_packaging is not None:
+                box_metadata = chain_packaging["boxmetadata"]
+                rf_chain_letter = box_metadata["rfchain"]
+                self.__setattr__(F"{rf_chain_letter}_chain_by_band", {})
+                del box_metadata["rfchain"]
+                positions_dicts = chain_packaging["positions_dicts"]
+                self.__setattr__(F"{rf_chain_letter}_chain_wafers", set())
+                wafers_this_chain = self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
+                for box_position in positions_dicts.keys():
+                    position_dict = positions_dicts[box_position]
+                    band = position_dict["band"]
+                    del position_dict["band"]
+                    box_and_pos_metadata = MetaDataDict(box_metadata)
+                    box_and_pos_metadata.update(position_dict)
+                    self.__getattribute__(F"{rf_chain_letter}_chain_by_band")[band] = box_and_pos_metadata
+                    wafers_this_chain.add(box_and_pos_metadata["wafer"])
+                else:
+                    if len(wafers_this_chain) == 1:
+                        self.__setattr__(F"{rf_chain_letter}_chain_wafers", list(wafers_this_chain)[0])
         # get all the wafers this cool down.
         wafers_this_cool_down = set()
         for rf_chain_letter in {"a", "b"}:

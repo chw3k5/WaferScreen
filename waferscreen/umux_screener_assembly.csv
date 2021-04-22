@@ -3,7 +3,7 @@
 "# whitespace is deleted on read in, use white space for readability only, blank lines are ignored, any lines that start with the # are also ignored. ",,,,,,,,
 # Expected date format: YYYY-MM-DD,,,,,,,,
 "# chip data format: Wafer: int, Band: int, x position: float, y position: float, where x position and y position are the chip's center coordinates on the wafer (this is how we distinguish different chips that are the same band)",,,,,,,,
-box number:,3,packaged by:,Zach,assembly date:,2021-04-01,umux design:,100k v3.3,rf chain:
+box number:,3,packaged by:,Zach,assembly date:,2021-04-01,umux design:,100k v3.3,rf chain:,a
 box position,wafer,band,x_position,y_position,,,,
 A1,14,1,-2,-2,,,,
 A2,14,3,-1,-1,,,,
