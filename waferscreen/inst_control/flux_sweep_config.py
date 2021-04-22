@@ -1,11 +1,10 @@
-import numpy as np
 import os
+import numpy as np
 
 # Output Base Directory
 output_base_dir = os.path.join("D:\\", "waferscreen")
 
 # Test Information
-wafer = "14"
 location = 'nist'
 
 # VNA Configuration

@@ -8,7 +8,11 @@ from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
 from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.s21_io import write_s21, dirname_create, read_s21
 import waferscreen.inst_control.flux_sweep_config as fsc
+from waferscreen.data_io.screener_read import ScreenerSheet
 import ref
+
+
+screener_sheet = ScreenerSheet()
 
 
 def ramp_name_parse(basename):
@@ -34,7 +38,8 @@ def ramp_name_create(power_dBm, current_uA, res_num, utc):
 
 def dirname_create_raw(sweep_type="scan", res_id=None):
     path_str = dirname_create(output_basedir=fsc.output_base_dir, location=fsc.location,
-                              wafer=fsc.wafer, date_str=today_str, is_raw=True, sweep_type=sweep_type, res_id=res_id)
+                              wafer=screener_sheet.wafers_this_cool_down, date_str=today_str,
+                              is_raw=True, sweep_type=sweep_type, res_id=res_id)
     return path_str
 
 
@@ -168,7 +173,7 @@ class AbstractFluxSweep:
                               'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dbm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
                               "fspan_ghz": fmax_GHz - fmin_GHz, "fcenter_ghz": (fmax_GHz + fmin_GHz) / 2.0,
-                              "location": fsc.location, "wafer": fsc.wafer}
+                              "location": fsc.location, "wafer": screener_sheet.wafers_this_cool_down}
         # overwrite the default values with what ever was sent by the use
         for user_key in kwargs.keys():
             resonator_metadata[user_key] = kwargs[user_key]

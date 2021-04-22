@@ -10,6 +10,9 @@ forbidden_characters = {"|", ","}
 
 
 def num_format(a_string):
+    if not isinstance(a_string, (str, int, float)):
+        # formatted datetime objects and other objects in strings
+        a_string = str(a_string)
     if isinstance(a_string, int):
         # it is an int
         return a_string

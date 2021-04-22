@@ -76,27 +76,50 @@ class ScreenerSheet:
             = parse_for_waferscreen(all_boxes_dict=self.all_boxes_dict)
         self.a_chain_by_band = None
         self.b_chain_by_band = None
+        self.a_chain_wafers = None
+        self.b_chain_wafers = None
+        self.wafers_this_cool_down = None
         self.sort()
 
     def sort(self):
         self.a_chain_by_band = None
         self.b_chain_by_band = None
+        # resort the data for method calls
         for chain_packaging in [self.a_chain_packaging, self.b_chain_packaging]:
             box_metadata = chain_packaging["boxmetadata"]
             rf_chain_letter = box_metadata["rfchain"]
             self.__setattr__(F"{rf_chain_letter}_chain_by_band", {})
             del box_metadata["rfchain"]
             positions_dicts = chain_packaging["positions_dicts"]
+            self.__setattr__(F"{rf_chain_letter}_chain_wafers", set())
+            wafers_this_chain = self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
             for box_position in positions_dicts.keys():
                 position_dict = positions_dicts[box_position]
                 band = position_dict["band"]
-                del positions_dicts["band"]
+                del position_dict["band"]
                 box_and_pos_metadata = MetaDataDict(box_metadata)
                 box_and_pos_metadata.update(position_dict)
                 self.__getattribute__(F"{rf_chain_letter}_chain_by_band")[band] = box_and_pos_metadata
+                wafers_this_chain.add(box_and_pos_metadata["wafer"])
+            else:
+                if len(wafers_this_chain) == 1:
+                    self.__setattr__(F"{rf_chain_letter}_chain_wafers", list(wafers_this_chain)[0])
+        # get all the wafers this cool down.
+        wafers_this_cool_down = set()
+        for rf_chain_letter in {"a", "b"}:
+            wafers_this_chain = self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
+            if isinstance(wafers_this_chain, set):
+                [wafers_this_cool_down.add(a_wafer) for a_wafer in wafers_this_chain]
+            else:
+                wafers_this_cool_down.add(wafers_this_chain)
+        if len(wafers_this_cool_down) == 1:
+            self.wafers_this_cool_down = list(wafers_this_cool_down)[0]
 
     def chain_and_band_to_package_data(self, rf_chain_letter, band_int):
         return self.__getattribute__(F"{rf_chain_letter.lower()}_chain_packaging")[band_int]
+
+    def chain_to_wafer_number(self, rf_chain_letter):
+        return self.__getattribute__(F"{rf_chain_letter}_chain_wafers")
 
 
 if __name__ == "__main__":
