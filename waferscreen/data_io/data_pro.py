@@ -11,6 +11,7 @@ from waferscreen.analyze.res_pipeline import ResPipe
 from waferscreen.analyze.lambcalc import LambCalc
 from waferscreen.data_io.s21_io import input_to_output_filename
 from waferscreen.data_io.exceptions import ResProcessingError, LambdaProcessingError
+from concurrent.futures.process import ProcessPoolExecutor
 
 # initialize resonator processing log settings
 logging.basicConfig(filename=ref.processing_log, level=logging.INFO)

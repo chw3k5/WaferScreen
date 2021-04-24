@@ -7,18 +7,7 @@ import getpass
 import matplotlib as mpl
 from datetime import datetime
 # To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
-if sys.platform == "win32":
-    mpl.use(backend="TkAgg")
-elif sys.platform == 'darwin':
-    mpl.use(backend="MacOSX")
-import matplotlib as mpl
-from datetime import datetime
-# To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
-if sys.platform == "win32":
-    mpl.use(backend="TkAgg")
-elif sys.platform == 'darwin':
-    mpl.use(backend="MacOSX")
-
+mpl.use(backend="TkAgg")
 
 # Instrument addresses
 usbvna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
@@ -36,7 +25,7 @@ if debug_mode:
 elif current_user == "chw3k5":
     multiprocessing_threads = 3  # Caleb's other computers
 elif current_user in "cwheeler":
-    multiprocessing_threads = 8  # Mac Pro 8-core intel core i9 processor 16 threads
+    multiprocessing_threads = 16  # Mac Pro 8-core intel core i9 processor 16 threads
 elif current_user == "uvwave":
     multiprocessing_threads = 2  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
 else:

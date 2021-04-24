@@ -28,7 +28,7 @@ pro_dirs = get_pro_res_dirs_between_dates(start_date=start_date, end_date=end_da
 
 
 if __name__ == "__main__":
-    do_quick_look = True
+    do_quick_look = False
     do_scan = False
     do_res_sweeps = not do_scan
 
