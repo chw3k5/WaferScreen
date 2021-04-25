@@ -11,7 +11,7 @@ from waferscreen.data_io.lamb_io import remove_processing_tags, prep_lamb_dirs, 
 from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.plot.s21_plots import lamb_plot, multi_lamb_plot
-from waferscreen.data_io.exceptions import NotEnoughDataForCurveFit
+from waferscreen.data_io.exceptions import NotEnoughDataForCurveFit, NoDataForCurveFit
 import ref
 
 
@@ -115,6 +115,9 @@ class LambCalc:
                 lamb_plt_basename = F"res{'%04i' % self.unified_metadata['res_num']}_{self.lamb_type_key}.png"
             else:
                 lamb_plt_basename = F"res{'%04i' % self.unified_metadata['res_num']}.png"
+        # make sure there is data to fit:
+        if currentuA.size == 0 or freqGHz.size == 0:
+            raise NoDataForCurveFit
         # guess for curve fit
         currentA = currentuA * 1.0e-6
         i0fit_guess, mfit_guess, f2fit_guess, pfit_guess, lambfit_guess = guess_lamb_fit_params(currentA, freqGHz)

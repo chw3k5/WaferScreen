@@ -24,6 +24,11 @@ class LambdaProcessingError(Exception):
     pass
 
 
+class NoDataForCurveFit(LambdaProcessingError):
+    """Empty lists, [], were return for currentuA and/or freqGHz needed for lambda fitting"""
+    pass
+
+
 class NotEnoughDataForCurveFit(LambdaProcessingError):
     """Curve Fit for lambda fitting has more free parameters then data points"""
     pass
