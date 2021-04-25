@@ -125,7 +125,7 @@ class ScreenerSheet:
             self.wafers_this_cool_down = wafers_this_cool_down
 
     def chain_and_band_to_package_data(self, rf_chain_letter, band_int):
-        return self.__getattribute__(F"{rf_chain_letter.lower()}_chain_packaging")[band_int]
+        return self.__getattribute__(F"{rf_chain_letter.lower()}_chain_by_band")[band_int]
 
     def chain_to_wafer_number(self, rf_chain_letter):
         return self.__getattribute__(F"{rf_chain_letter}_chain_wafers")

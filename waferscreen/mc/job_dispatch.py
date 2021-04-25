@@ -45,7 +45,7 @@ class JobDispatch:
                 # refresh and see if new job files were written to the disk
                 self.job_organizer = JobOrganizer()
             job_basename = self.job_organizer.get_next_job_to_process(rf_chain_letter=rf_chain_letter)
-            if job_basename is None:
+            if job_basename is None or not self.job_organizer.job_exists():
                 # Case: there a not jobs available for this RF chain
                 failed_attempts_count += 1
                 now = time.time()
@@ -71,8 +71,8 @@ class JobDispatch:
 
 
 if __name__ == "__main__":
-    rf_chain = "a"  # choose either {"a", "b"}
-    do_scan = True
+    rf_chain = "b"  # choose either {"a", "b"}
+    do_scan = False
     do_res_sweeps = not do_scan
 
     if do_scan:

@@ -36,6 +36,9 @@ class JobOrganizer:
         job_int = int(job_int)
         return rf_chain_letter, job_int
 
+    def job_exists(self, job_basename):
+        return os.path.isfile(os.path.join(self.working_dir, job_basename))
+
     def temp(self, rf_chain_letter):
         this_chain_job_deque = self.__getattribute__(F"{rf_chain_letter}_chain_job_deque")
         this_chain_new_job_int = self.__getattribute__(F"{rf_chain_letter}_chain_new_job_int")

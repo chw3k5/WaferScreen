@@ -19,7 +19,7 @@ def to_raw_path(seed_name):
 
 
 # edit these to look at existing measurements
-start_date = datetime.date(year=2021, month=4, day=22)
+start_date = datetime.date(year=2021, month=4, day=23)
 end_date = datetime.date(year=2022, month=4, day=7)
 
 scan_files = get_raw_scan_files_between_dates(start_date=start_date, end_date=end_date)
@@ -29,7 +29,7 @@ pro_dirs = get_pro_res_dirs_between_dates(start_date=start_date, end_date=end_da
 
 if __name__ == "__main__":
     do_quick_look = False
-    do_scan = False
+    do_scan = True
     do_res_sweeps = not do_scan
 
     if do_quick_look:
