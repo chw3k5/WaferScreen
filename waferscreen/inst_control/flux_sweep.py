@@ -9,6 +9,7 @@ from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.s21_io import write_s21, dirname_create, read_s21
 import waferscreen.inst_control.flux_sweep_config as fsc
 from waferscreen.data_io.screener_read import screener_sheet
+from waferscreen.analyze.res_pipeline_config import processing_metadata_to_remove_from_seeds
 import ref
 
 
@@ -185,19 +186,26 @@ class AbstractFluxSweep:
             all_files_in_seed_dir = os.listdir(seed_dirname)
             # skip files that have already have data
             if len(all_files_in_seed_dir) < 2:
-                _, metadata, res_params = read_s21(path=seed_file, return_res_params=True)
+                _, metadata_seed, res_params = read_s21(path=seed_file, return_res_params=True)
                 for res_param in res_params:
                     fcenter_GHz = res_param.fcenter_ghz
                     quality_factor_total = (res_param.q_i * res_param.q_c) / (res_param.q_c + res_param.q_i)
                     quality_factor_bw_GHz = fcenter_GHz / quality_factor_total
                     fspan_GHz = quality_factor_bw_GHz * fsc.ramp_span_as_multiple_of_quality_factor
                     res_num = res_param.res_number
-                    seed_base = metadata["seed_base"]
-                    resonator_metadata = {"export_type": "single_res", "res_id": F"res{res_num}_{seed_base}",
-                                          "res_num": res_num, "seed_group_delay_s": metadata["group_delay_found_s"],
-                                          "fspan_ghz": fspan_GHz, "fcenter_ghz": fcenter_GHz, "dirname": seed_dirname,
-                                          "location": fsc.location, "wafer": metadata["wafer"],
-                                          "so_band": metadata["so_band"], "seed_base": seed_base}
+                    resonator_metadata = {"export_type": "single_res",
+                                          "res_id": F"res{res_num}_{metadata_seed['seed_base']}",
+                                          "res_num": res_num,
+                                          "seed_group_delay_s": metadata_seed["group_delay_found_s"],
+                                          "fspan_ghz": fspan_GHz,
+                                          "fcenter_ghz": fcenter_GHz,
+                                          "dirname": seed_dirname,
+                                          "location": fsc.location}
+                    # update with all non-processing metadata (processing will start fresh for the new data).
+                    for seed_key in metadata_seed.keys():
+                        if seed_key not in processing_metadata_to_remove_from_seeds \
+                                and seed_key not in resonator_metadata.keys():
+                            resonator_metadata[seed_key] = metadata_seed[seed_key]
                     self.survey_power_ramp(resonator_metadata)
 
 

@@ -36,7 +36,7 @@ class SingleLamb:
         self.location = None
         self.series_key = None
 
-        self.wafer = self.band = self.meas_time = self.seed_name = None
+        self.wafer = self.so_band = self.chip_id = self.chip_position = self.meas_time = self.seed_name = None
         if auto_load:
             self.read(lamb_path=self.path)
 
@@ -49,7 +49,9 @@ class SingleLamb:
         if "wafer" in self.metadata.keys():
             self.wafer = self.metadata.wafer
         if "so_band" in self.metadata.keys():
-            self.band = self.metadata.so_band
+            self.so_band = self.metadata.so_band
+        if "x_position" in self.metadata.keys() and "y_position" in self.metadata.keys():
+            self.chip_position = (self.metadata["x_position"], self.metadata["y_position"])
         if 'seed_base' in self.metadata.keys():
             self.seed_name = remove_processing_tags(self.metadata.seed_base)
             scan_freqs, meas_utc = self.seed_name.split("_")
@@ -63,6 +65,18 @@ class SingleLamb:
             self.series_key = SeriesKey(port_power_dbm=self.metadata.port_power_dbm,
                                         if_bw_hz=self.metadata.if_bw_hz)
         self.res_number = self.lamb_fit.res_num
+
+        # make a unique-within-a-wafer chip ID
+        if self.so_band is None:
+            if self.chip_position is None:
+                self.chip_id = None
+            else:
+                self.chip_id = F"({'%1.3f' % self.chip_position[0]},{'%1.3f' % self.chip_position[1]})"
+        else:
+            if self.chip_position is None:
+                self.chip_id = F"{self.so_band}"
+            else:
+                self.chip_id = F"{self.so_band}_({'%1.3f' % self.chip_position[0]},{'%1.3f' % self.chip_position[1]})"
 
 
 def set_if(thing, other_thing, type_of_thing='unknown'):
@@ -92,7 +106,7 @@ class ResLamb:
 
 class SeriesLamb:
     def __init__(self, single_lamb=None):
-        self.band = self.wafer = self.report_dir = self.seed_scan_path = None
+        self.chip_id = self.wafer = self.report_dir = self.seed_scan_path = None
         self.available_series_handles = set()
         self.series_handle_to_key = {}
         if single_lamb is not None:
@@ -107,14 +121,14 @@ class SeriesLamb:
         self.available_series_handles.add(series_handle)
         self.series_handle_to_key[series_handle] = single_lamb.series_key
         self.wafer = set_if(thing=self.wafer, other_thing=single_lamb.wafer, type_of_thing='wafer')
-        self.band = set_if(thing=self.band, other_thing=single_lamb.band, type_of_thing='band')
+        self.chip_id = set_if(thing=self.chip_id, other_thing=single_lamb.chip_id, type_of_thing='chip_id')
         self.report_dir = set_if(thing=self.report_dir, other_thing=single_lamb.report_dir, type_of_thing='report_dir')
         self.seed_scan_path = set_if(thing=self.seed_scan_path, other_thing=single_lamb.seed_scan_path,
                                      type_of_thing='seed_scan_path')
 
     def report(self, show=False, omit_flagged=True):
         wafer_str = wafer_num_to_str(self.wafer)
-        band_str = self.band
+        chip_id_str = self.chip_id
         handle_list = list(self.available_series_handles)
         series_keys = [self.series_handle_to_key[handle] for handle in handle_list]
         sorted_series_handles, *ordered_series_values = zip(*sorted([(handle, *series_key)
@@ -125,7 +139,7 @@ class SeriesLamb:
                            sorted_series_handles}
         seed_scan_path = self.seed_scan_path
         report_dir = self.report_dir
-        report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, seed_scan_path, report_dir, show=show,
+        report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, seed_scan_path, report_dir, show=show,
                     omit_flagged=omit_flagged)
 
 
@@ -146,36 +160,36 @@ class SeedsWBS:
         pass
 
 
-class BandsSWB:
+class ChipIDsSWB:
     def __init__(self, single_lamb):
-        self.band = self.wafer = None
+        self.chip_id = self.wafer = None
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
     def add(self, single_lamb):
-        band_handle = str(single_lamb.band)
-        if band_handle in self.__dict__.keys():
-            self.__getattribute__(band_handle).add(single_lamb=single_lamb)
+        chip_id_handle = str(single_lamb.chip_id)
+        if chip_id_handle in self.__dict__.keys():
+            self.__getattribute__(chip_id_handle).add(single_lamb=single_lamb)
         else:
-            self.__setattr__(band_handle, SeriesLamb(single_lamb=single_lamb))
+            self.__setattr__(chip_id_handle, SeriesLamb(single_lamb=single_lamb))
         if self.wafer is None:
             self.wafer = single_lamb.wafer
         elif self.wafer != single_lamb.wafer:
             raise KeyError("Setting the wafer a second time is not allowed")
 
 
-class BandsWBS:
+class ChipIDsWBS:
     def __init__(self, single_lamb):
-        self.band = self.wafer = None
+        self.chip_id = self.wafer = None
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
     def add(self, single_lamb):
-        band_handle = str(single_lamb.band)
-        if band_handle in self.__dict__.keys():
-            self.__getattribute__(band_handle).add(single_lamb=single_lamb)
+        chip_id_handle = str(single_lamb.chip_id)
+        if chip_id_handle in self.__dict__.keys():
+            self.__getattribute__(chip_id_handle).add(single_lamb=single_lamb)
         else:
-            self.__setattr__(band_handle, SeedsWBS(single_lamb=single_lamb))
+            self.__setattr__(chip_id_handle, SeedsWBS(single_lamb=single_lamb))
         if self.wafer is None:
             self.wafer = single_lamb.wafer
         elif self.wafer != single_lamb.wafer:
@@ -184,7 +198,7 @@ class BandsWBS:
 
 class WafersSWB:
     def __init__(self, single_lamb):
-        self.band = self.wafer = None
+        self.chip_id = self.wafer = None
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
@@ -193,7 +207,7 @@ class WafersSWB:
         if wafer_handle in self.__dict__.keys():
             self.__getattribute__(wafer_handle).add(single_lamb=single_lamb)
         else:
-            self.__setattr__(wafer_handle, BandsSWB(single_lamb=single_lamb))
+            self.__setattr__(wafer_handle, ChipIDsSWB(single_lamb=single_lamb))
 
 
 class LambExplore:
@@ -215,7 +229,7 @@ class LambExplore:
 
         self.lamb_params_data = None
         self.available_seed_handles = set()
-        self.available_bands = set()
+        self.available_chip_ids = set()
         self.available_wafers = set()
         if start_date is None and end_date is None:
             self.readall()
@@ -233,7 +247,7 @@ class LambExplore:
 
     def update_loops_vars(self, single_lamb):
         self.available_seed_handles.add(seed_name_to_handle(single_lamb.seed_name))
-        self.available_bands.add(single_lamb.band)
+        self.available_chip_ids.add(single_lamb.chip_id)
         self.available_wafers.add(wafer_num_to_str(single_lamb.wafer))
 
     def organize(self, structure_key=None):
@@ -246,7 +260,7 @@ class LambExplore:
                 if wafer_str in self.__dict__.keys():
                     self.__getattribute__(wafer_str).add(single_lamb=single_lamb)
                 else:
-                    self.__setattr__(wafer_str, BandsWBS(single_lamb=single_lamb))
+                    self.__setattr__(wafer_str, ChipIDsWBS(single_lamb=single_lamb))
                 self.update_loops_vars(single_lamb=single_lamb)
 
         elif structure_key == "swb":
@@ -259,22 +273,22 @@ class LambExplore:
                     self.__setattr__(seed_handle, WafersSWB(single_lamb=single_lamb))
                 self.update_loops_vars(single_lamb=single_lamb)
 
-    def band_swbr_reports(self):
+    def chip_id_swbr_reports(self):
         for seed_handle in self.available_seed_handles:
             if seed_handle in self.__dict__.keys():
                 wafers_per_seed = self.__getattribute__(seed_handle)
                 for wafer_str in self.available_wafers:
                     if wafer_str in wafers_per_seed.__dict__.keys():
-                        bands_per_wafer = wafers_per_seed.__getattribute__(wafer_str)
-                        for band_str in self.available_bands:
-                            if band_str in bands_per_wafer.__dict__.keys():
-                                single_band = bands_per_wafer.__getattribute__(band_str)
-                                single_band.report()
+                        chip_ids_per_wafer = wafers_per_seed.__getattribute__(wafer_str)
+                        for chip_id_str in self.available_chip_ids:
+                            if chip_id_str in chip_ids_per_wafer.__dict__.keys():
+                                single_chip_id = chip_ids_per_wafer.__getattribute__(chip_id_str)
+                                single_chip_id.report()
 
 
 if __name__ == "__main__":
-    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=4, day=22),
-                               end_date=datetime.date(year=2022, month=4, day=22))
+    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=4, day=23),
+                               end_date=datetime.date(year=2022, month=4, day=23))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
-    lamb_explore.band_swbr_reports()
+    lamb_explore.chip_id_swbr_reports()

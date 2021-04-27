@@ -6,7 +6,8 @@ import ref
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
-from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, band_str_to_num, res_num_to_str
+from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, res_num_to_str, band_num_to_str,\
+    chip_id_str_to_band_and_pos
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 
 
@@ -556,11 +557,11 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info, flag_table_info
 
 
-def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, seed_scan_path, report_dir,
+def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, seed_scan_path, report_dir,
                 markersize=8, alpha=0.5,
                 show=False, omit_flagged=False):
     fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=4, num_of_scatter_hist_y=2)
-    fig.suptitle(F"{wafer_str}, {band_str} report:", y=0.995, x=0.98, horizontalalignment='right')
+    fig.suptitle(F"{wafer_str}, {chip_id_str} report:", y=0.995, x=0.98, horizontalalignment='right')
     leglines = []
     leglabels = []
     counter = 0
@@ -569,7 +570,8 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
     f_centers_ghz_all = []
     res_nums = []
     wafer_num = wafer_str_to_num(wafer_str)
-    band_num = band_str_to_num(band_str)
+    band_num, x_pos, y_pos = chip_id_str_to_band_and_pos(chip_id_str)
+    band_str = band_num_to_str(band_num)
     if omit_flagged and wafer_num in flagged_data.wafer_band_flags.keys() \
             and band_num in flagged_data.wafer_band_flags[wafer_num].keys():
         res_flags = flagged_data.wafer_band_flags[wafer_num][band_num]
@@ -661,9 +663,9 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, band_str, see
                         summary_info=summary_paragraph, res_flags=res_flags)
     # Display
     if res_nums_user_flagged is None:
-        scatter_plot_basename = F"ScatterHist_{band_str}_{wafer_str}"
+        scatter_plot_basename = F"ScatterHist_{chip_id_str}_{wafer_str}"
     else:
-        scatter_plot_basename = F"ScatterHist_{band_str}_{wafer_str}_curated"
+        scatter_plot_basename = F"ScatterHist_{chip_id_str}_{wafer_str}_curated"
     scatter_plot_path = os.path.join(report_dir, scatter_plot_basename)
     plt.draw()
     for extension in [".pdf", ".png"]:
