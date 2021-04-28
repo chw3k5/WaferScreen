@@ -278,12 +278,14 @@ class LambExplore:
                 self.update_loops_vars(single_lamb=single_lamb)
 
     def summary_reports(self, multi_page_summary=False):
+        figure_dict = {}
         for seed_handle in self.available_seed_handles:
             if seed_handle in self.__dict__.keys():
                 wafers_per_seed = self.__getattribute__(seed_handle)
                 for wafer_str in self.available_wafers:
                     if wafer_str in wafers_per_seed.__dict__.keys():
-                        figure_dict = {}
+                        if wafer_str not in figure_dict.keys():
+                            figure_dict[wafer_str] = {}
                         chip_id_strs_per_wafer = wafers_per_seed.__getattribute__(wafer_str)
                         for chip_id_str in self.available_chip_id_strs:
                             chip_id_handle = chip_id_str_to_chip_id_handle(chip_id_str)
@@ -299,24 +301,31 @@ class LambExplore:
                                     x_pos = float("-inf")
                                 if y_pos is None:
                                     y_pos = float("-inf")
-                                figure_dict[(band_num, x_pos, y_pos)] = report_fig
-                        # order the chip_id_tuples
-                        ordered_chip_id_tuples = sorted(figure_dict.keys())
-                        # multi-page PDF is made on a per-wafer basis
-                        multi_page_pdf_path = os.path.join(too_long_did_not_read_dir, F"{wafer_str}.pdf")
-                        if multi_page_summary:
-                            print("multipage test point1")
-                            with PdfPages(multi_page_pdf_path) as pdf_pages:
-                                for chip_id_tuple in ordered_chip_id_tuples:
-                                    fig_this_id = figure_dict[chip_id_tuple]
-                                    pdf_pages.savefig(fig_this_id)
-                                    # close all the figures and free up the resources
-                                    plt.close(fig=fig_this_id)
-                            print(F"Multipage PDF summary saved at:{multi_page_pdf_path}")
+                                # the chip count is to handle when the same chip was measured across multiple seeds
+                                chip_count = 0
+                                figure_id_tup = (band_num, x_pos, y_pos, chip_count)
+                                while figure_id_tup in figure_dict[wafer_str].keys():
+                                    chip_count += 1
+                                    figure_id_tup = (band_num, x_pos, y_pos, chip_count)
+                                figure_dict[wafer_str][figure_id_tup] = report_fig
+        for wafer_str in figure_dict.keys():
+            per_wafer_figure_dict = figure_dict[wafer_str]
+            # order the chip_id_tuples
+            ordered_chip_id_tuples = sorted(per_wafer_figure_dict.keys())
+            # multi-page PDF is made on a per-wafer basis
+            multi_page_pdf_path = os.path.join(too_long_did_not_read_dir, F"{wafer_str}.pdf")
+            if multi_page_summary:
+                with PdfPages(multi_page_pdf_path) as pdf_pages:
+                    for chip_id_tuple in ordered_chip_id_tuples:
+                        fig_this_id = per_wafer_figure_dict[chip_id_tuple]
+                        pdf_pages.savefig(fig_this_id)
+                        # close all the figures and free up the resources
+                        plt.close(fig=fig_this_id)
+                print(F"Multipage PDF summary saved at:{multi_page_pdf_path}")
 
 
 if __name__ == "__main__":
-    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=4, day=22),
+    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=1, day=1),
                                end_date=datetime.date(year=2021, month=4, day=23))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
