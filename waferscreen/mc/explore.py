@@ -4,12 +4,16 @@
 import os
 import datetime
 from operator import itemgetter
+import matplotlib.pyplot as plt
 from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_between_dates
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
-from waferscreen.data_io.explore_io import wafer_num_to_str, res_num_to_str, seed_name_to_handle
+from waferscreen.data_io.explore_io import wafer_num_to_str, res_num_to_str, seed_name_to_handle, \
+    chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
+    chip_id_str_to_chip_id_tuple, band_str_to_num
 from waferscreen.plot.explore_plots import report_plot
+# from ref import too_long_did_not_read_dir
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -36,7 +40,7 @@ class SingleLamb:
         self.location = None
         self.series_key = None
 
-        self.wafer = self.so_band = self.chip_id = self.chip_position = self.meas_time = self.seed_name = None
+        self.wafer = self.so_band = self.chip_id_str = self.chip_position = self.meas_time = self.seed_name = None
         if auto_load:
             self.read(lamb_path=self.path)
 
@@ -67,16 +71,13 @@ class SingleLamb:
         self.res_number = self.lamb_fit.res_num
 
         # make a unique-within-a-wafer chip ID
-        if self.so_band is None:
-            if self.chip_position is None:
-                self.chip_id = None
-            else:
-                self.chip_id = F"({'%1.3f' % self.chip_position[0]},{'%1.3f' % self.chip_position[1]})"
+        if self.chip_position is None:
+            self.chip_id_str = chip_id_tuple_to_chip_id_str(chip_id_tuple=(band_str_to_num(self.so_band),
+                                                                           None, None))
         else:
-            if self.chip_position is None:
-                self.chip_id = F"{self.so_band}"
-            else:
-                self.chip_id = F"{self.so_band}_({'%1.3f' % self.chip_position[0]},{'%1.3f' % self.chip_position[1]})"
+            self.chip_id_str = chip_id_tuple_to_chip_id_str(chip_id_tuple=(band_str_to_num(self.so_band),
+                                                                           self.chip_position[0],
+                                                                           self.chip_position[1]))
 
 
 def set_if(thing, other_thing, type_of_thing='unknown'):
@@ -106,7 +107,7 @@ class ResLamb:
 
 class SeriesLamb:
     def __init__(self, single_lamb=None):
-        self.chip_id = self.wafer = self.report_dir = self.seed_scan_path = None
+        self.chip_id_str = self.wafer = self.report_dir = self.seed_scan_path = None
         self.available_series_handles = set()
         self.series_handle_to_key = {}
         if single_lamb is not None:
@@ -121,14 +122,15 @@ class SeriesLamb:
         self.available_series_handles.add(series_handle)
         self.series_handle_to_key[series_handle] = single_lamb.series_key
         self.wafer = set_if(thing=self.wafer, other_thing=single_lamb.wafer, type_of_thing='wafer')
-        self.chip_id = set_if(thing=self.chip_id, other_thing=single_lamb.chip_id, type_of_thing='chip_id')
+        self.chip_id_str = set_if(thing=self.chip_id_str, other_thing=single_lamb.chip_id_str,
+                                  type_of_thing='chip_id_str')
         self.report_dir = set_if(thing=self.report_dir, other_thing=single_lamb.report_dir, type_of_thing='report_dir')
         self.seed_scan_path = set_if(thing=self.seed_scan_path, other_thing=single_lamb.seed_scan_path,
                                      type_of_thing='seed_scan_path')
 
-    def report(self, show=False, omit_flagged=True):
+    def report(self, show=False, omit_flagged=True, save=True):
         wafer_str = wafer_num_to_str(self.wafer)
-        chip_id_str = self.chip_id
+        chip_id_str = self.chip_id_str
         handle_list = list(self.available_series_handles)
         series_keys = [self.series_handle_to_key[handle] for handle in handle_list]
         sorted_series_handles, *ordered_series_values = zip(*sorted([(handle, *series_key)
@@ -139,8 +141,10 @@ class SeriesLamb:
                            sorted_series_handles}
         seed_scan_path = self.seed_scan_path
         report_dir = self.report_dir
-        report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, seed_scan_path, report_dir, show=show,
-                    omit_flagged=omit_flagged)
+        report_fig = report_plot(series_res_sets, sorted_series_handles, wafer_str,
+                                 chip_id_str, seed_scan_path, report_dir,
+                                 show=show, omit_flagged=omit_flagged, save=save)
+        return report_fig
 
 
 class SeedsWBS:
@@ -162,12 +166,12 @@ class SeedsWBS:
 
 class ChipIDsSWB:
     def __init__(self, single_lamb):
-        self.chip_id = self.wafer = None
+        self.chip_id_str = self.wafer = None
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
     def add(self, single_lamb):
-        chip_id_handle = str(single_lamb.chip_id)
+        chip_id_handle = chip_id_str_to_chip_id_handle(single_lamb.chip_id_str)
         if chip_id_handle in self.__dict__.keys():
             self.__getattribute__(chip_id_handle).add(single_lamb=single_lamb)
         else:
@@ -180,12 +184,12 @@ class ChipIDsSWB:
 
 class ChipIDsWBS:
     def __init__(self, single_lamb):
-        self.chip_id = self.wafer = None
+        self.chip_id_str = self.wafer = None
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
     def add(self, single_lamb):
-        chip_id_handle = str(single_lamb.chip_id)
+        chip_id_handle = chip_id_str_to_chip_id_handle(single_lamb.chip_id_str)
         if chip_id_handle in self.__dict__.keys():
             self.__getattribute__(chip_id_handle).add(single_lamb=single_lamb)
         else:
@@ -198,7 +202,7 @@ class ChipIDsWBS:
 
 class WafersSWB:
     def __init__(self, single_lamb):
-        self.chip_id = self.wafer = None
+        self.chip_id_str = self.wafer = None
         if single_lamb is not None:
             self.add(single_lamb=single_lamb)
 
@@ -211,7 +215,7 @@ class WafersSWB:
 
 
 class LambExplore:
-    def __init__(self, start_date=None, end_date=None):
+    def __init__(self, start_date=None, end_date=None, multi_page_summary=False):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                            or None. None will set the minimum date for data retrieval to be 0001-01-01
@@ -226,10 +230,10 @@ class LambExplore:
             self.end_date = datetime.date.max
         else:
             self.end_date = end_date
-
+        self.multi_page_summary = multi_page_summary
         self.lamb_params_data = None
         self.available_seed_handles = set()
-        self.available_chip_ids = set()
+        self.available_chip_id_strs = set()
         self.available_wafers = set()
         if start_date is None and end_date is None:
             self.readall()
@@ -247,7 +251,7 @@ class LambExplore:
 
     def update_loops_vars(self, single_lamb):
         self.available_seed_handles.add(seed_name_to_handle(single_lamb.seed_name))
-        self.available_chip_ids.add(single_lamb.chip_id)
+        self.available_chip_id_strs.add(single_lamb.chip_id_str)
         self.available_wafers.add(wafer_num_to_str(single_lamb.wafer))
 
     def organize(self, structure_key=None):
@@ -279,16 +283,40 @@ class LambExplore:
                 wafers_per_seed = self.__getattribute__(seed_handle)
                 for wafer_str in self.available_wafers:
                     if wafer_str in wafers_per_seed.__dict__.keys():
-                        chip_ids_per_wafer = wafers_per_seed.__getattribute__(wafer_str)
-                        for chip_id_str in self.available_chip_ids:
-                            if chip_id_str in chip_ids_per_wafer.__dict__.keys():
-                                single_chip_id = chip_ids_per_wafer.__getattribute__(chip_id_str)
-                                single_chip_id.report()
+                        figure_dict = {}
+                        chip_id_strs_per_wafer = wafers_per_seed.__getattribute__(wafer_str)
+                        for chip_id_str in self.available_chip_id_strs:
+                            chip_id_handle = chip_id_str_to_chip_id_handle(chip_id_str)
+                            if chip_id_handle in chip_id_strs_per_wafer.__dict__.keys():
+                                single_chip = chip_id_strs_per_wafer.__getattribute__(chip_id_handle)
+                                # individually saved report plots per umux chip scale
+                                report_fig = single_chip.report(save=not self.multi_page_summary)
+                                # Later we will save this figure in a multi-page pdf we will use this tuple to sort
+                                band_num, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str=single_chip.chip_id_str)
+                                if band_num is None:
+                                    band_num = float("-inf")
+                                if x_pos is None:
+                                    x_pos = float("-inf")
+                                if y_pos is None:
+                                    y_pos = float("-inf")
+                                figure_dict[(band_num, x_pos, y_pos)] = report_fig
+                        # order the chip_id_tuples
+                        ordered_chip_id_tuples = sorted(figure_dict.keys())
+                        # multi-page PDF is made on a per-wafer basis
+                        # multi_page_pdf_path = os.path.join(too_long_did_not_read_dir, F"{wafer_str}")
+                        if self.multi_page_summary:
+                            print("multipage test point1")
+                            # with PdfPages(multi_page_pdf_path) as pdf_pages:
+                            #     for chip_id_tuple in ordered_chip_id_tuples:
+                            #         fig_this_id = figure_dict[chip_id_tuple]
+                            #         pdf_pages.savefig(fig_this_id)
+                            #         # close all the figures and free up the resources
+                            #         plt.close(fig=fig_this_id)
 
 
 if __name__ == "__main__":
-    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=4, day=23),
-                               end_date=datetime.date(year=2022, month=4, day=23))
+    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=4, day=22),
+                               end_date=datetime.date(year=2021, month=4, day=23))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.chip_id_swbr_reports()

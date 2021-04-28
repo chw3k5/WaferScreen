@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, res_num_to_str, band_num_to_str,\
-    chip_id_str_to_band_and_pos
+    chip_id_str_to_chip_id_tuple
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 
 
@@ -559,7 +559,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
 
 def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, seed_scan_path, report_dir,
                 markersize=8, alpha=0.5,
-                show=False, omit_flagged=False):
+                show=False, omit_flagged=False, save=True):
     fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=4, num_of_scatter_hist_y=2)
     fig.suptitle(F"{wafer_str}, {chip_id_str} report:", y=0.995, x=0.98, horizontalalignment='right')
     leglines = []
@@ -570,7 +570,7 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
     f_centers_ghz_all = []
     res_nums = []
     wafer_num = wafer_str_to_num(wafer_str)
-    band_num, x_pos, y_pos = chip_id_str_to_band_and_pos(chip_id_str)
+    band_num, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str)
     band_str = band_num_to_str(band_num)
     if omit_flagged and wafer_num in flagged_data.wafer_band_flags.keys() \
             and band_num in flagged_data.wafer_band_flags[wafer_num].keys():
@@ -668,12 +668,16 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
         scatter_plot_basename = F"ScatterHist_{chip_id_str}_{wafer_str}_curated"
     scatter_plot_path = os.path.join(report_dir, scatter_plot_basename)
     plt.draw()
-    for extension in [".pdf", ".png"]:
-        plt.savefig(scatter_plot_path + extension)
-    print("Saved Plot to:", scatter_plot_path)
     if show:
         plt.show(block=True)
-    plt.close(fig=fig)
+    if save:
+        for extension in [".pdf", ".png"]:
+            plt.savefig(scatter_plot_path + extension)
+        print("Saved Plot to:", scatter_plot_path)
+        plt.close(fig=fig)
+        return None
+    else:
+        return fig
 
 
 if __name__ == "__main__":

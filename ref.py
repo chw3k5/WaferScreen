@@ -23,7 +23,7 @@ if debug_mode:
     multiprocessing_threads = None
     mpl.use(backend='module://backend_interagg')
 elif current_user == "chw3k5":
-    multiprocessing_threads = 3  # Caleb's other computers
+    multiprocessing_threads = 4  # Caleb's other computers
 elif current_user in "cwheeler":
     multiprocessing_threads = 16  # Mac Pro 8-core intel core i9 processor 16 threads
 elif current_user == "uvwave":
@@ -56,6 +56,9 @@ runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
 processing_log = os.path.join(working_dir, "processing_log_waferscreeen.txt")
 flag_file_path = os.path.join(parent_dir, "WaferScreen", "waferscreen", "res_flags.csv")
 umux_screener_assembly_path = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux_screener_assembly.csv")
+too_long_did_not_read_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen", "tldr")
+if not os.path.isdir(too_long_did_not_read_dir):
+    os.mkdir(too_long_did_not_read_dir)
 
 
 if current_user == 'uvwave':

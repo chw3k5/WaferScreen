@@ -29,7 +29,7 @@ def pos_str_to_nums(pos_str):
     return float(x_pos_str), float(y_pos_str)
 
 
-def chip_id_str_to_band_and_pos(chip_id_str):
+def chip_id_str_to_chip_id_tuple(chip_id_str):
     if "_(" in chip_id_str:
         band_str, pos_str = chip_id_str.split("_", 1)
         band_num = band_str_to_num(band_str=band_str)
@@ -38,6 +38,43 @@ def chip_id_str_to_band_and_pos(chip_id_str):
     else:
         # just a band_str
         return band_str_to_num(band_str=chip_id_str), None, None
+
+
+def chip_id_tuple_to_chip_id_str(chip_id_tuple):
+    band_num = chip_id_tuple[0]
+    x_pos = chip_id_tuple[1]
+    y_pos = chip_id_tuple[2]
+    if band_num is None:
+        chip_id_str = ""
+    else:
+        chip_id_str = band_num_to_str(band_num=band_num)
+    if x_pos is None or y_pos is None:
+        pass
+    else:
+        chip_id_str += F"_({'%1.3f' % x_pos},{'%1.3f' % y_pos})"
+    if chip_id_str == "":
+        raise TypeError("chip_id must be identified by a band_num and/or x_position and y_position," + \
+                        " all are 'None' in this instance")
+    return chip_id_str
+
+
+def chip_id_handle_chip_id_str(chip_id_handle):
+    if "_" in chip_id_handle:
+        band_str, pos_handle_str = chip_id_handle.split("_")
+        pos_str = pos_handle_str.replace("neg", "-").replace("and", ",")
+        return F"{band_str}_({pos_str})"
+    else:
+        # this handle is only a band_str
+        return chip_id_handle
+
+
+def chip_id_str_to_chip_id_handle(chip_id_str):
+    if "_(" in chip_id_str:
+        chip_id_handle = chip_id_str.replace(",", 'and').replace("(", "").replace(")", "").replace("-", "neg")
+        return chip_id_handle
+    else:
+        # this chip id is only a band number
+        return chip_id_str
 
 
 def seed_name_to_handle(seed_base):
