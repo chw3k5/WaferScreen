@@ -5,6 +5,7 @@ import os
 import datetime
 from operator import itemgetter
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_between_dates
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
@@ -13,7 +14,7 @@ from waferscreen.data_io.explore_io import wafer_num_to_str, res_num_to_str, see
     chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
     chip_id_str_to_chip_id_tuple, band_str_to_num
 from waferscreen.plot.explore_plots import report_plot
-# from ref import too_long_did_not_read_dir
+from ref import too_long_did_not_read_dir
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -128,7 +129,7 @@ class SeriesLamb:
         self.seed_scan_path = set_if(thing=self.seed_scan_path, other_thing=single_lamb.seed_scan_path,
                                      type_of_thing='seed_scan_path')
 
-    def report(self, show=False, omit_flagged=True, save=True):
+    def report(self, show=False, omit_flagged=True, save=True, return_fig=False):
         wafer_str = wafer_num_to_str(self.wafer)
         chip_id_str = self.chip_id_str
         handle_list = list(self.available_series_handles)
@@ -143,7 +144,7 @@ class SeriesLamb:
         report_dir = self.report_dir
         report_fig = report_plot(series_res_sets, sorted_series_handles, wafer_str,
                                  chip_id_str, seed_scan_path, report_dir,
-                                 show=show, omit_flagged=omit_flagged, save=save)
+                                 show=show, omit_flagged=omit_flagged, save=save, return_fig=return_fig)
         return report_fig
 
 
@@ -215,7 +216,7 @@ class WafersSWB:
 
 
 class LambExplore:
-    def __init__(self, start_date=None, end_date=None, multi_page_summary=False):
+    def __init__(self, start_date=None, end_date=None):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                            or None. None will set the minimum date for data retrieval to be 0001-01-01
@@ -230,7 +231,6 @@ class LambExplore:
             self.end_date = datetime.date.max
         else:
             self.end_date = end_date
-        self.multi_page_summary = multi_page_summary
         self.lamb_params_data = None
         self.available_seed_handles = set()
         self.available_chip_id_strs = set()
@@ -277,7 +277,7 @@ class LambExplore:
                     self.__setattr__(seed_handle, WafersSWB(single_lamb=single_lamb))
                 self.update_loops_vars(single_lamb=single_lamb)
 
-    def chip_id_swbr_reports(self):
+    def summary_reports(self, multi_page_summary=False):
         for seed_handle in self.available_seed_handles:
             if seed_handle in self.__dict__.keys():
                 wafers_per_seed = self.__getattribute__(seed_handle)
@@ -290,7 +290,7 @@ class LambExplore:
                             if chip_id_handle in chip_id_strs_per_wafer.__dict__.keys():
                                 single_chip = chip_id_strs_per_wafer.__getattribute__(chip_id_handle)
                                 # individually saved report plots per umux chip scale
-                                report_fig = single_chip.report(save=not self.multi_page_summary)
+                                report_fig = single_chip.report(save=True, return_fig=multi_page_summary)
                                 # Later we will save this figure in a multi-page pdf we will use this tuple to sort
                                 band_num, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str=single_chip.chip_id_str)
                                 if band_num is None:
@@ -303,15 +303,16 @@ class LambExplore:
                         # order the chip_id_tuples
                         ordered_chip_id_tuples = sorted(figure_dict.keys())
                         # multi-page PDF is made on a per-wafer basis
-                        # multi_page_pdf_path = os.path.join(too_long_did_not_read_dir, F"{wafer_str}")
-                        if self.multi_page_summary:
+                        multi_page_pdf_path = os.path.join(too_long_did_not_read_dir, F"{wafer_str}.pdf")
+                        if multi_page_summary:
                             print("multipage test point1")
-                            # with PdfPages(multi_page_pdf_path) as pdf_pages:
-                            #     for chip_id_tuple in ordered_chip_id_tuples:
-                            #         fig_this_id = figure_dict[chip_id_tuple]
-                            #         pdf_pages.savefig(fig_this_id)
-                            #         # close all the figures and free up the resources
-                            #         plt.close(fig=fig_this_id)
+                            with PdfPages(multi_page_pdf_path) as pdf_pages:
+                                for chip_id_tuple in ordered_chip_id_tuples:
+                                    fig_this_id = figure_dict[chip_id_tuple]
+                                    pdf_pages.savefig(fig_this_id)
+                                    # close all the figures and free up the resources
+                                    plt.close(fig=fig_this_id)
+                            print(F"Multipage PDF summary saved at:{multi_page_pdf_path}")
 
 
 if __name__ == "__main__":
@@ -319,4 +320,4 @@ if __name__ == "__main__":
                                end_date=datetime.date(year=2021, month=4, day=23))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
-    lamb_explore.chip_id_swbr_reports()
+    lamb_explore.summary_reports(multi_page_summary=True)

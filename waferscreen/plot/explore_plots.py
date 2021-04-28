@@ -559,7 +559,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
 
 def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, seed_scan_path, report_dir,
                 markersize=8, alpha=0.5,
-                show=False, omit_flagged=False, save=True):
+                show=False, omit_flagged=False, save=True, return_fig=False):
     fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=4, num_of_scatter_hist_y=2)
     fig.suptitle(F"{wafer_str}, {chip_id_str} report:", y=0.995, x=0.98, horizontalalignment='right')
     leglines = []
@@ -674,10 +674,12 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
         for extension in [".pdf", ".png"]:
             plt.savefig(scatter_plot_path + extension)
         print("Saved Plot to:", scatter_plot_path)
+    if return_fig:
+        return fig
+    else:
         plt.close(fig=fig)
         return None
-    else:
-        return fig
+
 
 
 if __name__ == "__main__":
