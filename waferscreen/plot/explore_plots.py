@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 import matplotlib.colors as colors
 import matplotlib.cm as cm
+from scipy.stats import chisquare
 from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, res_num_to_str, band_num_to_str,\
     chip_id_str_to_chip_id_tuple
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
@@ -32,6 +33,45 @@ def criteria_flagged_summary(flag_table_info, criteria_name, res_numbers, too_lo
         else:
             flag_table_info[res_label] = summary_str
     return flag_table_info
+
+
+def chi_squared_plot(ax, f_ghz_mean, chi_squared_for_resonators, res_nums_int, color, markersize, alpha,
+                     x_label, y_label, x_ticks_on, max_chi_squared=None):
+    # calculate when the values are outside of the acceptance range
+    if max_chi_squared is None:
+        upper_bound = float("inf")
+    else:
+        upper_bound = float(max_chi_squared)
+    res_nums_too_high_chi_squared = set()
+    # turn on/off tick marks
+    if not x_ticks_on:
+        ax.tick_params(axis="x", labelbottom=False)
+    # loop to plot data one point at a time (add a identifying marker for each data point)
+    counter = 0
+    for f_ghz, chi_squared in zip(f_ghz_mean, chi_squared_for_resonators):
+
+        res_num = res_nums_int[counter]
+        marker = report_markers[res_num % len(report_markers)]
+        ax.plot(f_ghz, chi_squared.statistic, color=color, ls='None', marker=marker, markersize=markersize, alpha=alpha)
+        if upper_bound < chi_squared.statistic:
+            res_nums_too_high_chi_squared.add(res_num_to_str(res_num))
+            ax.plot(f_ghz, chi_squared.statistic, color="black", ls='None', marker="x", markersize=markersize + 2, alpha=1.0)
+        counter += 1
+    # boundary and average lines
+    if max_chi_squared is not None:
+        ax.axhline(y=max_chi_squared, xmin=0, xmax=1, color='red', linestyle='dashdot')
+    # tick marks and axis labels
+    if x_label is None:
+        if x_ticks_on:
+            ax.set_xlabel("Average Resonator Center Frequency (GHz)")
+    else:
+        ax.set_xlabel(x_label)
+    if y_label is not None:
+        ax.set_ylabel(y_label)
+    # grid on major tick marks
+    ax.grid(b=True)
+    ax.set_yscale("log")
+    return ax, res_nums_too_high_chi_squared
 
 
 def error_bar_report_plot(ax, xdata, ydata, yerr, res_nums_int, color="black", ls='None', markersize=10, alpha=0.7,
@@ -148,7 +188,6 @@ def rug_plot(ax, xdata, y_min, y_max, color="blue",
     ax.set_xlabel('X LABEL')
     ax.set_xlabel(F"Frequency (GHz)")
     ax.xaxis.set_label_position('top')
-
     return ax
 
 
@@ -202,7 +241,6 @@ def band_plot(ax, f_ghz, mag_dbm, f_centers_ghz_all, res_nums, band_str):
                    top=False,  # ticks along the top edge are off
                    labelbottom=False)
     ax.set_ylim(bottom=None, top=plot_mag_max)
-
     return ax
 
 
@@ -431,6 +469,11 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                                ua_arrays_for_resonators))
     f_ghz_residuals_for_resonators = [f_ghz - f_ghz_fits for f_ghz, f_ghz_fits
                                       in zip(f_ghz_arrays_for_resonators, f_ghz_fit_arrays_for_resonators)]
+
+    # chi squared
+    chi_squared_for_resonators = [chisquare(f_obs=f_ghz, f_exp=f_ghz_fits) for f_ghz, f_ghz_fits
+                                  in zip(f_ghz_arrays_for_resonators, f_ghz_fit_arrays_for_resonators)]
+
     """ 
     The residuals should be near zero by definition (for good fits). For display purposes we will want to shift 
     them so the that their average value is the f_ghz_mean for a given resonator instead of around zero. 
@@ -503,7 +546,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
             error_bar_report_plot(ax=ax_scatter_lamb, xdata=f_centers_ghz_mean,
                                   ydata=lamb_values, yerr=lamb_value_errs, res_nums_int=res_nums_int,
                                   color=color, ls='None', markersize=markersize, alpha=alpha,
-                                  x_label=None, y_label=lamb_label, x_ticks_on=True,
+                                  x_label=None, y_label=lamb_label, x_ticks_on=False,
                                   min_y=ref.min_lambda, max_y=ref.max_lambda, average_y=ref.average_lambda)
     else:
         ax_scatter_lamb, res_nums_too_low_lamb, res_nums_too_high_lamb = \
@@ -544,20 +587,6 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     hist_report_plot(ax=ax_hist_fr_squid, data=fr_squid_mi_pH, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
-    # # Nonlinear Parameter
-    # non_linear_parameter_label = F"A - Nonlinear Parameter?"
-    # ax_scatter_non_linear_parameter, ax_hist_non_linear_parameter = axes[6]
-    # ax_scatter_non_linear_parameter, res_nums_too_low_non_linear_parameter, res_nums_too_high_non_linear_parameter = \
-    #     error_bar_report_plot(ax=ax_scatter_non_linear_parameter, xdata=f_centers_ghz_mean,
-    #                           ydata=non_linear_mean, yerr=non_linear_std, res_nums_int=res_nums_int,
-    #                           color=color, ls='None', markersize=markersize, alpha=alpha,
-    #                           x_label=None, y_label=non_linear_parameter_label, x_ticks_on=True)
-    # hist_report_plot(ax=ax_hist_non_linear_parameter, data=non_linear_mean, bins=10, color=color,
-    #                  x_label=None, y_label=None, alpha=alpha)
-
-    # lambda_corrected_dfpp = flux_ramp_span * (1 - lambda^2) /
-    # lambda dfpp is the "delta frequency peak to peak", it is identical to "flux ramp span".
-
     lambda_corrected_dfpp_label = F"lambda Corrected d_fpp (kHz)"
     ax_scatter_lambda_corrected_dfpp, ax_hist_lambda_corrected_dfpp = axes[6]
     ax_scatter_lambda_corrected_dfpp, res_nums_too_low_lambda_corrected_dfpp, \
@@ -570,28 +599,18 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     hist_report_plot(ax=ax_hist_lambda_corrected_dfpp, data=lambda_corrected_dfpp_khz, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
-    # Unused plot box
-    ax_scatter_unused, ax_hist_unused = axes[7]
-    ax_scatter_unused.tick_params(axis='x',  # changes apply to the x-axis
-                                  which='both',  # both major and minor ticks are affected
-                                  bottom=False,  # ticks along the bottom edge are off
-                                  top=False,  # ticks along the top edge are off
-                                  labelbottom=False)
-    ax_scatter_unused.tick_params(axis='y',  # changes apply to the x-axis
-                                  which='both',  # both major and minor ticks are affected
-                                  left=False,  # ticks along the bottom edge are off
-                                  right=False,  # ticks along the top edge are off
-                                  labelleft=False)
-    ax_hist_unused.tick_params(axis='x',  # changes apply to the x-axis
-                               which='both',  # both major and minor ticks are affected
-                               bottom=False,  # ticks along the bottom edge are off
-                               top=False,  # ticks along the top edge are off
-                               labelbottom=False)
-    ax_hist_unused.tick_params(axis='y',  # changes apply to the x-axis
-                               which='both',  # both major and minor ticks are affected
-                               left=False,  # ticks along the bottom edge are off
-                               right=False,  # ticks along the top edge are off
-                               labelleft=False)
+    # chi Squared
+    chi_squared_label = F"chi squared"
+    ax_scatter_chi_squared, ax_hist_chi_squared = axes[7]
+    ax_scatter_chi_squared, res_nums_too_high_chi_squared = \
+        chi_squared_plot(ax=ax_scatter_chi_squared, f_ghz_mean=f_centers_ghz_mean,
+                         chi_squared_for_resonators=chi_squared_for_resonators,  res_nums_int=res_nums_int,
+                         color=color, markersize=markersize, alpha=alpha,
+                         x_label=None, y_label=chi_squared_label, x_ticks_on=True, max_chi_squared=None)
+
+    hist_report_plot(ax=ax_hist_chi_squared,
+                     data=[chi_squared_result.statistic for chi_squared_result in chi_squared_for_resonators],
+                     bins=10, color=color, x_label=None, y_label=None, alpha=alpha)
 
     # legend and Yield calculations
     summary_info["f_spacings_ghz"] = list(f_spacings_ghz)
@@ -629,7 +648,8 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                                          res_nums_too_low_lamb | res_nums_too_high_lamb | \
                                                          res_nums_too_low_flux_ramp | res_nums_too_high_flux_ramp | \
                                                          res_nums_too_low_fr_squid | res_nums_too_high_fr_squid | \
-                                                         res_nums_too_low_lambda_corrected_dfpp | res_nums_too_high_lambda_corrected_dfpp
+                                                         res_nums_too_low_lambda_corrected_dfpp | res_nums_too_high_lambda_corrected_dfpp | \
+                                                         res_nums_too_high_chi_squared
     # legend lines and label
     leglines.append(plt.Line2D(range(12), range(12), color=color, ls='None',
                                marker='o', markersize=markersize, markerfacecolor=color, alpha=alpha))

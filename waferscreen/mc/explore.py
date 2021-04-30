@@ -329,4 +329,4 @@ if __name__ == "__main__":
                                end_date=datetime.date(year=2021, month=4, day=23))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
-    lamb_explore.summary_reports(multi_page_summary=True, show=False)
+    lamb_explore.summary_reports(multi_page_summary=True, show=True)
