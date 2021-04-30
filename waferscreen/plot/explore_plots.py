@@ -6,9 +6,12 @@ import ref
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
+import matplotlib.colors as colors
+import matplotlib.cm as cm
 from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, res_num_to_str, band_num_to_str,\
     chip_id_str_to_chip_id_tuple
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
+from waferscreen.analyze.lambfit import f0_of_I
 
 
 report_markers = ["*", "v", "s", "<", "X",
@@ -98,7 +101,31 @@ def hist_report_plot(ax, data, bins=10, color="blue", x_label=None, y_label=None
     return ax
 
 
-def rug_plot(ax, xdata, y_min, y_max, color="blue"):
+def rug_plot(ax, xdata, y_min, y_max, color="blue",
+             f_ghz_residuals_for_res_plot_shifted=None, ua_arrays_for_resonators=None):
+
+    # Lambda fit Residuals zen plot (the lines are reminiscent of the waves in a zen rock garden)
+    if f_ghz_residuals_for_res_plot_shifted is not None:
+        norm = colors.Normalize(vmin=0.0, vmax=0.01)
+        cmap = plt.get_cmap('gist_ncar_r')
+        scalar_map = cm.ScalarMappable(norm=norm, cmap=cmap)
+        y_span = y_max - y_min
+        # # the background color of the plot is an indicator that this feature is triggered.
+        # ax.set_facecolor("black")
+        # get the x axis limits prior to this plot
+        x_min, x_max = ax.get_xlim()
+        for f_ghz_plot_residuals, ua_array in zip(f_ghz_residuals_for_res_plot_shifted, ua_arrays_for_resonators):
+            ua_min = np.min(ua_array)
+            ua_max = np.max(ua_array)
+            ua_span = ua_max - ua_min
+            ua_array_normalized_for_plot = (((ua_array - ua_min) / ua_span) * y_span) + y_min
+            f_ghz_residuals_span = np.max(f_ghz_plot_residuals) - np.min(f_ghz_plot_residuals)
+            color_val = scalar_map.to_rgba(f_ghz_residuals_span)
+            ax.plot(f_ghz_plot_residuals, ua_array_normalized_for_plot, color=color_val, linewidth=0.5)
+        # reset the x limits, do not let the residuals dictate the x limits of this plot
+        ax.set_xlim((x_min, x_max))
+
+    # 'threads' of the rug plot
     ax.tick_params(axis="y", labelleft=False)
     for f_centers in xdata:
         f_len = len(f_centers)
@@ -222,7 +249,7 @@ def report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2):
     major12_region_spacing = 0.000
     major32_region_spacing = 0.001
 
-    major_regions_y = (0.60, top - 0.06)
+    major_regions_y = (0.50, top - 0.15)
 
     key_margin_x = 0.85
     key_space = 0.003
@@ -290,6 +317,14 @@ def report_plot_init(num_of_scatter_hist_x=3, num_of_scatter_hist_y=2):
                  for hist_coord, ax_scatter in zip(hist_coords, axes_scatter)]
     axes_shist = [(ax_scatter, ax_hist) for ax_scatter, ax_hist in zip(axes_scatter, axes_hist)]
     return fig, ax_key, ax_res_spec, ax_rug, axes_shist
+
+
+def f_ghz_from_lambda_fit(lambda_fit, ua_array):
+    def lamb_fit_these_params(ua):
+        f_ghz = f0_of_I(ramp_current_amps=ua * 1.0e-6, ramp_current_amps_0=lambda_fit.i0fit,
+                        m=lambda_fit.mfit, f2=lambda_fit.f2fit, P=lambda_fit.pfit, lamb=lambda_fit.lambfit)
+        return f_ghz
+    return np.fromiter(map(lamb_fit_these_params, ua_array), dtype=float)
 
 
 def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_str, flag_table_info, ordered_res_strs,
@@ -376,6 +411,36 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     impedance_ratio_std = np.array(impedance_ratio_std)
     f_spacings_ghz = f_centers_ghz_mean[1:] - f_centers_ghz_mean[:-1]
     res_nums_int = [int(res_str.replace("Res", "")) for res_str in ordered_res_strs]
+    # lambda dfpp is the "delta frequency peak to peak", it is identical to "flux ramp span".
+    lambda_corrected_dfpp_khz = flux_ramp_pp_khz * (1.0 - lamb_values**2.0)
+    lambda_corrected_dfpp_khz_errs = lambda_corrected_dfpp_khz * ((flux_ramp_pp_khz_errs/flux_ramp_pp_khz) +
+                                                                  ((lamb_value_errs/lamb_values)**2.0))
+
+    # Lambda fit residuals
+    # if -78.0 <= at_res_power_dbm_mean <= -72.0:
+    lambda_fits_for_resonators = [res_set.__getattribute__(res_str).lamb_fit for res_str in ordered_res_strs]
+    ua_arrays_for_resonators = []
+    f_ghz_arrays_for_resonators = []
+    for res_str in ordered_res_strs:
+        res_fits_per_resonator_number = res_set.__getattribute__(res_str).res_fits
+        ua_arrays_for_resonators.append(np.array([single_res_params.flux_ramp_current_ua
+                                                  for single_res_params in res_fits_per_resonator_number]))
+        f_ghz_arrays_for_resonators.append(np.array([single_res_params.fcenter_ghz
+                                                     for single_res_params in res_fits_per_resonator_number]))
+    f_ghz_fit_arrays_for_resonators = list(map(f_ghz_from_lambda_fit, lambda_fits_for_resonators,
+                                               ua_arrays_for_resonators))
+    f_ghz_residuals_for_resonators = [f_ghz - f_ghz_fits for f_ghz, f_ghz_fits
+                                      in zip(f_ghz_arrays_for_resonators, f_ghz_fit_arrays_for_resonators)]
+    """ 
+    The residuals should be near zero by definition (for good fits). For display purposes we will want to shift 
+    them so the that their average value is the f_ghz_mean for a given resonator instead of around zero. 
+    """
+    f_ghz_residuals_for_res_plot_shifted = [f_center_ghz - (1.0e3 * f_ghz_residuals)
+                                            for f_center_ghz,  f_ghz_residuals
+                                            in zip(f_centers_ghz_mean, f_ghz_residuals_for_resonators)]
+    # else:
+    #     f_ghz_residuals_for_res_plot_shifted = None
+    #     ua_arrays_for_resonators = None
 
     # Qi
     q_i_label = F"Qi (Quality Factor)"
@@ -450,7 +515,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     hist_report_plot(ax=ax_hist_lamb, data=lamb_values, bins=10, color=color, x_label=None, y_label=None, alpha=alpha)
 
     # Flux Ramp Span (peak-to-peak fit parameter)
-    flux_ramp_label = F"Flux Ramp Span (kHz)"
+    flux_ramp_label = F"d_fpp - Flux Ramp Span (kHz)"
     ax_scatter_flux_ramp, ax_hist_flux_ramp = axes[4]
     if -78.0 <= at_res_power_dbm_mean <= -72.0:
         ax_scatter_flux_ramp, res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp = \
@@ -479,15 +544,30 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     hist_report_plot(ax=ax_hist_fr_squid, data=fr_squid_mi_pH, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
-    # Nonlinear Parameter
-    non_linear_parameter_label = F"A - Nonlinear Parameter?"
-    ax_scatter_non_linear_parameter, ax_hist_non_linear_parameter = axes[6]
-    ax_scatter_non_linear_parameter, res_nums_too_low_non_linear_parameter, res_nums_too_high_non_linear_parameter = \
-        error_bar_report_plot(ax=ax_scatter_non_linear_parameter, xdata=f_centers_ghz_mean,
-                              ydata=non_linear_mean, yerr=non_linear_std, res_nums_int=res_nums_int,
+    # # Nonlinear Parameter
+    # non_linear_parameter_label = F"A - Nonlinear Parameter?"
+    # ax_scatter_non_linear_parameter, ax_hist_non_linear_parameter = axes[6]
+    # ax_scatter_non_linear_parameter, res_nums_too_low_non_linear_parameter, res_nums_too_high_non_linear_parameter = \
+    #     error_bar_report_plot(ax=ax_scatter_non_linear_parameter, xdata=f_centers_ghz_mean,
+    #                           ydata=non_linear_mean, yerr=non_linear_std, res_nums_int=res_nums_int,
+    #                           color=color, ls='None', markersize=markersize, alpha=alpha,
+    #                           x_label=None, y_label=non_linear_parameter_label, x_ticks_on=True)
+    # hist_report_plot(ax=ax_hist_non_linear_parameter, data=non_linear_mean, bins=10, color=color,
+    #                  x_label=None, y_label=None, alpha=alpha)
+
+    # lambda_corrected_dfpp = flux_ramp_span * (1 - lambda^2) /
+    # lambda dfpp is the "delta frequency peak to peak", it is identical to "flux ramp span".
+
+    lambda_corrected_dfpp_label = F"lambda Corrected d_fpp (kHz)"
+    ax_scatter_lambda_corrected_dfpp, ax_hist_lambda_corrected_dfpp = axes[6]
+    ax_scatter_lambda_corrected_dfpp, res_nums_too_low_lambda_corrected_dfpp, \
+        res_nums_too_high_lambda_corrected_dfpp = \
+        error_bar_report_plot(ax=ax_scatter_lambda_corrected_dfpp, xdata=f_centers_ghz_mean,
+                              ydata=lambda_corrected_dfpp_khz, yerr=lambda_corrected_dfpp_khz_errs,
+                              res_nums_int=res_nums_int,
                               color=color, ls='None', markersize=markersize, alpha=alpha,
-                              x_label=None, y_label=non_linear_parameter_label, x_ticks_on=True)
-    hist_report_plot(ax=ax_hist_non_linear_parameter, data=non_linear_mean, bins=10, color=color,
+                              x_label=None, y_label=lambda_corrected_dfpp_label, x_ticks_on=True)
+    hist_report_plot(ax=ax_hist_lambda_corrected_dfpp, data=lambda_corrected_dfpp_khz, bins=10, color=color,
                      x_label=None, y_label=None, alpha=alpha)
 
     # Unused plot box
@@ -512,8 +592,9 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                left=False,  # ticks along the bottom edge are off
                                right=False,  # ticks along the top edge are off
                                labelleft=False)
+
     # legend and Yield calculations
-    summary_info["f_spacings_ghz"] =  list(f_spacings_ghz)
+    summary_info["f_spacings_ghz"] = list(f_spacings_ghz)
 
     # in-band calculations (not counted against yield)
     band_min_ghz = ref.band_params[band_str]['min_GHz']
@@ -536,7 +617,7 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                                                (res_nums_too_low_lamb, res_nums_too_high_lamb, "Lambda"),
                                                                (res_nums_too_low_flux_ramp, res_nums_too_high_flux_ramp, "peak-to-peak"),
                                                                (res_nums_too_low_fr_squid, res_nums_too_high_fr_squid, "FR squid"),
-                                                               (res_nums_too_low_non_linear_parameter, res_nums_too_high_non_linear_parameter, "A")]:
+                                                               (res_nums_too_low_lambda_corrected_dfpp, res_nums_too_high_lambda_corrected_dfpp, "A")]:
         flag_table_info = criteria_flagged_summary(flag_table_info=flag_table_info, criteria_name=criteria_name,
                                                    res_numbers=res_nums_too_low, too_low=True)
         flag_table_info = criteria_flagged_summary(flag_table_info=flag_table_info, criteria_name=criteria_name,
@@ -548,20 +629,28 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
                                                          res_nums_too_low_lamb | res_nums_too_high_lamb | \
                                                          res_nums_too_low_flux_ramp | res_nums_too_high_flux_ramp | \
                                                          res_nums_too_low_fr_squid | res_nums_too_high_fr_squid | \
-                                                         res_nums_too_low_non_linear_parameter | res_nums_too_high_non_linear_parameter
+                                                         res_nums_too_low_lambda_corrected_dfpp | res_nums_too_high_lambda_corrected_dfpp
     # legend lines and label
     leglines.append(plt.Line2D(range(12), range(12), color=color, ls='None',
                                marker='o', markersize=markersize, markerfacecolor=color, alpha=alpha))
     power = res_set.series_key.port_power_dbm
     leglabels.append(F"{'%4i' % at_res_power_dbm_mean} est., {'%4i' % power} port (dBm)")
-    return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info, flag_table_info
+    return axes, leglines, leglabels, f_centers_ghz_all, ordered_res_strs, summary_info, flag_table_info, \
+        f_ghz_residuals_for_res_plot_shifted, ua_arrays_for_resonators
 
 
 def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, seed_scan_path, report_dir,
                 markersize=8, alpha=0.5,
                 show=False, omit_flagged=False, save=True, return_fig=False):
     fig, ax_key, ax_res_spec, ax_rug, axes_shist = report_plot_init(num_of_scatter_hist_x=4, num_of_scatter_hist_y=2)
-    fig.suptitle(F"{wafer_str}, {chip_id_str} report:", y=0.995, x=0.98, horizontalalignment='right')
+    band_num, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str)
+    # one of Hannes' design element requests that differs slightly from the more general
+    # string formatting of chip_id designed for robust for comparison and sorting.
+    if x_pos is None or y_pos is None:
+        hannes_formatted_chip_id = F"{band_num_to_str(band_num)}"
+    else:
+        hannes_formatted_chip_id = F"{band_num_to_str(band_num)} ({'%i' % x_pos},{'%i' % y_pos})"
+    fig.suptitle(F"{wafer_str} {hannes_formatted_chip_id} report:", y=0.995, x=0.98, horizontalalignment='right')
     leglines = []
     leglabels = []
     counter = 0
@@ -570,7 +659,7 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
     f_centers_ghz_all = []
     res_nums = []
     wafer_num = wafer_str_to_num(wafer_str)
-    band_num, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str)
+
     band_str = band_num_to_str(band_num)
     if omit_flagged and wafer_num in flagged_data.wafer_band_flags.keys() \
             and band_num in flagged_data.wafer_band_flags[wafer_num].keys():
@@ -596,15 +685,19 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
     for series_handle in sorted_series_handles:
         res_set = series_res_sets[series_handle]
         color = report_colors[counter % len(report_colors)]
-        axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info, flag_table_info \
+        axes_shist, leglines, leglabels, f_centers_ghz_all, res_nums, summary_info, flag_table_info, \
+            f_ghz_residuals_for_res_plot_shifted, ua_arrays_for_resonators \
             = single_lamb_to_report_plot(axes=axes_shist, res_set=res_set, color=color, band_str=band_str,
                                          leglines=leglines, leglabels=leglabels, flag_table_info=flag_table_info,
                                          ordered_res_strs=sorted(available_res_nums - res_nums_user_flagged),
                                          markersize=markersize, alpha=alpha)
+        # rug plot
         y_max = 1.0 - (rug_y_increment * counter)
         counter += 1
         y_min = 1.0 - (rug_y_increment * counter)
-        ax_rug = rug_plot(ax=ax_rug, xdata=f_centers_ghz_all, y_min=y_min, y_max=y_max, color=color)
+        ax_rug = rug_plot(ax=ax_rug, xdata=f_centers_ghz_all, y_min=y_min, y_max=y_max, color=color,
+                          f_ghz_residuals_for_res_plot_shifted=f_ghz_residuals_for_res_plot_shifted,
+                          ua_arrays_for_resonators=ua_arrays_for_resonators)
         for summary_key in summary_info.keys():
             if summary_key in total_summary_info.keys():
                 if summary_key in {"f_spacings_ghz"}:
@@ -662,10 +755,12 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
     ax_key = report_key(ax=ax_key, leglines=leglines, leglabels=leglabels,
                         summary_info=summary_paragraph, res_flags=res_flags)
     # Display
+    # another special case of string formatting for Hannes.
+    hannes_formatted_chip_id = hannes_formatted_chip_id.replace(" ", "_")
     if res_nums_user_flagged is None:
-        scatter_plot_basename = F"ScatterHist_{chip_id_str}_{wafer_str}"
+        scatter_plot_basename = F"ScatterHist_{hannes_formatted_chip_id}_{wafer_str}"
     else:
-        scatter_plot_basename = F"ScatterHist_{chip_id_str}_{wafer_str}_curated"
+        scatter_plot_basename = F"ScatterHist_{hannes_formatted_chip_id}_{wafer_str}_curated"
     scatter_plot_path = os.path.join(report_dir, scatter_plot_basename)
     plt.draw()
     if show:
@@ -679,7 +774,6 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
     else:
         plt.close(fig=fig)
         return None
-
 
 
 if __name__ == "__main__":
