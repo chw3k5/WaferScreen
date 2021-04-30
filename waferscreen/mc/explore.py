@@ -277,7 +277,7 @@ class LambExplore:
                     self.__setattr__(seed_handle, WafersSWB(single_lamb=single_lamb))
                 self.update_loops_vars(single_lamb=single_lamb)
 
-    def summary_reports(self, multi_page_summary=False):
+    def summary_reports(self, multi_page_summary=False, show=False):
         figure_dict = {}
         for seed_handle in self.available_seed_handles:
             if seed_handle in self.__dict__.keys():
@@ -292,7 +292,7 @@ class LambExplore:
                             if chip_id_handle in chip_id_strs_per_wafer.__dict__.keys():
                                 single_chip = chip_id_strs_per_wafer.__getattribute__(chip_id_handle)
                                 # individually saved report plots per umux chip scale
-                                report_fig = single_chip.report(save=True, return_fig=multi_page_summary)
+                                report_fig = single_chip.report(save=True, show=show, return_fig=multi_page_summary)
                                 # Later we will save this figure in a multi-page pdf we will use this tuple to sort
                                 band_num, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str=single_chip.chip_id_str)
                                 if band_num is None:
@@ -329,4 +329,4 @@ if __name__ == "__main__":
                                end_date=datetime.date(year=2021, month=4, day=23))
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
-    lamb_explore.summary_reports(multi_page_summary=True)
+    lamb_explore.summary_reports(multi_page_summary=True, show=False)
