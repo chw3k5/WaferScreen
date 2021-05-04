@@ -59,6 +59,7 @@ umux_screener_assembly_path = os.path.join(parent_dir, "WaferScreen", "waferscre
 too_long_did_not_read_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen", "tldr")
 if not os.path.isdir(too_long_did_not_read_dir):
     os.mkdir(too_long_did_not_read_dir)
+starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
 
 
 if current_user == 'uvwave':
