@@ -3,6 +3,7 @@
 
 import os
 import datetime
+import numpy as np
 from operator import itemgetter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -10,11 +11,12 @@ from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_betw
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
-from waferscreen.data_io.explore_io import wafer_num_to_str, res_num_to_str, seed_name_to_handle, \
+from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
     chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
-    chip_id_str_to_chip_id_tuple, band_str_to_num
+    chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header
 from waferscreen.plot.explore_plots import report_plot
-from ref import too_long_did_not_read_dir
+from waferscreen.plot.explore_frequency import frequencies_plot
+from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -42,6 +44,7 @@ class SingleLamb:
         self.series_key = None
 
         self.wafer = self.so_band = self.chip_id_str = self.chip_position = self.meas_time = self.seed_name = None
+        self.port_power_dbm = None
         if auto_load:
             self.read(lamb_path=self.path)
 
@@ -69,6 +72,8 @@ class SingleLamb:
         if all([header_key in self.metadata.keys() for header_key in series_key_header]):
             self.series_key = SeriesKey(port_power_dbm=self.metadata.port_power_dbm,
                                         if_bw_hz=self.metadata.if_bw_hz)
+        if 'port_power_dbm' in self.metadata.keys():
+            self.port_power_dbm = self.metadata["port_power_dbm"]
         self.res_number = self.lamb_fit.res_num
 
         # make a unique-within-a-wafer chip ID
@@ -216,13 +221,16 @@ class WafersSWB:
 
 
 class LambExplore:
-    def __init__(self, start_date=None, end_date=None):
+    def __init__(self, start_date=None, end_date=None, lambda_params_data=None):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                            or None. None will set the minimum date for data retrieval to be 0001-01-01
         :param end_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                          or None. None will set the maximum date for data to be retrieved as 9999-12-31
         """
+        self.frequencies_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "frequencies_stats.csv")
+        self.frequencies_cvs_path = os.path.join(too_long_did_not_read_dir, "frequencies_summary.csv")
+        self.frequencies_plot_path = os.path.join(too_long_did_not_read_dir, "frequencies_plot.pdf")
         if start_date is None:
             self.start_date = datetime.date.min
         else:
@@ -235,19 +243,20 @@ class LambExplore:
         self.available_seed_handles = set()
         self.available_chip_id_strs = set()
         self.available_wafers = set()
-        if start_date is None and end_date is None:
-            self.readall()
+
+        # there are two ways to initiate this class
+        if lambda_params_data is None:
+            # 1) A a read-in from the lambda csv files
+            if start_date is None and end_date is None:
+                self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
+                                         for lamb_path in get_all_lamb_files()}
+            else:
+                self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
+                                         for lamb_path in get_lamb_files_between_dates(start_date=self.start_date,
+                                                                                       end_date=self.end_date)}
         else:
-            self.read_between_dates()
-
-    def readall(self):
-        self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
-                                 for lamb_path in get_all_lamb_files()}
-
-    def read_between_dates(self):
-        self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
-                                 for lamb_path in get_lamb_files_between_dates(start_date=self.start_date,
-                                                                               end_date=self.end_date)}
+            # 2) A lambda_params_data from a prior read-in
+            self.lamb_params_data = lambda_params_data
 
     def update_loops_vars(self, single_lamb):
         self.available_seed_handles.add(seed_name_to_handle(single_lamb.seed_name))
@@ -323,10 +332,179 @@ class LambExplore:
                         plt.close(fig=fig_this_id)
                 print(F"Multipage PDF summary saved at:{multi_page_pdf_path}")
 
+    def filtered_output(self, wafer_numbers=None, utc_after=None, utc_before=None):
+        # populate section criteria that are None
+        if wafer_numbers is None:
+            wafer_numbers = {wafer_str_to_num(wafer_str=wafer_str) for wafer_str in self.available_wafers}
+        if utc_after is None:
+            utc_after = datetime.datetime.min
+        if utc_before is None:
+            utc_before = datetime.datetime.max
+        # loop though all the lambda_data and select what meets the various filter criteria
+        output_lambda_params_data = {}
+        for lambda_path in self.lamb_params_data.keys():
+            lambda_data_this_lap = self.lamb_params_data[lambda_path]
+            # the criteria selection statements
+            if lambda_data_this_lap.wafer in wafer_numbers:
+                if utc_after <= lambda_data_this_lap.meas_time <= utc_before:
+                    output_lambda_params_data[lambda_path] = lambda_data_this_lap
+        # check to make sure there was data in from the results of the filter
+        if output_lambda_params_data == {}:
+            raise ValueError("The filtered_out did not return any data after the criteria matching.")
+        return LambExplore(lambda_params_data=output_lambda_params_data)
 
-if __name__ == "__main__":
-    lamb_explore = LambExplore(start_date=datetime.date(year=2021, month=1, day=1),
-                               end_date=datetime.date(year=2021, month=4, day=23))
+    def frequency_report(self):
+        wafer_scale_frequencies_data = {}
+        # loop over all available data in this class and organize the relevant information.
+        for lambda_path in self.lamb_params_data.keys():
+            lambda_data_this_lap = self.lamb_params_data[lambda_path]
+            wafer_num = lambda_data_this_lap.wafer
+            # add this wafer number to the wafer_scale_frequencies_plot_data
+            if wafer_num not in wafer_scale_frequencies_data.keys():
+                wafer_scale_frequencies_data[wafer_num] = {}
+            # get the so_band number
+            so_band_num = band_str_to_num(lambda_data_this_lap.so_band)
+            # get the chip_id
+            chip_id_str = lambda_data_this_lap.chip_id_str
+            # make a new data container set for this chip_id is none exists
+            if chip_id_str not in wafer_scale_frequencies_data[wafer_num].keys():
+                wafer_scale_frequencies_data[wafer_num][chip_id_str] = {}
+            # get the seed name
+            seed_name = lambda_data_this_lap.seed_name
+            # make a new data container for seed_name
+            if seed_name not in wafer_scale_frequencies_data[wafer_num][chip_id_str].keys():
+                wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name] = {}
+            # get the port_power_dbm
+            port_power_dbm = lambda_data_this_lap.port_power_dbm
+            # make a new data container for port_power_dbm
+            if port_power_dbm not in wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name].keys():
+                wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm] = set()
+            # take the average of the resonator fit
+            f_ghz = float(np.mean(np.array([res_fit.fcenter_ghz for res_fit in lambda_data_this_lap.res_fits])))
+            # collect the data record information
+            is_in_band = in_band(band_str=lambda_data_this_lap.so_band, f_ghz=f_ghz)
+            is_in_keepout = in_smurf_keepout(f_ghz=f_ghz)
+            # make the data record
+            frequency_report_entry = FrequencyReportEntry(f_ghz=f_ghz, so_band=so_band_num,
+                                                          is_in_band=is_in_band, is_in_keepout=is_in_keepout)
+            # add the data record
+            wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm].add(frequency_report_entry)
+        # With all the data collected we do some statistics and order the data
+        wafer_scale_frequencies_ordered = {}
+        wafer_scale_frequencies_stats = {}
+        for wafer_num in wafer_scale_frequencies_data.keys():
+            single_wafer_frequencies = wafer_scale_frequencies_data[wafer_num]
+            wafer_scale_frequencies_stats[wafer_num] = {}
+            wafer_scale_frequencies_ordered[wafer_num] = {}
+            for chip_id_str in single_wafer_frequencies.keys():
+                single_chip_frequencies = single_wafer_frequencies[chip_id_str]
+                wafer_scale_frequencies_stats[wafer_num][chip_id_str] = {}
+                wafer_scale_frequencies_ordered[wafer_num][chip_id_str] = {}
+                for seed_name in single_chip_frequencies.keys():
+                    single_seed_frequencies = single_chip_frequencies[seed_name]
+                    wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name] = {}
+                    wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name] = {}
+                    for port_power_dbm in single_seed_frequencies.keys():
+                        # this is currently the base level for this data structure
+                        single_power_frequency_records = single_seed_frequencies[port_power_dbm]
+                        # order the data records
+                        frequency_records_ordered = sorted(single_power_frequency_records, key=itemgetter(0))
+                        # save the data for output to a csv file
+                        wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm] \
+                            = frequency_records_ordered
+                        # make and array for doing stats
+                        frequencies_array = np.array([frequency_report_entry.f_ghz
+                                                      for frequency_report_entry in frequency_records_ordered])
+                        # do stats
+                        f_ghz_min = np.min(frequencies_array)
+                        f_ghz_max = np.max(frequencies_array)
+                        f_ghz_median = np.median(frequencies_array)
+                        f_ghz_mean = np.mean(frequencies_array)
+                        f_ghz_std = np.std(frequencies_array)
+                        # makes a dictionary to store the stats
+                        stats_dict = {"f_ghz_min": f_ghz_min, 'f_ghz_max': f_ghz_max, 'f_ghz_median': f_ghz_median,
+                                      'f_ghz_mean': f_ghz_mean, 'f_ghz_std': f_ghz_std}
+                        # place the dictionary in the data structure
+                        wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm] = stats_dict
+        # Write out a csv file, this time we go through the loops in an order to make the output uniform
+        # collect all the header info for the csv files
+        stats_dict_columns = ["f_ghz_min", 'f_ghz_max', 'f_ghz_median', 'f_ghz_mean', 'f_ghz_std']
+        header_stats_dict = ""
+        for stats_column in stats_dict_columns:
+            header_stats_dict += F"{stats_column},"
+        header_frequencies_report = ""
+        for report_column in frequency_report_entry_header:
+            header_frequencies_report += F"{report_column},"
+        shared_id_column_names = ["wafer_num", "chip_id_str", "seed_name", "port_power_dbm"]
+        header_shared = ""
+        for id_column in shared_id_column_names:
+            header_shared += F"{id_column},"
+        # the :-1 drops the last comma
+        header_stats = F"{header_shared}{header_stats_dict[:-1]}\n"
+        header_frequencies_summary = F"{header_shared}{header_frequencies_report[:-1]}\n"
+        with open(self.frequencies_stats_cvs_path, 'w') as f_stats, open(self.frequencies_cvs_path, 'w') as f_csv:
+            # write out the header lines
+            f_stats.write(header_stats)
+            f_csv.write(header_frequencies_summary)
+            for wafer_num in sorted(wafer_scale_frequencies_ordered.keys()):
+                for chip_id_str in sorted(wafer_scale_frequencies_ordered[wafer_num].keys()):
+                    chip_id_str_for_output = chip_id_str.replace(',', '')
+                    for seed_name in sorted(wafer_scale_frequencies_ordered[wafer_num][chip_id_str].keys()):
+                        for port_power_dbm in \
+                                sorted(wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name].keys()):
+                            frequency_records_ordered = \
+                                wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm]
+                            stats_dict = \
+                                wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm]
+                            # the data record output order is driven by the header columns names
+                            # the sharded identifying information record
+                            record_id_shared = F"{wafer_num},{chip_id_str_for_output},{seed_name},{port_power_dbm},"
+                            # the stats record
+                            record_stats_dict = ""
+                            for stats_column in stats_dict_columns:
+                                record_stats_dict += F"{stats_dict[stats_column]},"
+                            # assemble the full row entry
+                            record_stats_row = F"{record_id_shared}{record_stats_dict[:-1]}\n"
+                            f_stats.write(record_stats_row)
+                            # loop through the ordered frequencies
+                            for frequency_report_entry in frequency_records_ordered:
+                                record_f_summary_row = F"{record_id_shared}{frequency_report_entry}\n"
+                                f_csv.write(record_f_summary_row)
+        print(F"Wrote output to:\n  {self.frequencies_stats_cvs_path}\n  {self.frequencies_cvs_path}")
+        # render and write the plot to give context to the data
+        frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_stats,
+                         plot_path=self.frequencies_plot_path)
+
+
+def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=None):
+    if lamb_explore is None:
+        lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
-    lamb_explore.summary_reports(multi_page_summary=True, show=True)
+    lamb_explore.summary_reports(multi_page_summary=True, show=False)
+    return lamb_explore
+
+
+def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
+    if lamb_explore is None:
+        lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
+    lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
+    lamb_explore.frequency_report()
+    return lamb_explore
+
+
+if __name__ == "__main__":
+    do_summary_report_plots = True
+    do_frequency_report_plot = True
+
+    example_start_date = datetime.date(year=2020, month=4, day=23)
+    example_end_date = datetime.date(year=2022, month=4, day=23)
+
+    example_lamb_explore = None
+    if do_summary_report_plots:
+        example_lamb_explore = standard_summary_report_plots(start_date=example_start_date, end_date=example_end_date,
+                                                             lamb_explore=example_lamb_explore)
+
+    if do_frequency_report_plot:
+        example_lamb_explore = frequency_report_plot(start_date=example_start_date, end_date=example_end_date,
+                                                     lamb_explore=example_lamb_explore)

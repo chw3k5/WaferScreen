@@ -2,6 +2,7 @@
 # Please refer to the LICENSE file in the root of this repository.
 
 from waferscreen.data_io.flags import Flagger
+from typing import NamedTuple
 
 
 def wafer_num_to_str(wafer_num):
@@ -79,6 +80,19 @@ def chip_id_str_to_chip_id_handle(chip_id_str):
 
 def seed_name_to_handle(seed_base):
     return seed_base.replace("-", "_").replace(".", "point")
+
+
+frequency_report_entry_header = ['f_ghz', 'so_band', 'is_in_band', 'is_in_keepout']
+
+
+class FrequencyReportEntry(NamedTuple):
+    f_ghz: float
+    so_band: int
+    is_in_band: bool
+    is_in_keepout: bool
+
+    def __str__(self):
+        return F"{self.f_ghz},{self.so_band},{self.is_in_band},{self.is_in_keepout}"
 
 
 flagged_data = Flagger()

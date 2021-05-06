@@ -120,6 +120,13 @@ def in_smurf_keepout(f_ghz):
     return False
 
 
+def in_band(band_str, f_ghz):
+    if band_params[band_str]['min_GHz'] <= f_ghz <= band_params[band_str]['max_GHz']:
+        return True
+    else:
+        return False
+
+
 """wafer acceptance criteria"""
 # Qi Quality Factor
 min_q_i = 1.2e5
