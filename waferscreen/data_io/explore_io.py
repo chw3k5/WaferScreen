@@ -83,7 +83,7 @@ def seed_name_to_handle(seed_base):
 
 
 optional_frequency_report_entry_header = ['res_num', 'designed_f_ghz', 'x_pos_mm_on_chip', 'y_pos_mm_on_chip',
-                                          'lambda_path']
+                                          'lambda_path', 'group_num']
 frequency_report_entry_header = ['f_ghz', 'so_band', 'is_in_band', 'is_in_keepout']
 frequency_report_entry_header.extend(optional_frequency_report_entry_header)
 
@@ -98,6 +98,7 @@ class FrequencyReportEntry(NamedTuple):
     x_pos_mm_on_chip: Optional[float] = None
     y_pos_mm_on_chip: Optional[float] = None
     lambda_path: Optional[str] = None
+    group_num: Optional[int] = None
 
     def __str__(self):
         return_str = ""

@@ -11,7 +11,7 @@ from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_betw
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
-from waferscreen.data_io.chip_metadata import chip_metadata
+from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_and_group
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
     chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
     chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header, \
@@ -46,7 +46,7 @@ class SingleLamb:
         self.series_key = None
 
         self.wafer = self.so_band = self.chip_id_str = self.chip_position = self.meas_time = self.seed_name = None
-        self.port_power_dbm = None
+        self.port_power_dbm = self.group_num = None
         if auto_load:
             self.read(lamb_path=self.path)
 
@@ -61,7 +61,10 @@ class SingleLamb:
         if "so_band" in self.metadata.keys():
             self.so_band = self.metadata.so_band
         if "x_position" in self.metadata.keys() and "y_position" in self.metadata.keys():
-            self.chip_position = (self.metadata["x_position"], self.metadata["y_position"])
+            x_pos = self.metadata["x_position"]
+            y_pos = self.metadata["y_position"]
+            self.chip_position = (x_pos, y_pos)
+            self.group_num = wafer_pos_to_band_and_group.form_pos_to_group_num(x_pos=x_pos, y_pos=y_pos)
         if 'seed_base' in self.metadata.keys():
             self.seed_name = remove_processing_tags(self.metadata.seed_base)
             scan_freqs, meas_utc = self.seed_name.split("_")
@@ -361,6 +364,7 @@ class LambExplore:
         for lambda_path in self.lamb_params_data.keys():
             lambda_data_this_lap = self.lamb_params_data[lambda_path]
             wafer_num = lambda_data_this_lap.wafer
+            group_num = lambda_data_this_lap.group_num
             # add this wafer number to the wafer_scale_frequencies_plot_data
             if wafer_num not in wafer_scale_frequencies_data.keys():
                 wafer_scale_frequencies_data[wafer_num] = {}
@@ -389,7 +393,7 @@ class LambExplore:
             # make the data record
             frequency_report_entry = FrequencyReportEntry(f_ghz=f_ghz, so_band=so_band_num,
                                                           is_in_band=is_in_band, is_in_keepout=is_in_keepout,
-                                                          lambda_path=lambda_path)
+                                                          lambda_path=lambda_path, group_num=group_num)
             # add the data record
             wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm].add(frequency_report_entry)
         # With all the data collected we do some statistics and order the data
@@ -521,6 +525,8 @@ def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
         lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
     lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
     lamb_explore.frequency_report()
+    lamb_explore.organize(structure_key="swb")
+    lamb_explore.organize(structure_key="wbs")
     return lamb_explore
 
 

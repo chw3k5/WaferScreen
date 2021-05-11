@@ -84,10 +84,27 @@ class WaferPosToBandAndGroup:
             self.from_band_and_group[(so_band_num, group_num)] = data_dict
 
     def get_from_wafer_pos(self, x_pos, y_pos):
-        return self.from_wafer_pos[(int(x_pos, int(y_pos)))]
+        if x_pos is None or y_pos is None:
+            return None
+        pos_key = (int(x_pos), int(y_pos))
+        if pos_key in self.from_wafer_pos.keys():
+            return self.from_wafer_pos[pos_key]
+        else:
+            return None
+
+    def form_pos_to_group_num(self, x_pos, y_pos):
+        data_dict = self.get_from_wafer_pos(x_pos=x_pos, y_pos=y_pos)
+        if data_dict is None:
+            return None
+        else:
+            return data_dict['group_num']
 
     def get_from_band_and_group(self, so_band_num, group_num):
-        return self.from_band_and_group[(int(so_band_num, int(group_num)))]
+        band_and_group_key = (int(so_band_num), int(group_num))
+        if band_and_group_key in self.from_band_and_group.keys():
+            return self.from_band_and_group[band_and_group_key]
+        else:
+            return None
 
 
 chip_metadata = ChipMetaData()
