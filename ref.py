@@ -60,7 +60,8 @@ too_long_did_not_read_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen
 if not os.path.isdir(too_long_did_not_read_dir):
     os.mkdir(too_long_did_not_read_dir)
 starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
-
+chip_per_band_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux100k_v321_banddef_summary.csv")
+wafer_pos_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "wafer_pos_metadata.csv")
 
 if current_user == 'uvwave':
     if not os.path.isfile(runtime_log):
@@ -108,6 +109,14 @@ for band in band_params.keys():
     params_dict["span_GHz"] = params_dict["max_GHz"] - params_dict["min_GHz"]
     params_dict["center_GHz"] = (params_dict["max_GHz"] + params_dict["min_GHz"]) * 0.5
     params_dict["band_num"] = int(band.lower().replace("band", ""))
+
+
+def get_band_name(f_ghz):
+    for band_name in band_names:
+        band_dict = band_params[band_name]
+        if band_dict["min_GHz"] <= f_ghz <= band_dict['max_GHz']:
+            return band_name
+    return None
 
 # smurf (FPGA readout) definitions
 smurf_keepout_zones_ghz = [(3.981 + 0.5 * zone_number, 4.019 + 0.5 * zone_number) for zone_number in range(5)]

@@ -2,7 +2,7 @@
 # Please refer to the LICENSE file in the root of this repository.
 
 from waferscreen.data_io.flags import Flagger
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 
 def wafer_num_to_str(wafer_num):
@@ -82,7 +82,10 @@ def seed_name_to_handle(seed_base):
     return seed_base.replace("-", "_").replace(".", "point")
 
 
+optional_frequency_report_entry_header = ['res_num', 'designed_f_ghz', 'x_pos_mm_on_chip', 'y_pos_mm_on_chip',
+                                          'lambda_path']
 frequency_report_entry_header = ['f_ghz', 'so_band', 'is_in_band', 'is_in_keepout']
+frequency_report_entry_header.extend(optional_frequency_report_entry_header)
 
 
 class FrequencyReportEntry(NamedTuple):
@@ -90,9 +93,18 @@ class FrequencyReportEntry(NamedTuple):
     so_band: int
     is_in_band: bool
     is_in_keepout: bool
+    res_num: Optional[int] = None
+    designed_f_ghz: Optional[float] = None
+    x_pos_mm_on_chip: Optional[float] = None
+    y_pos_mm_on_chip: Optional[float] = None
+    lambda_path: Optional[str] = None
 
     def __str__(self):
-        return F"{self.f_ghz},{self.so_band},{self.is_in_band},{self.is_in_keepout}"
+        return_str = ""
+        for var_name in frequency_report_entry_header:
+            return_str += F"{self.__getattribute__(var_name)},"
+        # get rid of the last comma ","
+        return return_str[:-1]
 
 
 flagged_data = Flagger()

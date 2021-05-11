@@ -11,12 +11,14 @@ from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_betw
 from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
+from waferscreen.data_io.chip_metadata import chip_metadata
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
     chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
-    chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header
+    chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header, \
+    optional_frequency_report_entry_header
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
-from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band
+from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -386,7 +388,8 @@ class LambExplore:
             is_in_keepout = in_smurf_keepout(f_ghz=f_ghz)
             # make the data record
             frequency_report_entry = FrequencyReportEntry(f_ghz=f_ghz, so_band=so_band_num,
-                                                          is_in_band=is_in_band, is_in_keepout=is_in_keepout)
+                                                          is_in_band=is_in_band, is_in_keepout=is_in_keepout,
+                                                          lambda_path=lambda_path)
             # add the data record
             wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm].add(frequency_report_entry)
         # With all the data collected we do some statistics and order the data
@@ -397,6 +400,7 @@ class LambExplore:
             wafer_scale_frequencies_stats[wafer_num] = {}
             wafer_scale_frequencies_ordered[wafer_num] = {}
             for chip_id_str in single_wafer_frequencies.keys():
+                so_band_num, *_xy_pos = chip_id_str_to_chip_id_tuple(chip_id_str=chip_id_str)
                 single_chip_frequencies = single_wafer_frequencies[chip_id_str]
                 wafer_scale_frequencies_stats[wafer_num][chip_id_str] = {}
                 wafer_scale_frequencies_ordered[wafer_num][chip_id_str] = {}
@@ -409,9 +413,36 @@ class LambExplore:
                         single_power_frequency_records = single_seed_frequencies[port_power_dbm]
                         # order the data records
                         frequency_records_ordered = sorted(single_power_frequency_records, key=itemgetter(0))
+                        # import chip level metadata and make a new frequency data record
+                        order_updated_records = []
+                        for res_num, f_record in list(enumerate(frequency_records_ordered)):
+                            res_num_metadata = chip_metadata.return_res_metadata(so_band_num=so_band_num,
+                                                                                 res_num=res_num)
+                            if res_num_metadata is None:
+                                order_updated_records.append(f_record)
+                            else:
+                                # get the existing record data
+                                updated_record_data = {var_name: f_record.__getattribute__(var_name)
+                                                       for var_name in frequency_report_entry_header}
+                                # add the some of the selected meta
+                                update_f_record = {'res_num': res_num,
+                                                   'designed_f_ghz': res_num_metadata['freq_hz'] * 1.0e-9,
+                                                   'x_pos_mm_on_chip': res_num_metadata['x_pos_mm'],
+                                                   'y_pos_mm_on_chip': res_num_metadata['y_pos_mm']}
+                                updated_record_data.update(update_f_record)
+                                order_updated_records.append(FrequencyReportEntry(**updated_record_data))
+                                # update the explore.py class metadata
+                                order_updated_records.append(FrequencyReportEntry(**updated_record_data))
+                                for chip_metadata_column in ['resonator_height_um', 'wiggles', 'sliders',
+                                                             'slider_delta_um', 'resonator_impedance_ohms',
+                                                             'coupling_capacitance_f', 'coupling_inductance_h']:
+                                    update_f_record[chip_metadata_column] = res_num_metadata[chip_metadata_column]
+                                lambda_path = updated_record_data['lambda_path']
+                                # the lambda file from which this associated metadata belongs
+                                self.lamb_params_data[lambda_path].metadata.update(update_f_record)
                         # save the data for output to a csv file
                         wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm] \
-                            = frequency_records_ordered
+                            = order_updated_records
                         # make and array for doing stats
                         frequencies_array = np.array([frequency_report_entry.f_ghz
                                                       for frequency_report_entry in frequency_records_ordered])
@@ -494,10 +525,10 @@ def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
 
 
 if __name__ == "__main__":
-    do_summary_report_plots = True
+    do_summary_report_plots = False
     do_frequency_report_plot = True
 
-    example_start_date = datetime.date(year=2020, month=4, day=23)
+    example_start_date = datetime.date(year=2020, month=4, day=26)
     example_end_date = datetime.date(year=2022, month=4, day=23)
 
     example_lamb_explore = None
