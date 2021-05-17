@@ -28,6 +28,8 @@ elif current_user in "cwheeler":
     multiprocessing_threads = 16  # Mac Pro 8-core intel core i9 processor 16 threads
 elif current_user == "uvwave":
     multiprocessing_threads = 8  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
+elif current_user == "bjd":
+    multiprocessing_threads = 10  # 4 core machine
 else:
     # this will do standard linear processing.
     multiprocessing_threads = None

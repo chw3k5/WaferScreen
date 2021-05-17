@@ -65,27 +65,29 @@ def get_dirs_between_dates(start_date, end_date):
     for location_dir in ref.output_dirs:
         # get all the wafer-number directories
         wafer_number_dirs = []
-        for wafer_number_dir_name in os.listdir(location_dir):
-            wafer_number_dir_test = os.path.join(location_dir, wafer_number_dir_name)
-            if os.path.isdir(wafer_number_dir_test):
-                # wafer number directory name can be converted to and integer, ignore calibration directories and others
-                try:
-                    int(wafer_number_dir_name)
-                except ValueError:
-                    pass
-                else:
-                    wafer_number_dirs.append(wafer_number_dir_test)
-        # get all the date name directory directories between the start and end dates
-        for wafer_number_dir in wafer_number_dirs:
-            for date_string_dir in os.listdir(wafer_number_dir):
-                # move on if the directory is not in date format (like hidden directories i.e. .DS_Store)
-                try:
-                    dt_this_dir = datetime.datetime.strptime(date_string_dir, "%Y-%m-%d").date()
-                except ValueError:
-                    pass
-                else:
-                    if start_date <= dt_this_dir <= end_date:
-                        date_dirs_in_range.append(os.path.join(wafer_number_dir, date_string_dir))
+        # not all locations may be found on all computers
+        if os.path.isdir(location_dir):
+            for wafer_number_dir_name in os.listdir(location_dir):
+                wafer_number_dir_test = os.path.join(location_dir, wafer_number_dir_name)
+                if os.path.isdir(wafer_number_dir_test):
+                    # wafer number directory name can be converted to and integer, ignore calibration directories and others
+                    try:
+                        int(wafer_number_dir_name)
+                    except ValueError:
+                        pass
+                    else:
+                        wafer_number_dirs.append(wafer_number_dir_test)
+            # get all the date name directory directories between the start and end dates
+            for wafer_number_dir in wafer_number_dirs:
+                for date_string_dir in os.listdir(wafer_number_dir):
+                    # move on if the directory is not in date format (like hidden directories i.e. .DS_Store)
+                    try:
+                        dt_this_dir = datetime.datetime.strptime(date_string_dir, "%Y-%m-%d").date()
+                    except ValueError:
+                        pass
+                    else:
+                        if start_date <= dt_this_dir <= end_date:
+                            date_dirs_in_range.append(os.path.join(wafer_number_dir, date_string_dir))
     return date_dirs_in_range
 
 
