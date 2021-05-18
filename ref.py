@@ -60,7 +60,7 @@ if getpass.getuser() == 'uvwave':
 else:
     working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
 
-output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["hannes"]]
+output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["nist"]]
 
 
 # reference file locations

@@ -183,10 +183,11 @@ def frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_st
             plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
                      color=band_colors[so_band_num], linewidth=thread_linewidth, alpha=thread_alpha)
 
-    # add a black line to separate wafers
+    # add a black line to separate wafers-groups
     for x_data_axis_count in range(1, x_data_axes):
         y_pos = x_data_axis_count * wafer_data_increment_size
-        ax.plot((left_margin, right_margin), (y_pos, y_pos), color='black', linewidth=2)
+        ax.plot((ref.smurf_keepout_zones_ghz[0][0], ref.smurf_keepout_zones_ghz[-1][1]), (y_pos, y_pos),
+                color='black', linewidth=2)
     # band labels
     band_label_centers = []
     band_label_names = []
@@ -194,7 +195,7 @@ def frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_st
         band_label_names.append(band_string)
         band_label_centers.append(ref.band_params[band_string]["center_GHz"])
         plt.text(x=ref.band_params[band_string]["center_GHz"], y=1.01, s=band_string,
-                 horizontalalignment='center', verticalalignment='bottom', size=12,
+                 horizontalalignment='center', verticalalignment='bottom', size=12, color='white',
                  bbox=dict(boxstyle='square', fc=band_colors[band_num]))
     # axis details
     ax.set_ylim([0, 1])
