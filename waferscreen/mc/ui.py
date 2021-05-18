@@ -52,6 +52,6 @@ if __name__ == "__main__":
                            do_interactive_plot=True, save_res_plots=True,
                            make_band_seeds=False, make_single_res_seeds=True)
     if do_res_sweeps:
-        dm.full_loop_single_res(raw_res_dirs=raw_res_dirs, do_raw=True, save_phase_plot=False,
-                                pro_res_dirs=pro_dirs, do_pro=True, save_res_plots=False, reprocess_res=True,
+        dm.full_loop_single_res(raw_res_dirs=raw_res_dirs, do_raw=True, save_phase_plot=True,
+                                pro_res_dirs=pro_dirs, do_pro=True, save_res_plots=True, reprocess_res=True,
                                 do_lamb=True, lamb_plots=True)  # lamb_plots is not properly toggling the plots

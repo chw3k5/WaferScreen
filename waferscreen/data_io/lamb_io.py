@@ -45,6 +45,10 @@ def remove_processing_tags(dir_str):
 
 
 def prep_lamb_dirs(pro_data_dir, report_parent_dir_str):
+    report_parent_dir = os.path.join(pro_data_dir, report_parent_dir_str)
+    if not os.path.isdir(report_parent_dir):
+        # this happens when scans have not yet been processed on this computer
+        os.mkdir(report_parent_dir)
     report_dir = os.path.join(pro_data_dir, report_parent_dir_str, 'report')
     if not os.path.isdir(report_dir):
         os.mkdir(report_dir)

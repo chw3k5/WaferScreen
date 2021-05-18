@@ -5,6 +5,7 @@ import os
 import datetime
 import numpy as np
 from operator import itemgetter
+import itertools
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_between_dates
@@ -18,7 +19,7 @@ from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, r
     optional_frequency_report_entry_header
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
-from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name
+from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name, min_spacings_mhz
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -248,6 +249,11 @@ class LambExplore:
         self.available_seed_handles = set()
         self.available_chip_id_strs = set()
         self.available_wafers = set()
+        # data structures
+        self.wafer_scale_frequencies_ordered = None
+        self.wafer_scale_frequencies_stats = None
+        self.wafer_scale_frequencies_spacing = None
+        self.frequencies_stats_dict_keys = None
 
         # there are two ways to initiate this class
         if lambda_params_data is None:
@@ -358,7 +364,7 @@ class LambExplore:
             raise ValueError("The filtered_out did not return any data after the criteria matching.")
         return LambExplore(lambda_params_data=output_lambda_params_data)
 
-    def frequency_report(self):
+    def do_frequencies_analysis(self):
         wafer_scale_frequencies_data = {}
         # loop over all available data in this class and organize the relevant information.
         for lambda_path in self.lamb_params_data.keys():
@@ -397,29 +403,45 @@ class LambExplore:
             # add the data record
             wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm].add(frequency_report_entry)
         # With all the data collected we do some statistics and order the data
-        wafer_scale_frequencies_ordered = {}
-        wafer_scale_frequencies_stats = {}
+        self.wafer_scale_frequencies_ordered = {}
+        self.wafer_scale_frequencies_stats = {}
+        self.wafer_scale_frequencies_spacing = {}
+        self.frequencies_stats_dict_keys = []
+        spacing_dict_types = set()
         for wafer_num in wafer_scale_frequencies_data.keys():
             single_wafer_frequencies = wafer_scale_frequencies_data[wafer_num]
-            wafer_scale_frequencies_stats[wafer_num] = {}
-            wafer_scale_frequencies_ordered[wafer_num] = {}
+            self.wafer_scale_frequencies_stats[wafer_num] = {}
+            self.wafer_scale_frequencies_ordered[wafer_num] = {}
+            self.wafer_scale_frequencies_spacing[wafer_num] = {}
             for chip_id_str in single_wafer_frequencies.keys():
                 so_band_num, *_xy_pos = chip_id_str_to_chip_id_tuple(chip_id_str=chip_id_str)
                 single_chip_frequencies = single_wafer_frequencies[chip_id_str]
-                wafer_scale_frequencies_stats[wafer_num][chip_id_str] = {}
-                wafer_scale_frequencies_ordered[wafer_num][chip_id_str] = {}
+                self.wafer_scale_frequencies_stats[wafer_num][chip_id_str] = {}
+                self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str] = {}
+                self.wafer_scale_frequencies_spacing[wafer_num][chip_id_str] = {}
                 for seed_name in single_chip_frequencies.keys():
                     single_seed_frequencies = single_chip_frequencies[seed_name]
-                    wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name] = {}
-                    wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name] = {}
+                    self.wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name] = {}
+                    self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name] = {}
+                    self.wafer_scale_frequencies_spacing[wafer_num][chip_id_str][seed_name] = {}
                     for port_power_dbm in single_seed_frequencies.keys():
                         # this is currently the base level for this data structure
                         single_power_frequency_records = single_seed_frequencies[port_power_dbm]
                         # order the data records
                         frequency_records_ordered = sorted(single_power_frequency_records, key=itemgetter(0))
+                        # make and array for doing stats
+                        frequencies_array = np.array([frequency_report_entry.f_ghz
+                                                      for frequency_report_entry in frequency_records_ordered])
+                        # get spacing data
+                        delta_f_mhz_array = (frequencies_array[:-1] - frequencies_array[1:]) * 1.0e3
+                        left_spacing_list_mhz = list(itertools.chain([float('inf')], list(delta_f_mhz_array)))
+                        right_spacing_list_mhz = list(itertools.chain(list(delta_f_mhz_array), [float('inf')]))
                         # import chip level metadata and make a new frequency data record
                         order_updated_records = []
+                        acceptance_list = []
                         for res_num, f_record in list(enumerate(frequency_records_ordered)):
+                            left_spacing_mhz = left_spacing_list_mhz[res_num]
+                            right_spacing_mhz = right_spacing_list_mhz[res_num]
                             res_num_metadata = chip_metadata.return_res_metadata(so_band_num=so_band_num,
                                                                                  res_num=res_num)
                             if res_num_metadata is None:
@@ -444,28 +466,88 @@ class LambExplore:
                                 lambda_path = updated_record_data['lambda_path']
                                 # the lambda file from which this associated metadata belongs
                                 self.lamb_params_data[lambda_path].metadata.update(update_f_record)
-                        # save the data for output to a csv file
-                        wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm] \
+                            # deal with spacing acceptance
+                            acceptance_dict = {}
+                            for min_spacing_mhz in min_spacings_mhz:
+                                spacing_str = F"{np.round(min_spacing_mhz)}_mhz"
+                                left_str = F"left_neighbor_within_{spacing_str}"
+                                right_str = F"right_neighbor_within_{spacing_str}"
+                                spacing_dict_types.add(left_str)
+                                spacing_dict_types.add(right_str)
+                                if left_spacing_mhz > min_spacing_mhz:
+                                    acceptance_dict[left_str] = False
+                                else:
+                                    acceptance_dict[left_str] = True
+                                if right_spacing_mhz > min_spacing_mhz:
+                                    acceptance_dict[right_str] = False
+                                else:
+                                    acceptance_dict[right_str] = True
+                            acceptance_list.append(acceptance_dict)
+
+                        self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm] \
                             = order_updated_records
-                        # make and array for doing stats
-                        frequencies_array = np.array([frequency_report_entry.f_ghz
-                                                      for frequency_report_entry in frequency_records_ordered])
+                        self.wafer_scale_frequencies_spacing[wafer_num][chip_id_str][seed_name][port_power_dbm] \
+                            = acceptance_list
+
                         # do stats
                         f_ghz_min = np.min(frequencies_array)
                         f_ghz_max = np.max(frequencies_array)
                         f_ghz_median = np.median(frequencies_array)
                         f_ghz_mean = np.mean(frequencies_array)
                         f_ghz_std = np.std(frequencies_array)
+                        # do spacing stats
+                        delta_f_mhz_min = np.min(delta_f_mhz_array)
+                        delta_f_mhz_max = np.max(delta_f_mhz_array)
+                        delta_f_mhz_median = np.median(delta_f_mhz_array)
+                        delta_f_mhz_mean = np.mean(delta_f_mhz_array)
+                        delta_f_mhz_std = np.std(delta_f_mhz_array)
+                        # count collision zones
+                        counting_dict = {}
+                        for min_spacing_mhz in min_spacings_mhz:
+                            spacing_str = F"{np.round(min_spacing_mhz)}_mhz"
+                            left_str = F"left_neighbor_within_{spacing_str}"
+                            right_str = F"right_neighbor_within_{spacing_str}"
+                            counting_dict[min_spacing_mhz] = {'left':  0, 'right':  0, 'both':  0, 'none':  0}
+                            for acceptance_dict, frequency_record in zip(acceptance_list, order_updated_records):
+                                left_is_within = acceptance_dict[left_str]
+                                right_is_within = acceptance_dict[right_str]
+                                if left_is_within and right_is_within:
+                                    counting_dict[min_spacing_mhz]['both'] += 1
+                                elif left_is_within:
+                                    counting_dict[min_spacing_mhz]['left'] += 1
+                                elif right_is_within:
+                                    counting_dict[min_spacing_mhz]['right'] += 1
+                                else:
+                                    counting_dict[min_spacing_mhz]['none'] += 1
                         # makes a dictionary to store the stats
                         stats_dict = {"f_ghz_min": f_ghz_min, 'f_ghz_max': f_ghz_max, 'f_ghz_median': f_ghz_median,
-                                      'f_ghz_mean': f_ghz_mean, 'f_ghz_std': f_ghz_std}
+                                      'f_ghz_mean': f_ghz_mean, 'f_ghz_std': f_ghz_std,
+                                      "delta_f_mhz_min": delta_f_mhz_min, 'delta_f_mhz_max': delta_f_mhz_max,
+                                      'delta_f_mhz_median': delta_f_mhz_median, 'delta_f_mhz_mean': delta_f_mhz_mean,
+                                      'delta_f_mhz_std': delta_f_mhz_std}
+                        keys = None
+                        if not self.frequencies_stats_dict_keys:
+                            keys = sorted(stats_dict.keys(), reverse=True)
+                        for min_spacing_mhz in sorted(counting_dict.keys()):
+                            spacing_str = F"{np.round(min_spacing_mhz)}_mhz"
+                            for collision_type in sorted(counting_dict[min_spacing_mhz].keys()):
+                                stats_key = F"{spacing_str}_{collision_type}_count"
+                                stats_dict[stats_key] = counting_dict[min_spacing_mhz][collision_type]
+                                if keys is not None:
+                                    keys.append(stats_key)
+                        if keys is not None:
+                            self.frequencies_stats_dict_keys = keys
                         # place the dictionary in the data structure
-                        wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm] = stats_dict
+                        self.wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm] \
+                            = stats_dict
+
+    def frequency_report(self):
+        self.do_frequencies_analysis()
+
         # Write out a csv file, this time we go through the loops in an order to make the output uniform
         # collect all the header info for the csv files
-        stats_dict_columns = ["f_ghz_min", 'f_ghz_max', 'f_ghz_median', 'f_ghz_mean', 'f_ghz_std']
         header_stats_dict = ""
-        for stats_column in stats_dict_columns:
+        for stats_column in self.frequencies_stats_dict_keys:
             header_stats_dict += F"{stats_column},"
         header_frequencies_report = ""
         for report_column in frequency_report_entry_header:
@@ -481,22 +563,22 @@ class LambExplore:
             # write out the header lines
             f_stats.write(header_stats)
             f_csv.write(header_frequencies_summary)
-            for wafer_num in sorted(wafer_scale_frequencies_ordered.keys()):
-                for chip_id_str in sorted(wafer_scale_frequencies_ordered[wafer_num].keys()):
+            for wafer_num in sorted(self.wafer_scale_frequencies_ordered.keys()):
+                for chip_id_str in sorted(self.wafer_scale_frequencies_ordered[wafer_num].keys()):
                     chip_id_str_for_output = chip_id_str.replace(',', '')
-                    for seed_name in sorted(wafer_scale_frequencies_ordered[wafer_num][chip_id_str].keys()):
+                    for seed_name in sorted(self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str].keys()):
                         for port_power_dbm in \
-                                sorted(wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name].keys()):
+                                sorted(self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name].keys()):
                             frequency_records_ordered = \
-                                wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm]
+                                self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm]
                             stats_dict = \
-                                wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm]
+                                self.wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm]
                             # the data record output order is driven by the header columns names
                             # the sharded identifying information record
                             record_id_shared = F"{wafer_num},{chip_id_str_for_output},{seed_name},{port_power_dbm},"
                             # the stats record
                             record_stats_dict = ""
-                            for stats_column in stats_dict_columns:
+                            for stats_column in self.frequencies_stats_dict_keys:
                                 record_stats_dict += F"{stats_dict[stats_column]},"
                             # assemble the full row entry
                             record_stats_row = F"{record_id_shared}{record_stats_dict[:-1]}\n"
@@ -507,7 +589,7 @@ class LambExplore:
                                 f_csv.write(record_f_summary_row)
         print(F"Wrote output to:\n  {self.frequencies_stats_cvs_path}\n  {self.frequencies_cvs_path}")
         # render and write the plot to give context to the data
-        frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_stats,
+        frequencies_plot(self.wafer_scale_frequencies_ordered, self.wafer_scale_frequencies_stats,
                          plot_path=self.frequencies_plot_path)
 
 
@@ -534,8 +616,8 @@ if __name__ == "__main__":
     do_summary_report_plots = False
     do_frequency_report_plot = True
 
-    example_start_date = datetime.date(year=2020, month=4, day=26)
-    example_end_date = datetime.date(year=2022, month=4, day=23)
+    example_start_date = datetime.date(year=2020, month=4, day=1)
+    example_end_date = datetime.date(year=2022, month=4, day=30)
 
     example_lamb_explore = None
     if do_summary_report_plots:

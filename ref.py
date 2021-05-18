@@ -4,10 +4,14 @@
 import os
 import sys
 import getpass
+import numpy as np
 import matplotlib as mpl
 from datetime import datetime
 # To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
-mpl.use(backend="TkAgg")
+if sys.platform == 'win32':
+    mpl.use(backend='Qt5Agg')
+else:
+    mpl.use(backend="TkAgg")
 
 # Instrument addresses
 usbvna_address = "TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"
@@ -18,21 +22,28 @@ volt_source_port = 1
 # Debug mode
 debug_mode = False
 # multiprocessing
+# the 'assumption' of max threads is that we are cpu limited in processing,
+# so we use should not use more than a computer's available threads
+max_threads = int(os.cpu_count())
+# Try to strike a balance between best performance and computer usability during processing
+balanced_threads = max(max_threads - 2, 2)
+# Use onl half of the available threads for processing
+half_threads = int(np.round(os.cpu_count() * 0.5))
 current_user = getpass.getuser()
 if debug_mode:
+    # this will do standard linear processing.
     multiprocessing_threads = None
     mpl.use(backend='module://backend_interagg')
 elif current_user == "chw3k5":
-    multiprocessing_threads = 4  # Caleb's other computers
+    multiprocessing_threads = balanced_threads  # Caleb's other computers
 elif current_user in "cwheeler":
-    multiprocessing_threads = 16  # Mac Pro 8-core intel core i9 processor 16 threads
+    multiprocessing_threads = max_threads  # Mac Pro 8-core intel core i9 processor 16 threads
 elif current_user == "uvwave":
-    multiprocessing_threads = 8  # The Nist computer has an Intel Xeon W-2123, 8 threads on 4 cores.
+    multiprocessing_threads = half_threads
 elif current_user == "bjd":
-    multiprocessing_threads = 10  # 4 core machine
+    multiprocessing_threads = balanced_threads  # 4 core machine
 else:
-    # this will do standard linear processing.
-    multiprocessing_threads = None
+    multiprocessing_threads = balanced_threads
 
 # References used in the WaferScreen Catalog
 now = datetime.now()
@@ -49,7 +60,7 @@ if getpass.getuser() == 'uvwave':
 else:
     working_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen")
 
-output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["nist"]]
+output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["hannes"]]
 
 
 # reference file locations
@@ -149,3 +160,6 @@ average_lambda = 0.3
 
 # Peak-to-peak shift (Flux Ramp Span) in Hertz (Hz)
 peak_to_peak_shift_hz = 60.0
+
+# resonator spacing
+min_spacings_mhz = {1000.0, 900.0, 800.0, 700.0, 600.0, 500.0}
