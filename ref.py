@@ -7,6 +7,7 @@ import getpass
 import numpy as np
 import matplotlib as mpl
 from datetime import datetime
+
 # To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
 if sys.platform == 'win32':
     mpl.use(backend='Qt5Agg')
@@ -62,7 +63,6 @@ else:
 
 output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["nist"]]
 
-
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
 runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
@@ -93,10 +93,8 @@ c = 299792458.0  # m/s
 k = 1.380658E-23  # J/K
 phi_0 = 2.068e-15  # magnetic flux quantum
 
-
 # processing types
 s21_processing_types = {"phase", "windowbaselinesmoothedremoved"}
-
 
 # Simons Observatory Frequency Band definitions
 band_names = ["Band00", "Band01", "Band02", "Band03", "Band04", "Band05", "Band06",
@@ -130,6 +128,7 @@ def get_band_name(f_ghz):
         if band_dict["min_GHz"] <= f_ghz <= band_dict['max_GHz']:
             return band_name
     return None
+
 
 # smurf (FPGA readout) definitions
 smurf_keepout_zones_ghz = [(3.981 + 0.5 * zone_number, 4.019 + 0.5 * zone_number) for zone_number in range(5)]
