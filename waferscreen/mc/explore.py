@@ -19,7 +19,7 @@ from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, r
     optional_frequency_report_entry_header
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
-from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name, min_spacings_mhz
+from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name, min_spacings_khz
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -37,6 +37,9 @@ class SingleLamb:
         self.pro_scan_dir, _rportt_foldername = os.path.split(self.report_dir)
         self.pro_dir, _scan_foldername = os.path.split(self.pro_scan_dir)
         self.date_str_dir, _pro_foldername = os.path.split(self.pro_dir)
+
+        self.flags = set()
+
         self.seed_scan_path = None
 
         self.metadata = None
@@ -153,9 +156,15 @@ class SeriesLamb:
                            sorted_series_handles}
         seed_scan_path = self.seed_scan_path
         report_dir = self.report_dir
-        report_fig = report_plot(series_res_sets, sorted_series_handles, wafer_str,
-                                 chip_id_str, seed_scan_path, report_dir,
-                                 show=show, omit_flagged=omit_flagged, save=save, return_fig=return_fig)
+        report_fig, flag_table_info = report_plot(series_res_sets, sorted_series_handles, wafer_str,
+                                                  chip_id_str, seed_scan_path, report_dir,
+                                                  show=show, omit_flagged=omit_flagged, save=save,
+                                                  return_fig=return_fig)
+        # update metadata with flag info
+        for series_handle in self.available_series_handles:
+            for res_num_str in flag_table_info.keys():
+                single_lamb = self.__getattribute__(series_handle).__getattribute__(res_num_str)
+                [single_lamb.flags.add(flag_str) for flag_str in flag_table_info[res_num_str].split("\n")]
         return report_fig
 
 
@@ -433,15 +442,15 @@ class LambExplore:
                         frequencies_array = np.array([frequency_report_entry.f_ghz
                                                       for frequency_report_entry in frequency_records_ordered])
                         # get spacing data
-                        delta_f_mhz_array = (frequencies_array[:-1] - frequencies_array[1:]) * 1.0e3
-                        left_spacing_list_mhz = list(itertools.chain([float('inf')], list(delta_f_mhz_array)))
-                        right_spacing_list_mhz = list(itertools.chain(list(delta_f_mhz_array), [float('inf')]))
+                        delta_f_khz_array = (frequencies_array[1:] - frequencies_array[:-1]) * 1.0e6
+                        left_spacing_list_khz = list(itertools.chain([float('inf')], list(delta_f_khz_array)))
+                        right_spacing_list_khz = list(itertools.chain(list(delta_f_khz_array), [float('inf')]))
                         # import chip level metadata and make a new frequency data record
                         order_updated_records = []
                         acceptance_list = []
                         for res_num, f_record in list(enumerate(frequency_records_ordered)):
-                            left_spacing_mhz = left_spacing_list_mhz[res_num]
-                            right_spacing_mhz = right_spacing_list_mhz[res_num]
+                            left_spacing_khz = left_spacing_list_khz[res_num]
+                            right_spacing_khz = right_spacing_list_khz[res_num]
                             res_num_metadata = chip_metadata.return_res_metadata(so_band_num=so_band_num,
                                                                                  res_num=res_num)
                             if res_num_metadata is None:
@@ -468,17 +477,17 @@ class LambExplore:
                                 self.lamb_params_data[lambda_path].metadata.update(update_f_record)
                             # deal with spacing acceptance
                             acceptance_dict = {}
-                            for min_spacing_mhz in min_spacings_mhz:
-                                spacing_str = F"{np.round(min_spacing_mhz)}_mhz"
+                            for min_spacing_khz in min_spacings_khz:
+                                spacing_str = F"{np.round(min_spacing_khz)}_khz"
                                 left_str = F"left_neighbor_within_{spacing_str}"
                                 right_str = F"right_neighbor_within_{spacing_str}"
                                 spacing_dict_types.add(left_str)
                                 spacing_dict_types.add(right_str)
-                                if left_spacing_mhz > min_spacing_mhz:
+                                if left_spacing_khz > min_spacing_khz:
                                     acceptance_dict[left_str] = False
                                 else:
                                     acceptance_dict[left_str] = True
-                                if right_spacing_mhz > min_spacing_mhz:
+                                if right_spacing_khz > min_spacing_khz:
                                     acceptance_dict[right_str] = False
                                 else:
                                     acceptance_dict[right_str] = True
@@ -496,43 +505,43 @@ class LambExplore:
                         f_ghz_mean = np.mean(frequencies_array)
                         f_ghz_std = np.std(frequencies_array)
                         # do spacing stats
-                        delta_f_mhz_min = np.min(delta_f_mhz_array)
-                        delta_f_mhz_max = np.max(delta_f_mhz_array)
-                        delta_f_mhz_median = np.median(delta_f_mhz_array)
-                        delta_f_mhz_mean = np.mean(delta_f_mhz_array)
-                        delta_f_mhz_std = np.std(delta_f_mhz_array)
+                        delta_f_khz_min = np.min(delta_f_khz_array)
+                        delta_f_khz_max = np.max(delta_f_khz_array)
+                        delta_f_khz_median = np.median(delta_f_khz_array)
+                        delta_f_khz_mean = np.mean(delta_f_khz_array)
+                        delta_f_khz_std = np.std(delta_f_khz_array)
                         # count collision zones
                         counting_dict = {}
-                        for min_spacing_mhz in min_spacings_mhz:
-                            spacing_str = F"{np.round(min_spacing_mhz)}_mhz"
+                        for min_spacing_khz in min_spacings_khz:
+                            spacing_str = F"{np.round(min_spacing_khz)}_khz"
                             left_str = F"left_neighbor_within_{spacing_str}"
                             right_str = F"right_neighbor_within_{spacing_str}"
-                            counting_dict[min_spacing_mhz] = {'left':  0, 'right':  0, 'both':  0, 'none':  0}
+                            counting_dict[min_spacing_khz] = {'left':  0, 'right':  0, 'both':  0, 'none':  0}
                             for acceptance_dict, frequency_record in zip(acceptance_list, order_updated_records):
                                 left_is_within = acceptance_dict[left_str]
                                 right_is_within = acceptance_dict[right_str]
                                 if left_is_within and right_is_within:
-                                    counting_dict[min_spacing_mhz]['both'] += 1
+                                    counting_dict[min_spacing_khz]['both'] += 1
                                 elif left_is_within:
-                                    counting_dict[min_spacing_mhz]['left'] += 1
+                                    counting_dict[min_spacing_khz]['left'] += 1
                                 elif right_is_within:
-                                    counting_dict[min_spacing_mhz]['right'] += 1
+                                    counting_dict[min_spacing_khz]['right'] += 1
                                 else:
-                                    counting_dict[min_spacing_mhz]['none'] += 1
+                                    counting_dict[min_spacing_khz]['none'] += 1
                         # makes a dictionary to store the stats
                         stats_dict = {"f_ghz_min": f_ghz_min, 'f_ghz_max': f_ghz_max, 'f_ghz_median': f_ghz_median,
                                       'f_ghz_mean': f_ghz_mean, 'f_ghz_std': f_ghz_std,
-                                      "delta_f_mhz_min": delta_f_mhz_min, 'delta_f_mhz_max': delta_f_mhz_max,
-                                      'delta_f_mhz_median': delta_f_mhz_median, 'delta_f_mhz_mean': delta_f_mhz_mean,
-                                      'delta_f_mhz_std': delta_f_mhz_std}
+                                      "delta_f_khz_min": delta_f_khz_min, 'delta_f_khz_max': delta_f_khz_max,
+                                      'delta_f_khz_median': delta_f_khz_median, 'delta_f_khz_mean': delta_f_khz_mean,
+                                      'delta_f_khz_std': delta_f_khz_std}
                         keys = None
                         if not self.frequencies_stats_dict_keys:
                             keys = sorted(stats_dict.keys(), reverse=True)
-                        for min_spacing_mhz in sorted(counting_dict.keys()):
-                            spacing_str = F"{np.round(min_spacing_mhz)}_mhz"
-                            for collision_type in sorted(counting_dict[min_spacing_mhz].keys()):
+                        for min_spacing_khz in sorted(counting_dict.keys()):
+                            spacing_str = F"{np.round(min_spacing_khz)}_khz"
+                            for collision_type in sorted(counting_dict[min_spacing_khz].keys()):
                                 stats_key = F"{spacing_str}_{collision_type}_count"
-                                stats_dict[stats_key] = counting_dict[min_spacing_mhz][collision_type]
+                                stats_dict[stats_key] = counting_dict[min_spacing_khz][collision_type]
                                 if keys is not None:
                                     keys.append(stats_key)
                         if keys is not None:
@@ -613,7 +622,7 @@ def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
 
 
 if __name__ == "__main__":
-    do_summary_report_plots = False
+    do_summary_report_plots = True
     do_frequency_report_plot = True
 
     example_start_date = datetime.date(year=2020, month=4, day=1)

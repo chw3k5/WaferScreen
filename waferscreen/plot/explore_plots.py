@@ -726,7 +726,12 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
                     total_summary_info[summary_key].update(summary_info[summary_key])
             else:
                 total_summary_info[summary_key] = summary_info[summary_key]
-
+    # Flag table update
+    for res_str in total_summary_info['res_nums_in_keepout_zones']:
+        if res_str in flag_table_info.keys():
+            flag_table_info[res_str] += "\nIn keepout zone."
+        else:
+            flag_table_info[res_str] = "In keepout zone."
     # Raw S21 Scan data
     x_min, x_max = ax_rug.get_xlim()
     formatted_s21_dict, metadata = read_s21(path=seed_scan_path)
@@ -790,10 +795,10 @@ def report_plot(series_res_sets, sorted_series_handles, wafer_str, chip_id_str, 
             plt.savefig(scatter_plot_path + extension)
         print("Saved Plot to:", scatter_plot_path)
     if return_fig:
-        return fig
+        return fig, flag_table_info
     else:
         plt.close(fig=fig)
-        return None
+        return None, flag_table_info
 
 
 if __name__ == "__main__":

@@ -162,4 +162,4 @@ average_lambda = 0.3
 peak_to_peak_shift_hz = 60.0
 
 # resonator spacing
-min_spacings_mhz = {1000.0, 900.0, 800.0, 700.0, 600.0, 500.0}
+min_spacings_khz = {1000.0, 900.0, 800.0, 700.0, 600.0, 500.0}
