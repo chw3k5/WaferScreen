@@ -26,7 +26,13 @@ def band_num_to_str(band_num):
 
 
 def pos_str_to_nums(pos_str):
-    x_pos_str, y_pos_str = pos_str.replace("(", "").replace(")", "").replace(" ", "").split(",")
+    if ',' in pos_str:
+        delimiter = ','
+    elif '&' in pos_str:
+        delimiter = '&'
+    else:
+        raise KeyError(F"delimiter not recognized in: {pos_str}")
+    x_pos_str, y_pos_str = pos_str.replace("(", "").replace(")", "").replace(" ", "").split(delimiter)
     return float(x_pos_str), float(y_pos_str)
 
 
@@ -85,6 +91,9 @@ def seed_name_to_handle(seed_base):
 id_frequency_report_entry_header = ['record_id', "device_id", "group_id", 'wafer_and_chip_id']
 required_frequency_report_entry_header = ['lambda_path', 'f_ghz', 'so_band', 'is_in_band', 'is_in_keepout']
 optional_frequency_report_entry_header = ['res_num', 'designed_f_ghz', 'x_pos_mm_on_chip', 'y_pos_mm_on_chip',
+                                          'resonator_height_um', 'wiggles', 'sliders', 'slider_delta_um',
+                                          'resonator_impedance_ohms', 'coupling_capacitance_f',
+                                          'coupling_inductance_h',
                                           'group_num', 'flags']
 
 frequency_report_entry_header = []
@@ -110,6 +119,13 @@ class FrequencyReportEntry(NamedTuple):
     device_id: Optional[str] = None
     group_id: Optional[str] = None
     wafer_and_chip_id: Optional[str] = None
+    resonator_height_um: Optional[float] = None
+    wiggles: Optional[float] = None
+    sliders: Optional[float] = None
+    slider_delta_um: Optional[float] = None
+    resonator_impedance_ohms: Optional[float] = None
+    coupling_capacitance_f: Optional[float] = None
+    coupling_inductance_h: Optional[float] = None
 
     def __str__(self):
         return_str = ""
@@ -144,6 +160,97 @@ class CalcMetadata(NamedTuple):
             return_str += F"{self.__getattribute__(var_name)},"
         # get rid of the last comma ","
         return return_str[:-1]
+
+
+class PhysicalChipData:
+    records_column_names = list(frequency_report_entry_header)
+    records_column_names.extend(['wafer', 'chip_id'])
+    records_column_names.extend(calc_metadata_header)
+    records_header = ''
+    for column in records_column_names:
+        records_header += F"{column},"
+    records_header = records_header[:-1] + '\n'
+    stats_columns = ['group_id', 'wafer_and_chip_id', 'wafer', 'chip_id']
+    stats_header = "group_id,wafer_and_chip_id,wafer,chip_id\n"
+    spacing_acceptance_column_names = []
+
+    def __init__(self, wafer_and_chip_id, group_id, rank_data,
+                 frequency_records_ordered=None, stats_dict=None,
+                 frequency_spacing_acceptance=None,
+                 calc_metadata_all_res=None):
+        # record data
+        self.frequency_records_ordered = frequency_records_ordered
+        self.stats_dict = stats_dict
+        self.frequency_spacing_acceptance = frequency_spacing_acceptance
+        self.calc_metadata_all_res = calc_metadata_all_res
+        # for quick reference and sorting
+        self.wafer_and_chip_id = wafer_and_chip_id
+        if self.frequency_records_ordered is None:
+            self.group_num = None
+        else:
+            self.group_num = self.frequency_records_ordered[0].group_num
+        if wafer_and_chip_id is None:
+            self.wafer_num = None
+            self.chip_id_str = None
+        else:
+            wafer_str, self.chip_id_str = wafer_and_chip_id.split("|")
+            self.wafer_num = wafer_str_to_num(wafer_str=wafer_str)
+        if self.chip_id_str is None:
+            self.so_band = None
+        else:
+            self.so_band, *_chip_pos = chip_id_str_to_chip_id_tuple(self.chip_id_str)
+        self.group_id = group_id
+        self.rank_data = rank_data
+
+        # organization
+        if stats_dict is None:
+            self.stats_dict = {}
+        self.stats_dict['group_id'] = self.group_id
+        self.stats_dict['wafer_and_chip_id'] = self.wafer_and_chip_id
+        self.stats_dict['wafer'] = self.wafer_num
+        self.stats_dict['chip_id'] = self.chip_id_str
+
+    def update_header(self, spacing_acceptance=None, stats=None):
+        if spacing_acceptance is not None:
+            self.spacing_acceptance_column_names.extend(list(spacing_acceptance))
+            new_records_header = self.records_header.rstrip("\n")
+            for item in spacing_acceptance:
+                new_records_header += F",{item}"
+                self.records_column_names.append(str(item))
+            self.records_header = F"{new_records_header}\n"
+        if stats is not None:
+            new_stats_header = self.stats_header.rstrip("\n")
+            for item in stats:
+                new_stats_header += F",{item}"
+                self.stats_columns.append(str(item))
+            self.stats_header = F"{new_stats_header}\n"
+
+    def records_str(self, records_column_names=None):
+        if records_column_names is None:
+            records_column_names = self.records_column_names
+        output_str = ''
+        for f_record, spacing_acceptance, calc_metadata in zip(self.frequency_records_ordered,
+                                                               self.frequency_spacing_acceptance,
+                                                               self.calc_metadata_all_res):
+            combined_data_dict = {'wafer': self.wafer_num, 'chip_id': self.chip_id_str}
+            for f_record_column in frequency_report_entry_header:
+                combined_data_dict[f_record_column] = f_record.__getattribute__(f_record_column)
+            for spacing_column in self.spacing_acceptance_column_names:
+                combined_data_dict[spacing_column] = spacing_acceptance[spacing_column]
+            for calc_metadata_column in calc_metadata_header:
+                combined_data_dict[calc_metadata_column] = calc_metadata.__getattribute__(calc_metadata_column)
+            for column_name in records_column_names:
+                output_str += F"{combined_data_dict[column_name]},"
+            output_str = output_str[:-1] + '\n'
+        return output_str
+
+    def stats_str(self, stats_columns=None):
+        if stats_columns is None:
+            stats_columns = self.stats_columns
+        output_str = ''
+        for column_name in stats_columns:
+            output_str += F"{self.stats_dict[column_name]},"
+        return output_str[:-1] + '\n'
 
 
 flagged_data = Flagger()

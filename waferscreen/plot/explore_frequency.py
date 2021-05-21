@@ -6,39 +6,30 @@ import numpy as np
 import ref
 from waferscreen.plot.band_and_keepout import band_and_keepout_plot
 from waferscreen.plot.band_and_keepout import colors as band_colors
-from waferscreen.data_io.explore_io import chip_id_str_to_chip_id_tuple
+from waferscreen.data_io.explore_io import chip_id_str_to_chip_id_tuple, PhysicalChipData, wafer_str_to_num
 from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_and_group
 
 
-def organize_frequencies_for_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_stats):
-    plot_data_chips = {}
-    for wafer_count, wafer_num in list(enumerate(sorted(wafer_scale_frequencies_ordered.keys(), reverse=False))):
-        for chip_id_str in sorted(wafer_scale_frequencies_ordered[wafer_num].keys()):
-            so_band, x_pos, y_pos = chip_id_str_to_chip_id_tuple(chip_id_str)
-            group_num = wafer_pos_to_band_and_group.form_pos_to_group_num(x_pos=x_pos, y_pos=y_pos)
-            if group_num is None:
-                group_num = 0
-            plot_id = (wafer_num, group_num, so_band)
-            for seed_name in sorted(wafer_scale_frequencies_ordered[wafer_num][chip_id_str].keys()):
-                for port_power_dbm in sorted(wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name].keys()):
-                    rank_data = (port_power_dbm, seed_name)
-                    stats_dict = wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm]
-                    frequency_records_ordered = \
-                        wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm]
-                    if plot_id not in plot_data_chips.keys() or plot_data_chips[plot_id]['rank_data'] < rank_data:
-                        plot_data_chips[plot_id] = {'rank_data': rank_data, "stats_dict": stats_dict,
-                                                    "frequency_records_ordered": frequency_records_ordered}
-
+def organize_frequencies_for_plot(measurement_records):
     plot_data_lines = {}
-    for wafer_num, group_num, so_band in plot_data_chips.keys():
+    for physical_chip_data in measurement_records:
+        wafer_num = physical_chip_data.wafer_num
+        so_band = physical_chip_data.so_band
+        group_num = physical_chip_data.group_num
+        if group_num is None:
+            group_num = 0
         plot_x_axis_id = (wafer_num, group_num)
         if plot_x_axis_id not in plot_data_lines.keys():
             plot_data_lines[plot_x_axis_id] = {}
-        plot_data_lines[plot_x_axis_id][so_band] = plot_data_chips[(wafer_num, group_num, so_band)]
+        if so_band not in plot_data_lines[plot_x_axis_id].keys():
+            plot_data_lines[plot_x_axis_id][so_band] = []
+        plot_data_lines[plot_x_axis_id][so_band].append({'rank_data': physical_chip_data.rank_data,
+                                                         "stats_dict": physical_chip_data.stats_dict,
+                                                         "frequency_records_ordered": physical_chip_data.frequency_records_ordered})
     return plot_data_lines
 
 
-def frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_stats, plot_path=None, show=False):
+def frequencies_plot(measurement_records, plot_path=None, show=False):
     """
     A rug plot to display frequency placement data on a database scale. Each row of plot data is a different
     wafer-group number pair.
@@ -59,7 +50,7 @@ def frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_st
     fig = plt.figure(figsize=(16, 12), dpi=200)
     ax = fig.add_axes([left, bottom, width, height], frameon=False)
     # organize data
-    plot_data_lines = organize_frequencies_for_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_stats)
+    plot_data_lines = organize_frequencies_for_plot(measurement_records)
     # plot spacing vertical spacing for wafer data rows, y axis is in data coordinates
     thread_to_label_spacing_ratio = 1.0
     x_data_axes = len(plot_data_lines.keys()) + 1
@@ -90,51 +81,53 @@ def frequencies_plot(wafer_scale_frequencies_ordered, wafer_scale_frequencies_st
         label_region_span = label_region_stop - label_region_start
         label_region_stop_margin = label_region_stop - (label_region_span * 0.1)
         for so_band_num in sorted(plot_data_lines[(wafer_num, group_num)].keys()):
-            frequency_records_ordered = plot_data_line[so_band_num]['frequency_records_ordered']
-            stats_dict = plot_data_line[so_band_num]["stats_dict"]
-            # the minimum label
-            plt.text(y=label_region_start, x=stats_dict['f_ghz_min'], s=F"{'%1.3f' % stats_dict['f_ghz_min']}",
-                     ha="left", va='bottom', size=stats_text_font_size, rotation=stats_text_rotation,
-                     color=stat_text_color,
-                     bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
-            # the maximum label
-            plt.text(y=label_region_start, x=stats_dict['f_ghz_max'], s=F"{'%1.3f' % stats_dict['f_ghz_max']}",
-                     ha="right", va='bottom', size=stats_text_font_size, rotation=stats_text_rotation,
-                     color=stat_text_color,
-                     bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
-            # the median label
-            plt.text(y=label_region_start, x=stats_dict['f_ghz_median'],
-                     s=F"{'%1.3f' % stats_dict['f_ghz_median']}",
-                     ha="center", va='bottom', size=stats_text_font_size, rotation=stats_text_rotation,
-                     color=stat_text_color,
-                     bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
-            # the mean (std) label
-            plt.text(y=label_region_stop_margin, x=stats_dict['f_ghz_mean'],
-                     s=F"{'%1.3f' % stats_dict['f_ghz_mean']} ({'%1.3f' % stats_dict['f_ghz_std']})",
-                     ha="center", va='top', size=stats_text_font_size,
-                     color=stat_text_color,
-                     bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
+            for plot_dict_this_measurement_set in plot_data_line[so_band_num]:
+                frequency_records_ordered = plot_dict_this_measurement_set['frequency_records_ordered']
+                band_data = plot_data_line[so_band_num]
+                stats_dict = plot_dict_this_measurement_set["stats_dict"]
+                # the minimum label
+                plt.text(y=label_region_start, x=stats_dict['f_ghz_min'], s=F"{'%1.3f' % stats_dict['f_ghz_min']}",
+                         ha="left", va='bottom', size=stats_text_font_size, rotation=stats_text_rotation,
+                         color=stat_text_color,
+                         bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
+                # the maximum label
+                plt.text(y=label_region_start, x=stats_dict['f_ghz_max'], s=F"{'%1.3f' % stats_dict['f_ghz_max']}",
+                         ha="right", va='bottom', size=stats_text_font_size, rotation=stats_text_rotation,
+                         color=stat_text_color,
+                         bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
+                # the median label
+                plt.text(y=label_region_start, x=stats_dict['f_ghz_median'],
+                         s=F"{'%1.3f' % stats_dict['f_ghz_median']}",
+                         ha="center", va='bottom', size=stats_text_font_size, rotation=stats_text_rotation,
+                         color=stat_text_color,
+                         bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
+                # the mean (std) label
+                plt.text(y=label_region_stop_margin, x=stats_dict['f_ghz_mean'],
+                         s=F"{'%1.3f' % stats_dict['f_ghz_mean']} ({'%1.3f' % stats_dict['f_ghz_std']})",
+                         ha="center", va='top', size=stats_text_font_size,
+                         color=stat_text_color,
+                         bbox=dict(boxstyle='square', fc=band_colors[so_band_num], alpha=stats_bbox_alpha))
 
-            # keep track tof the margin requirements
-            if stats_dict['f_ghz_min'] < left_margin:
-                left_margin = stats_dict['f_ghz_min']
-            if right_margin < stats_dict['f_ghz_max']:
-                right_margin = stats_dict['f_ghz_max']
-            # threads of the frequency lines
-            for f_ghz, so_band, is_in_band, is_in_keepout, *_optional_vars in frequency_records_ordered:
-                # plot the data
-                if is_in_band and not is_in_keepout:
-                    plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
-                             color=band_colors[so_band], linewidth=thread_linewidth, alpha=thread_alpha)
-                elif is_in_keepout:
-                    plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
-                             color="white", linewidth=thread_linewidth, alpha=thread_alpha)
-                elif ref.get_band_name(f_ghz=f_ghz) is None:
-                    plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
-                             color="black", linewidth=thread_linewidth, alpha=thread_alpha)
-                else:
-                    plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
-                             color="white", linewidth=thread_linewidth, alpha=thread_alpha)
+                # keep track tof the margin requirements
+                if stats_dict['f_ghz_min'] < left_margin:
+                    left_margin = stats_dict['f_ghz_min']
+                if right_margin < stats_dict['f_ghz_max']:
+                    right_margin = stats_dict['f_ghz_max']
+                # threads of the frequency lines
+                for f_ghz, so_band, is_in_band, is_in_keepout, *_optional_vars in frequency_records_ordered:
+                    # plot the data
+                    if is_in_band and not is_in_keepout:
+                        plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
+                                 color=band_colors[so_band], linewidth=thread_linewidth, alpha=thread_alpha)
+                    elif is_in_keepout:
+                        plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
+                                 color="white", linewidth=thread_linewidth, alpha=thread_alpha)
+                    elif ref.get_band_name(f_ghz=f_ghz) is None:
+                        plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
+                                 color="black", linewidth=thread_linewidth, alpha=thread_alpha)
+                    else:
+                        plt.plot((f_ghz, f_ghz), (thread_region_start, thread_region_stop),
+                                 color="white", linewidth=thread_linewidth, alpha=thread_alpha)
     # add the designed frequencies to the top of the plot.
     x_data_axis_count += 1
     thread_region_start = x_data_axis_count * wafer_data_increment_size

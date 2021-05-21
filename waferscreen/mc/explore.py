@@ -16,7 +16,7 @@ from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_a
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
     chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
     chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header, \
-    optional_frequency_report_entry_header, calc_metadata_header, CalcMetadata, frequency_report_columns
+    optional_frequency_report_entry_header, calc_metadata_header, CalcMetadata, PhysicalChipData
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
 from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name, min_spacings_khz
@@ -166,10 +166,12 @@ class SeriesLamb:
                 if res_num_str in self.__getattribute__(series_handle).__dict__.keys():
                     single_lamb = self.__getattribute__(series_handle).__getattribute__(res_num_str)
                     [single_lamb.flags.add(flag_str) for flag_str in flag_table_info[res_num_str].split("\n")]
-                    calc_metadata_this_res = calc_metadata[series_handle][res_num_str]
-                    calc_metadata_dict = {column_name: calc_metadata_this_res.__getattribute__(column_name)
-                                          for column_name in calc_metadata_header}
-                    single_lamb.metadata.update(calc_metadata_dict)
+            for res_num_str in calc_metadata[series_handle].keys():
+                single_lamb = self.__getattribute__(series_handle).__getattribute__(res_num_str)
+                calc_metadata_this_res = calc_metadata[series_handle][res_num_str]
+                calc_metadata_dict = {column_name: calc_metadata_this_res.__getattribute__(column_name)
+                                      for column_name in calc_metadata_header}
+                single_lamb.metadata.update(calc_metadata_dict)
         return report_fig
 
 
@@ -240,79 +242,6 @@ class WafersSWB:
             self.__setattr__(wafer_handle, ChipIDsSWB(single_lamb=single_lamb))
 
 
-class PhysicalChipData:
-    records_column_names = list(frequency_report_entry_header)
-    records_column_names.extend(calc_metadata_header)
-    records_header = ''
-    for column in records_column_names:
-        records_header += F"{column},"
-    records_header = records_header[:-1] + '\n'
-    stats_columns = ['group_id', 'wafer_and_chip_id']
-    stats_header = "group_id,wafer_and_chip_id\n"
-    spacing_acceptance_column_names = []
-
-    def __init__(self, wafer_and_chip_id, group_id, rank_data, frequency_records_ordered=None, stats_dict=None,
-                 frequency_spacing_acceptance=None,
-                 calc_metadata_all_res=None):
-        # record data
-        self.frequency_records_ordered = frequency_records_ordered
-        self.stats_dict = stats_dict
-        self.frequency_spacing_acceptance = frequency_spacing_acceptance
-        self.calc_metadata_all_res = calc_metadata_all_res
-        # for quick reference and sorting
-        self.wafer_and_chip_id = wafer_and_chip_id
-        self.group_id = group_id
-        self.rank_data = rank_data
-
-        # organization
-        if stats_dict is None:
-            self.stats_dict = {}
-        self.stats_dict['group_id'] = self.group_id
-        self.stats_dict['wafer_and_chip_id'] = self.wafer_and_chip_id
-
-    def update_header(self, spacing_acceptance=None, stats=None):
-        if spacing_acceptance is not None:
-            self.spacing_acceptance_column_names.extend(list(spacing_acceptance))
-            new_records_header = self.records_header.rstrip("\n")
-            for item in spacing_acceptance:
-                new_records_header += F",{item}"
-                self.records_column_names.append(str(item))
-            self.records_header = F"{new_records_header}\n"
-        if stats is not None:
-            new_stats_header = self.stats_header.rstrip("\n")
-            for item in stats:
-                new_stats_header += F",{item}"
-                self.stats_columns.append(str(item))
-            self.stats_header = F"{new_stats_header}\n"
-
-    def records_str(self, records_column_names=None):
-        if records_column_names is None:
-            records_column_names = self.records_column_names
-        output_str = ''
-        for f_record, spacing_acceptance, calc_metadata in zip(self.frequency_records_ordered,
-                                                               self.frequency_spacing_acceptance,
-                                                               self.calc_metadata_all_res):
-            combined_data_dict = {}
-            for f_record_column in frequency_report_entry_header:
-                combined_data_dict[f_record_column] = f_record.__getattribute__(f_record_column)
-            for spacing_column in self.spacing_acceptance_column_names:
-                combined_data_dict[spacing_column] = spacing_acceptance[spacing_column]
-            for calc_metadata_column in calc_metadata_header:
-                combined_data_dict[calc_metadata_column] = calc_metadata.__getattribute__(calc_metadata_column)
-            for column_name in records_column_names:
-                output_str += F"{combined_data_dict[column_name]},"
-            output_str = output_str[:-1] + '\n'
-        return output_str
-
-    def stats_str(self, stats_columns=None):
-        if stats_columns is None:
-            stats_columns = self.stats_columns
-        output_str = ''
-        for column_name in stats_columns:
-            output_str += F"{self.stats_dict[column_name]},"
-        return output_str[:-1] + '\n'
-
-
 class LambExplore:
     def __init__(self, start_date=None, end_date=None, lambda_params_data=None):
         """
@@ -323,9 +252,10 @@ class LambExplore:
         """
         self.measurement_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_stats.csv")
         self.measurement_records_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_summary.csv")
+        self.measurement_plot_path = os.path.join(too_long_did_not_read_dir, "measurement_frequencies_plot.pdf")
         self.device_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "device_stats.csv")
         self.device_records_cvs_path = os.path.join(too_long_did_not_read_dir, "device_summary.csv")
-        self.frequencies_plot_path = os.path.join(too_long_did_not_read_dir, "frequencies_plot.pdf")
+        self.device_plot_path = os.path.join(too_long_did_not_read_dir, "device_frequencies_plot.pdf")
 
         if start_date is None:
             self.start_date = datetime.date.min
@@ -339,6 +269,8 @@ class LambExplore:
         self.available_seed_handles = set()
         self.available_chip_id_strs = set()
         self.available_wafers = set()
+        self.records_column_names = None
+        self.stats_columns = None
         # data structures
         self.device_records = None
         self.measurement_records = None
@@ -559,26 +491,29 @@ class LambExplore:
                                     else:
                                         updated_flags += F"|{right_str.replace('_', ' ')}"
                             acceptance_list.append(acceptance_dict)
+                            # get the existing record data
+                            updated_record_data = {var_name: f_record.__getattribute__(var_name)
+                                                   for var_name in frequency_report_entry_header}
+                            # update some values here
+                            update_f_record = {'record_id': record_id, 'device_id': device_id,
+                                               'group_id': group_id, "wafer_and_chip_id": wafer_and_chip_id,
+                                               'res_num': res_num, 'flags': updated_flags}
                             # get design metadata
                             res_num_metadata = chip_metadata.return_res_metadata(so_band_num=so_band_num,
                                                                                  res_num=res_num)
-                            if res_num_metadata is None:
-                                order_updated_records.append(f_record)
-                            else:
-                                # get the existing record data
-                                updated_record_data = {var_name: f_record.__getattribute__(var_name)
-                                                       for var_name in frequency_report_entry_header}
+                            if res_num_metadata is not None:
                                 # add the some of the selected meta
-                                update_f_record = {'record_id': record_id, 'device_id': device_id,
-                                                   'group_id': group_id, "wafer_and_chip_id": wafer_and_chip_id,
-                                                   'res_num': res_num,
-                                                   'designed_f_ghz': res_num_metadata['freq_hz'] * 1.0e-9,
-                                                   'x_pos_mm_on_chip': res_num_metadata['x_pos_mm'],
-                                                   'y_pos_mm_on_chip': res_num_metadata['y_pos_mm'],
-                                                   'flags': updated_flags}
-                                updated_record_data.update(update_f_record)
-                                # update the explore.py class metadata
-                                order_updated_records.append(FrequencyReportEntry(**updated_record_data))
+                                update_f_record.update({'designed_f_ghz': res_num_metadata['freq_hz'] * 1.0e-9,
+                                                        'x_pos_mm_on_chip': res_num_metadata['x_pos_mm'],
+                                                        'y_pos_mm_on_chip': res_num_metadata['y_pos_mm'],
+                                                        'resonator_height_um': res_num_metadata['resonator_height_um'],
+                                                        'wiggles': res_num_metadata['wiggles'],
+                                                        'sliders': res_num_metadata['sliders'],
+                                                        'slider_delta_um': res_num_metadata['slider_delta_um'],
+                                                        'resonator_impedance_ohms': res_num_metadata['resonator_impedance_ohms'],
+                                                        'coupling_capacitance_f': res_num_metadata['coupling_capacitance_f'],
+                                                        'coupling_inductance_h': res_num_metadata['coupling_inductance_h']})
+
                                 for chip_metadata_column in ['resonator_height_um', 'wiggles', 'sliders',
                                                              'slider_delta_um', 'resonator_impedance_ohms',
                                                              'coupling_capacitance_f', 'coupling_inductance_h']:
@@ -587,6 +522,9 @@ class LambExplore:
                                 # the lambda file from which this associated metadata belongs
                                 self.lamb_params_data[lambda_path].metadata.update(update_f_record)
 
+                            updated_record_data.update(update_f_record)
+                            # update the explore.py class metadata
+                            order_updated_records.append(FrequencyReportEntry(**updated_record_data))
                         # do stats
                         f_ghz_min = np.min(frequencies_array)
                         f_ghz_max = np.max(frequencies_array)
@@ -680,69 +618,43 @@ class LambExplore:
             summary_file_names.append(self.measurement_records_cvs_path)
             stats_filenames.append(self.measurement_stats_cvs_path)
         # outer loop to write all file types
-        header_pcd = PhysicalChipData(wafer_and_chip_id=None, group_id=None, rank_data=None)
-        header_pcd.update_header(spacing_acceptance=self.spacing_dict_keys,
-                                 stats=self.measurement_records_stats_dict_keys)
-        records_column_names = header_pcd.records_column_names
-        stats_columns = header_pcd.stats_columns
+        if self.records_column_names is None:
+            header_pcd = PhysicalChipData(wafer_and_chip_id=None, group_id=None, rank_data=None)
+            header_pcd.update_header(spacing_acceptance=self.spacing_dict_keys,
+                                     stats=self.measurement_records_stats_dict_keys)
+
+            self.records_column_names = header_pcd.records_column_names
+            self.stats_columns = header_pcd.stats_columns
+        # here is a place to edit the columns before they are written out
+
+        # make the header
+        stats_header = ""
+        for stats_column in self.stats_columns:
+            stats_header += F"{stats_column},"
+        stats_header = stats_header[:-1] + '\n'
+        records_header = ''
+        for records_column in self.records_column_names:
+            records_header += F"{records_column},"
+        records_header = records_header[:-1] + '\n'
+        # Write the file
         for output_list, summary_path, stats_path in zip(output_lists, summary_file_names, stats_filenames):
             with open(stats_path, 'w') as f_stats, open(summary_path, 'w') as f_csv:
                 # write out the header lines
-                f_stats.write(header_pcd.stats_header)
-                f_csv.write(header_pcd.records_header)
+                f_stats.write(stats_header)
+                f_csv.write(records_header)
                 for physical_chip_data in output_list:
-                    f_stats.write(physical_chip_data.stats_str(stats_columns=stats_columns))
-                    f_csv.write(physical_chip_data.records_str(records_column_names=records_column_names))
+                    # write the stats line
+                    f_stats.write(physical_chip_data.stats_str(stats_columns=self.stats_columns))
+                    # write all the lines for each resonators in this group
+                    f_csv.write(physical_chip_data.records_str(records_column_names=self.records_column_names))
 
-    def frequency_report(self):
+    def frequency_report(self, do_device_scale=True, do_measurement_scale=True):
         self.do_frequencies_analysis()
-        # Write out a csv file, this time we go through the loops in an order to make the output uniform
-        # collect all the header info for the csv files
-        header_stats_dict = ""
-        for stats_column in self.measurement_records_frequencies_stats_dict_keys:
-            header_stats_dict += F"{stats_column},"
-        header_frequencies_report = ""
-        for report_column in frequency_report_entry_header:
-            header_frequencies_report += F"{report_column},"
-        shared_id_column_names = ["wafer_num", "chip_id_str", "seed_name", "port_power_dbm"]
-        header_shared = ""
-        for id_column in shared_id_column_names:
-            header_shared += F"{id_column},"
-        # the :-1 drops the last comma
-        header_stats = F"{header_shared}{header_stats_dict[:-1]}\n"
-        header_frequencies_summary = F"{header_shared}{header_frequencies_report[:-1]}\n"
-        with open(self.frequencies_stats_cvs_path, 'w') as f_stats, open(self.frequencies_cvs_path, 'w') as f_csv:
-            # write out the header lines
-            f_stats.write(header_stats)
-            f_csv.write(header_frequencies_summary)
-            for wafer_num in sorted(self.wafer_scale_frequencies_ordered.keys()):
-                for chip_id_str in sorted(self.wafer_scale_frequencies_ordered[wafer_num].keys()):
-                    chip_id_str_for_output = chip_id_str.replace(',', '')
-                    for seed_name in sorted(self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str].keys()):
-                        for port_power_dbm in \
-                                sorted(self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name].keys()):
-                            frequency_records_ordered = \
-                                self.wafer_scale_frequencies_ordered[wafer_num][chip_id_str][seed_name][port_power_dbm]
-                            stats_dict = \
-                                self.wafer_scale_frequencies_stats[wafer_num][chip_id_str][seed_name][port_power_dbm]
-                            # the data record output order is driven by the header columns names
-                            # the sharded identifying information record
-                            record_id_shared = F"{wafer_num},{chip_id_str_for_output},{seed_name},{port_power_dbm},"
-                            # the stats record
-                            record_stats_dict = ""
-                            for stats_column in self.frequencies_stats_dict_keys:
-                                record_stats_dict += F"{stats_dict[stats_column]},"
-                            # assemble the full row entry
-                            record_stats_row = F"{record_id_shared}{record_stats_dict[:-1]}\n"
-                            f_stats.write(record_stats_row)
-                            # loop through the ordered frequencies
-                            for frequency_report_entry in frequency_records_ordered:
-                                record_f_summary_row = F"{record_id_shared}{frequency_report_entry}\n"
-                                f_csv.write(record_f_summary_row)
-        print(F"Wrote output to:\n  {self.frequencies_stats_cvs_path}\n  {self.frequencies_cvs_path}")
-        # render and write the plot to give context to the data
-        frequencies_plot(self.wafer_scale_frequencies_ordered, self.wafer_scale_frequencies_stats,
-                         plot_path=self.frequencies_plot_path)
+        self.write_csv(do_device_scale=do_device_scale, do_measurement_scale=do_measurement_scale)
+        if do_device_scale:
+            frequencies_plot(self.device_records, plot_path=self.device_plot_path)
+        if do_measurement_scale:
+            frequencies_plot(self.measurement_records, plot_path=self.measurement_plot_path)
 
 
 def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=None):
@@ -763,16 +675,17 @@ def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
     return lamb_explore
 
 
-def full_analysis(start_date=None, end_date=None, lamb_explore=None):
+def full_analysis(start_date=None, end_date=None, lamb_explore=None,
+                  do_device_scale=True, do_measurement_scale=True):
     if lamb_explore is None:
         lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
-    lamb_explore.do_frequencies_analysis()
-    lamb_explore.write_csv()
+    # lamb_explore.do_frequencies_analysis()
+    lamb_explore.frequency_report(do_device_scale=do_device_scale, do_measurement_scale=do_measurement_scale)
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.summary_reports(multi_page_summary=True, show=False)
     lamb_explore.do_frequencies_analysis()
-    lamb_explore.write_csv()
+    lamb_explore.write_csv(do_device_scale=do_device_scale, do_measurement_scale=do_measurement_scale)
     return lamb_explore
 
 
@@ -793,4 +706,5 @@ if __name__ == "__main__":
                                                      lamb_explore=example_lamb_explore)
 
     if all([not do_summary_report_plots, not do_frequency_report_plot]):
-        full_analysis(start_date=example_start_date, end_date=example_end_date, lamb_explore=example_lamb_explore)
+        full_analysis(start_date=example_start_date, end_date=example_end_date, lamb_explore=example_lamb_explore,
+                      do_device_scale=True, do_measurement_scale=True)
