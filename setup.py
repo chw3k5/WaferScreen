@@ -8,5 +8,5 @@ setup(name='WaferScreen',
       packages=['waferscreen', "gluerobot", "submm_python_routines"],
       url="https://github.com/chw3k5/WaferScreen",
       requires=['numpy', 'matplotlib', 'scipy', "pyvisa", "LabJackPython", "PySerial", "numba",
-                'pytz', 'pyqt5']
+                'pytz', 'pyqt5', 'pandas']
       )

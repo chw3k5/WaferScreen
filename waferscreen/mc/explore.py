@@ -243,6 +243,13 @@ class WafersSWB:
 
 
 class LambExplore:
+    measurement_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_stats.csv")
+    measurement_records_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_summary.csv")
+    measurement_plot_path = os.path.join(too_long_did_not_read_dir, "measurement_frequencies_plot.pdf")
+    device_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "device_stats.csv")
+    device_records_cvs_path = os.path.join(too_long_did_not_read_dir, "device_summary.csv")
+    device_plot_path = os.path.join(too_long_did_not_read_dir, "device_frequencies_plot.pdf")
+
     def __init__(self, start_date=None, end_date=None, lambda_params_data=None):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
@@ -250,12 +257,6 @@ class LambExplore:
         :param end_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                          or None. None will set the maximum date for data to be retrieved as 9999-12-31
         """
-        self.measurement_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_stats.csv")
-        self.measurement_records_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_summary.csv")
-        self.measurement_plot_path = os.path.join(too_long_did_not_read_dir, "measurement_frequencies_plot.pdf")
-        self.device_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "device_stats.csv")
-        self.device_records_cvs_path = os.path.join(too_long_did_not_read_dir, "device_summary.csv")
-        self.device_plot_path = os.path.join(too_long_did_not_read_dir, "device_frequencies_plot.pdf")
 
         if start_date is None:
             self.start_date = datetime.date.min
