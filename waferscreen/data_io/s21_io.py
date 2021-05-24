@@ -58,7 +58,8 @@ def read_s21(path, return_res_params=False, return_lamb_params=False):
             else:
                 context_type = context_type.rstrip().lower()
                 if context_type == "header":
-                    header = [column_name.strip().lower() for column_name in context_data.split(",")]
+                    header = [column_name.strip().lower() for column_name in context_data.split(",")
+                              if column_name.strip().lower() != '']
                     found_s21_header_data = True
                     # the rest of the data is columns of S21 data
                     break
@@ -90,8 +91,8 @@ def read_s21(path, return_res_params=False, return_lamb_params=False):
         s21_data = raw_lines[line_index + 1:]
         s21_assembly_dict = {column_name: [] for column_name in header}
         for raw_s21_line in s21_data:
-            [s21_assembly_dict[column_name].append(float(raw_cell_value))
-             for column_name, raw_cell_value in zip(header, raw_s21_line.split(","))]
+            for column_name, raw_cell_value in zip(header, raw_s21_line.split(",")):
+                s21_assembly_dict[column_name].append(float(raw_cell_value))
         formatted_s21_dict = {column_name: np.array(s21_assembly_dict[column_name])
                               for column_name in s21_assembly_dict.keys()}
     else:

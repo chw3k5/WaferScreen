@@ -712,8 +712,8 @@ if __name__ == "__main__":
     do_summary_report_plots = False
     do_frequency_report_plot = False
 
-    example_start_date = datetime.date(year=2020, month=4, day=1)
-    example_end_date = datetime.date(year=2022, month=4, day=30)
+    example_start_date = datetime.date(year=2020, month=5, day=1)
+    example_end_date = datetime.date(year=2022, month=5, day=30)
 
     example_lamb_explore = None
     if do_summary_report_plots:
