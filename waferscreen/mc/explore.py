@@ -645,9 +645,10 @@ class LambExplore:
                 f_csv.write(records_header)
                 for physical_chip_data in output_list:
                     # write the stats line
-                    f_stats.write(physical_chip_data.stats_str(stats_columns=self.stats_columns))
+                    f_stats.write(physical_chip_data.stats_str(stats_columns=self.stats_columns).replace('None', 'null'))
                     # write all the lines for each resonators in this group
-                    f_csv.write(physical_chip_data.records_str(records_column_names=self.records_column_names))
+                    f_csv.write(physical_chip_data.records_str(records_column_names=self.records_column_names)
+                                .replace('None', 'null'))
 
     def frequency_report(self, do_device_scale=True, do_measurement_scale=True):
         self.do_frequencies_analysis()
