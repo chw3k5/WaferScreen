@@ -13,7 +13,7 @@ from waferscreen.data_io.explore_io import flagged_data, wafer_str_to_num, res_n
     chip_id_str_to_chip_id_tuple
 from waferscreen.data_io.s21_io import read_s21, ri_to_magphase
 from waferscreen.analyze.lambfit import f0_of_I
-from waferscreen.data_io.explore_io import CalcMetadata
+from waferscreen.data_io.explore_io import CalcMetadataAtNeg95dbm, CalcMetadataAtNeg75dbm
 
 
 report_markers = ["*", "v", "s", "<", "X",
@@ -474,18 +474,39 @@ def single_lamb_to_report_plot(axes, res_set, color, leglines, leglabels, band_s
     # chi squared
     chi_squared_for_resonators = [chisquare(f_obs=f_ghz, f_exp=f_ghz_fits) for f_ghz, f_ghz_fits
                                   in zip(f_ghz_arrays_for_resonators, f_ghz_fit_arrays_for_resonators)]
-    # get ready to export some of the calculations to update metadata for these resonators
+    # get ready to export some of the calculations to update metadata for these resonators.
     series_calc_metadata = {}
-    for res_index, res_str in list(enumerate(ordered_res_strs)):
-        series_calc_metadata[res_str] = CalcMetadata(lamb=lamb_values[res_index], lamb_err=lamb_value_errs[res_index],
-                                                     flux_ramp_pp_khz=flux_ramp_pp_khz[res_index],
-                                                     flux_ramp_pp_khz_err=flux_ramp_pp_khz_errs[res_index],
-                                                     fr_squid_mi_pH=fr_squid_mi_pH[res_index],
-                                                     fr_squid_mi_pH_err=fr_squid_mi_pH_err[res_index],
-                                                     chi_squared=chi_squared_for_resonators[res_index][0],
-                                                     q_i_mean=q_i_mean[res_index], q_i_std=q_i_std[res_index],
-                                                     q_c_mean=q_c_mean[res_index], q_c_std=q_c_std[res_index],
-                                                     impedance_ratio_mean=impedance_ratio_mean[res_index])
+    # test if the resonators are in the requested export ranges
+    if -78.0 <= at_res_power_dbm_mean <= -72.0:
+        for res_index, res_str in list(enumerate(ordered_res_strs)):
+            series_calc_metadata[res_str] = CalcMetadataAtNeg75dbm(lamb=lamb_values[res_index],
+                                                                   lamb_err=lamb_value_errs[res_index],
+                                                                   flux_ramp_pp_khz=flux_ramp_pp_khz[res_index],
+                                                                   flux_ramp_pp_khz_err=flux_ramp_pp_khz_errs[
+                                                                       res_index],
+                                                                   fr_squid_mi_pH=fr_squid_mi_pH[res_index],
+                                                                   fr_squid_mi_pH_err=fr_squid_mi_pH_err[res_index],
+                                                                   chi_squared=chi_squared_for_resonators[res_index][0],
+                                                                   q_i_mean=q_i_mean[res_index],
+                                                                   q_i_std=q_i_std[res_index],
+                                                                   q_c_mean=q_c_mean[res_index],
+                                                                   q_c_std=q_c_std[res_index],
+                                                                   impedance_ratio_mean=impedance_ratio_mean[res_index])
+    elif -98.0 <= at_res_power_dbm_mean <= -92.0:
+        for res_index, res_str in list(enumerate(ordered_res_strs)):
+            series_calc_metadata[res_str] = CalcMetadataAtNeg95dbm(lamb=lamb_values[res_index],
+                                                                   lamb_err=lamb_value_errs[res_index],
+                                                                   flux_ramp_pp_khz=flux_ramp_pp_khz[res_index],
+                                                                   flux_ramp_pp_khz_err=flux_ramp_pp_khz_errs[
+                                                                       res_index],
+                                                                   fr_squid_mi_pH=fr_squid_mi_pH[res_index],
+                                                                   fr_squid_mi_pH_err=fr_squid_mi_pH_err[res_index],
+                                                                   chi_squared=chi_squared_for_resonators[res_index][0],
+                                                                   q_i_mean=q_i_mean[res_index],
+                                                                   q_i_std=q_i_std[res_index],
+                                                                   q_c_mean=q_c_mean[res_index],
+                                                                   q_c_std=q_c_std[res_index],
+                                                                   impedance_ratio_mean=impedance_ratio_mean[res_index])
 
     """ 
     The residuals should be near zero by definition (for good fits). For display purposes we will want to shift 

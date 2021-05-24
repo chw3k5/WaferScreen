@@ -1,6 +1,6 @@
 # Copyright (C) 2018 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
-
+import numpy as np
 from waferscreen.data_io.flags import Flagger
 from typing import NamedTuple, Optional
 
@@ -88,6 +88,14 @@ def seed_name_to_handle(seed_base):
     return seed_base.replace("-", "_").replace(".", "point")
 
 
+def power_to_power_str(power_dbm):
+    return F"{int(np.round(power_dbm))}dbm"
+
+
+def power_str_and_column_name_to_metadata_str(power_str, column_name):
+    return F"{column_name}_at{power_str}"
+
+
 id_frequency_report_entry_header = ['record_id', "device_id", "group_id", 'wafer_and_chip_id']
 required_frequency_report_entry_header = ['lambda_path', 'f_ghz', 'so_band', 'is_in_band', 'is_in_keepout']
 optional_frequency_report_entry_header = ['res_num', 'designed_f_ghz', 'x_pos_mm_on_chip', 'y_pos_mm_on_chip',
@@ -162,10 +170,28 @@ class CalcMetadata(NamedTuple):
         return return_str[:-1]
 
 
+class CalcMetadataAtNeg95dbm(CalcMetadata):
+    est_device_power_dbm = -95.0
+
+
+class CalcMetadataAtNeg75dbm(CalcMetadata):
+    est_device_power_dbm = -75.0
+
+
+power_ints_and_mata_data_classes = [(-95, CalcMetadataAtNeg95dbm), (-75, CalcMetadataAtNeg75dbm)]
+
+power_strs = [power_to_power_str(power_int) for power_int, CalcMetadataAt in power_ints_and_mata_data_classes]
+calc_metadata_header_full = []
+for power_str in power_strs:
+    for column_name in calc_metadata_header:
+        calc_metadata_header_full.append(power_str_and_column_name_to_metadata_str(power_str=power_str,
+                                                                                   column_name=column_name))
+
+
 class PhysicalChipData:
     records_column_names = list(frequency_report_entry_header)
     records_column_names.extend(['wafer', 'chip_id'])
-    records_column_names.extend(calc_metadata_header)
+    records_column_names.extend(calc_metadata_header_full)
     records_header = ''
     for column in records_column_names:
         records_header += F"{column},"
@@ -182,7 +208,18 @@ class PhysicalChipData:
         self.frequency_records_ordered = frequency_records_ordered
         self.stats_dict = stats_dict
         self.frequency_spacing_acceptance = frequency_spacing_acceptance
-        self.calc_metadata_all_res = calc_metadata_all_res
+        # calculated metadata at specific powers, reshape to one dict per resonator
+        if calc_metadata_all_res is None:
+            self.calc_metadata_all_res = None
+        else:
+            self.calc_metadata_all_res = []
+            for per_power_calc_metadata_this_res in calc_metadata_all_res:
+                calc_metadata_this_res = {}
+                for power_str, calc_metadata_at_power in per_power_calc_metadata_this_res:
+                    for column_name in calc_metadata_header:
+                        md_str = power_str_and_column_name_to_metadata_str(power_str=power_str, column_name=column_name)
+                        calc_metadata_this_res[md_str] = calc_metadata_at_power.__getattribute__(column_name)
+                self.calc_metadata_all_res.append(calc_metadata_this_res)
         # for quick reference and sorting
         self.wafer_and_chip_id = wafer_and_chip_id
         if self.frequency_records_ordered is None:
@@ -237,8 +274,8 @@ class PhysicalChipData:
                 combined_data_dict[f_record_column] = f_record.__getattribute__(f_record_column)
             for spacing_column in self.spacing_acceptance_column_names:
                 combined_data_dict[spacing_column] = spacing_acceptance[spacing_column]
-            for calc_metadata_column in calc_metadata_header:
-                combined_data_dict[calc_metadata_column] = calc_metadata.__getattribute__(calc_metadata_column)
+            for calc_metadata_column in calc_metadata_header_full:
+                combined_data_dict[calc_metadata_column] = calc_metadata[calc_metadata_column]
             for column_name in records_column_names:
                 output_str += F"{combined_data_dict[column_name]},"
             output_str = output_str[:-1] + '\n'

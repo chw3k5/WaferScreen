@@ -16,7 +16,9 @@ from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_a
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
     chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
     chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header, \
-    optional_frequency_report_entry_header, calc_metadata_header, CalcMetadata, PhysicalChipData
+    optional_frequency_report_entry_header, calc_metadata_header, CalcMetadataAtNeg75dbm, CalcMetadataAtNeg95dbm,\
+    PhysicalChipData, power_ints_and_mata_data_classes, power_str_and_column_name_to_metadata_str, power_to_power_str,\
+    calc_metadata_header_full
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
 from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name, min_spacings_khz
@@ -161,17 +163,26 @@ class SeriesLamb:
                                                                  show=show, omit_flagged=omit_flagged, save=save,
                                                                  return_fig=return_fig)
         # update metadata with flag info
+        calc_metadata_per_res_num = {}
         for series_handle in self.available_series_handles:
             for res_num_str in flag_table_info.keys():
                 if res_num_str in self.__getattribute__(series_handle).__dict__.keys():
                     single_lamb = self.__getattribute__(series_handle).__getattribute__(res_num_str)
                     [single_lamb.flags.add(flag_str) for flag_str in flag_table_info[res_num_str].split("\n")]
             for res_num_str in calc_metadata[series_handle].keys():
-                single_lamb = self.__getattribute__(series_handle).__getattribute__(res_num_str)
                 calc_metadata_this_res = calc_metadata[series_handle][res_num_str]
-                calc_metadata_dict = {column_name: calc_metadata_this_res.__getattribute__(column_name)
-                                      for column_name in calc_metadata_header}
-                single_lamb.metadata.update(calc_metadata_dict)
+                power_str = power_to_power_str(calc_metadata_this_res.est_device_power_dbm)
+                calc_metadata_this_series = {power_str_and_column_name_to_metadata_str(power_str, column_name):
+                                             calc_metadata_this_res.__getattribute__(column_name)
+                                             for column_name in calc_metadata_header}
+                if res_num_str not in calc_metadata_per_res_num.keys():
+                    calc_metadata_per_res_num[res_num_str] = {}
+                calc_metadata_per_res_num[res_num_str].update(calc_metadata_this_series)
+        for series_handle in self.available_series_handles:
+            for res_num_str in calc_metadata[series_handle].keys():
+                single_lamb = self.__getattribute__(series_handle).__getattribute__(res_num_str)
+                combined_calc_metadata_dict = calc_metadata_per_res_num[res_num_str]
+                single_lamb.metadata.update(combined_calc_metadata_dict)
         return report_fig
 
 
@@ -442,7 +453,7 @@ class LambExplore:
             for chip_id_str in sorted(single_wafer_frequencies.keys()):
                 so_band_num, *_xy_pos = chip_id_str_to_chip_id_tuple(chip_id_str=chip_id_str)
                 single_chip_frequencies = single_wafer_frequencies[chip_id_str]
-                wafer_and_chip_id = F"Wafer{wafer_num}|{chip_id_str.replace(',', '&').replace(' ', '')}"
+                wafer_and_chip_id = F"Wafer{'%03i' % wafer_num}|{chip_id_str.replace(',', '&').replace(' ', '')}"
                 for seed_name in sorted(single_chip_frequencies.keys()):
                     single_seed_frequencies = single_chip_frequencies[seed_name]
                     for port_power_dbm in sorted(single_seed_frequencies.keys()):
@@ -580,10 +591,18 @@ class LambExplore:
                         for f_record in frequency_records_ordered:
                             lambda_path = f_record.lambda_path
                             lambda_data_this_lap = self.lamb_params_data[lambda_path]
-                            calc_meta_data_dict = {column_name: lambda_data_this_lap.metadata[column_name]
-                                                   for column_name in calc_metadata_header
-                                                   if column_name in lambda_data_this_lap.metadata.keys()}
-                            calc_metadata_all_res.append(CalcMetadata(**calc_meta_data_dict))
+                            power_int_and_metadata = []
+                            for power_int_dbm, CalcMetadataAtNeg in power_ints_and_mata_data_classes:
+                                power_str = power_to_power_str(power_int_dbm)
+                                metadata_strs = [power_str_and_column_name_to_metadata_str(power_str, column_name)
+                                                 for column_name in calc_metadata_header]
+                                calc_meta_data_dict = {column_name: lambda_data_this_lap.metadata[metadata_str]
+                                                       for metadata_str, column_name
+                                                       in zip(metadata_strs, calc_metadata_header)
+                                                       if metadata_str in lambda_data_this_lap.metadata.keys()}
+                                power_int_and_metadata.append((power_str, CalcMetadataAtNeg(**calc_meta_data_dict)))
+
+                            calc_metadata_all_res.append(power_int_and_metadata)
                         # get all the chip together in a chip level class
                         rank_data = (port_power_dbm, seed_name)
                         chip_data = PhysicalChipData(wafer_and_chip_id=wafer_and_chip_id, group_id=group_id,
@@ -601,10 +620,8 @@ class LambExplore:
         self.spacing_dict_keys = sorted(spacing_dict_types)
         # order the chip records
         self.device_records = []
-        for chip_data in self.measurement_records:
-            wafer_and_chip_id = chip_data.wafer_and_chip_id
-            if wafer_and_chip_id in device_records.keys():
-                self.device_records.append(device_records[wafer_and_chip_id])
+        for wafer_and_chip_id in sorted(device_records.keys()):
+            self.device_records.append(device_records[wafer_and_chip_id])
 
     def write_csv(self, do_device_scale=True, do_measurement_scale=True):
         output_lists = []
