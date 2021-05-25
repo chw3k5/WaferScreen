@@ -93,7 +93,7 @@ def power_to_power_str(power_dbm):
 
 
 def power_str_and_column_name_to_metadata_str(power_str, column_name):
-    return F"{column_name}_at{power_str}"
+    return F"{column_name}_at{power_str}".replace('-', '_minus')
 
 
 id_frequency_report_entry_header = ['record_id', "device_id", "group_id", 'wafer_and_chip_id']

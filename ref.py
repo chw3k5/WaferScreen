@@ -72,6 +72,9 @@ umux_screener_assembly_path = os.path.join(parent_dir, "WaferScreen", "waferscre
 too_long_did_not_read_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen", "tldr")
 if not os.path.isdir(too_long_did_not_read_dir):
     os.mkdir(too_long_did_not_read_dir)
+device_summaries_dir = os.path.join(too_long_did_not_read_dir, 'device_summaries')
+if not os.path.isdir(device_summaries_dir):
+    os.mkdir(device_summaries_dir)
 starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
 chip_per_band_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux100k_v321_banddef_summary.csv")
 wafer_pos_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "wafer_pos_metadata.csv")
