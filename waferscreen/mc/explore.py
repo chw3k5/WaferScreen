@@ -550,23 +550,43 @@ class LambExplore:
                         delta_f_khz_mean = np.mean(delta_f_khz_array)
                         delta_f_khz_std = np.std(delta_f_khz_array)
                         # count collision zones
-                        counting_dict = {}
+                        spacing_counting_dict = {}
+                        flag_counting_dict = {}
                         for min_spacing_khz in min_spacings_khz:
                             spacing_str = F"{np.round(min_spacing_khz)}_khz"
                             left_str = F"left_neighbor_within_{spacing_str}"
                             right_str = F"right_neighbor_within_{spacing_str}"
-                            counting_dict[min_spacing_khz] = {'left':  0, 'right':  0, 'both':  0, 'none':  0}
+                            spacing_counting_dict[min_spacing_khz] = {'left':  0, 'right':  0, 'both':  0, 'none':  0}
+                            flag_counting_dict[min_spacing_khz] = {'criteria': 0, 'both': 0, 'spacing': 0, 'none': 0}
                             for acceptance_dict, frequency_record in zip(acceptance_list, order_updated_records):
+                                # get stats on the types of collisions
                                 left_is_within = acceptance_dict[left_str]
                                 right_is_within = acceptance_dict[right_str]
+                                spacing_flag = True
                                 if left_is_within and right_is_within:
-                                    counting_dict[min_spacing_khz]['both'] += 1
+                                    spacing_counting_dict[min_spacing_khz]['both'] += 1
                                 elif left_is_within:
-                                    counting_dict[min_spacing_khz]['left'] += 1
+                                    spacing_counting_dict[min_spacing_khz]['left'] += 1
                                 elif right_is_within:
-                                    counting_dict[min_spacing_khz]['right'] += 1
+                                    spacing_counting_dict[min_spacing_khz]['right'] += 1
                                 else:
-                                    counting_dict[min_spacing_khz]['none'] += 1
+                                    spacing_counting_dict[min_spacing_khz]['none'] += 1
+                                    spacing_flag = False
+                                # get some stats on the total number and type of flags
+                                if frequency_record.flags is None:
+                                    criteria_flags = set()
+                                else:
+                                    flag_strs = set(frequency_record.flags.split('|'))
+                                    spacing_flags = {flag_str for flag_str in flag_strs if 'neighbor within' in flag_str}
+                                    criteria_flags = flag_strs - spacing_flags
+                                if criteria_flags != set() and spacing_flag:
+                                    flag_counting_dict[min_spacing_khz]['both'] += 1
+                                elif spacing_flag:
+                                    flag_counting_dict[min_spacing_khz]['spacing'] += 1
+                                elif criteria_flags != set():
+                                    flag_counting_dict[min_spacing_khz]['criteria'] += 1
+                                else:
+                                    flag_counting_dict[min_spacing_khz]['none'] += 1
                         # makes a dictionary to store the stats
                         stats_dict = {"f_ghz_min": f_ghz_min, 'f_ghz_max': f_ghz_max, 'f_ghz_median': f_ghz_median,
                                       'f_ghz_mean': f_ghz_mean, 'f_ghz_std': f_ghz_std,
@@ -576,13 +596,18 @@ class LambExplore:
                         keys = None
                         if not self.measurement_records_stats_dict_keys:
                             keys = sorted(stats_dict.keys(), reverse=True)
-                        for min_spacing_khz in sorted(counting_dict.keys()):
+                        for min_spacing_khz in sorted(spacing_counting_dict.keys()):
                             spacing_str = F"{np.round(min_spacing_khz)}_khz"
-                            for collision_type in sorted(counting_dict[min_spacing_khz].keys()):
+                            for collision_type in sorted(spacing_counting_dict[min_spacing_khz].keys()):
                                 stats_key = F"{spacing_str}_{collision_type}_count"
-                                stats_dict[stats_key] = counting_dict[min_spacing_khz][collision_type]
+                                stats_dict[stats_key] = spacing_counting_dict[min_spacing_khz][collision_type]
                                 if keys is not None:
                                     keys.append(stats_key)
+                            for flag_type in sorted(flag_counting_dict[min_spacing_khz].keys()):
+                                flags_key = F"{spacing_str}_{flag_type}_flags_count"
+                                stats_dict[flags_key] = flag_counting_dict[min_spacing_khz][flag_type]
+                                if keys is not None:
+                                    keys.append(flags_key)
                         if keys is not None:
                             self.measurement_records_stats_dict_keys = keys
                         # harvest some metadata

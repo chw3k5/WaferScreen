@@ -170,7 +170,7 @@ def rug_plot(ax, xdata, y_min, y_max, color="blue",
     ax.tick_params(axis="y", labelleft=False)
     for f_centers in xdata:
         f_len = len(f_centers)
-        alpha = 25.0 / f_len
+        alpha = min(25.0 / f_len, 1.0)
         for f_center in list(f_centers):
             ax.plot((f_center, f_center), (y_min, y_max), ls='solid', linewidth=0.1, color=color, alpha=alpha)
     ax.set_ylim(bottom=0, top=1)

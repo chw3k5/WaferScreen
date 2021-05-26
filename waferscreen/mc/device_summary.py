@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas
+pandas.options.mode.chained_assignment = None  # default='warn'
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from ref import device_summaries_dir
@@ -29,7 +30,7 @@ def delta_f_plot(device_records, show=True, output_dir=None, markersize=30, font
     # get only the columns we are going to be working with
     subset_columns = device_records[["f_ghz", "designed_f_ghz", "wafer"]]
     # make a mask that reports true fro all rows of non-null data.
-    not_null_row_mask = subset_columns.notnull().any(axis=1)
+    not_null_row_mask = subset_columns.notnull().all(axis=1)
     # select all the data with no nulls in any of the rows
     delta_f = subset_columns[not_null_row_mask]
     # do a little math to make a new column the scatter plot

@@ -93,7 +93,7 @@ def get_table_data(filename, delimiter=','):
     return table_dict
 
 
-def row_dict(filename, key=None, delimiter=",", null_value=None, inner_key_remove=True):
+def row_dict(filename, key=None, delimiter=",", null_value=None, inner_key_remove=True, return_keys=False):
     """
     Use this to make a dictionary of dictionaries per row of data in a table. The outer most dictionary has keys set
     from the column of data listed under the header denoted be the "key" parameter. The inner dictionary contains the
@@ -136,7 +136,10 @@ def row_dict(filename, key=None, delimiter=",", null_value=None, inner_key_remov
                         for row_index, outer_key in list(enumerate(table_dict[key]))}
     if comments is not None:
         data["comments"] = comments
-    return data
+    if return_keys:
+        return data, keys
+    else:
+        return data
 
 
 def floats_table(file, delimiter=",", return_header=False):
