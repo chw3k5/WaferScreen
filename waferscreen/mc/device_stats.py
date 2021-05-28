@@ -7,12 +7,14 @@ from ref import device_stats_dir, min_spacings_khz
 from waferscreen.mc.explore import LambExplore
 from waferscreen.data_io.table_read import row_dict
 
-hatches = ['/', '*', '|', '\\', 'x', 'o', '-', '.', '0', '+']
+hatches = ['+', '/', '|', '\\', '*', 'o', '-', 'z', '0', '.']
 len_hatches = len(hatches)
 series_plot_order = ['none', 'left', 'both', 'right']
-series_plot_colors = ['Chartreuse', 'darkorchid', 'firebrick', 'dodgerblue']
+series_plot_colors = ['SpringGreen', 'darkorchid', 'firebrick', 'dodgerblue']
+series_plot_colors_text = ['black', 'white', 'white', 'white']
 all_flags_plot_order = ['none', 'criteria', 'both', 'spacing']
-all_flags_plot_colors = ['green', 'yellow', 'red', 'blue']
+all_flags_plot_colors = ['green', 'darkgoldenrod', 'red', 'blue']
+all_flags_plot_colors_text = ['white', 'black', 'white', 'white']
 
 
 def yield_fraction_bars(ax, series_flags, series_of_all_flags):
@@ -70,8 +72,17 @@ def yield_fraction_bars(ax, series_flags, series_of_all_flags):
             label = F"no flags"
         ax.bar(bar_centers, height=text_this_layer, width=bar_width, bottom=bottom_data,
                color=all_flags_plot_colors[key_index], label=label)
-        for text, height, bar_center in zip(text_this_layer, heights_this_layer, bar_centers):
-            ax.text(x=bar_center, y=height, s=F"{'%i' % text}", ha='center', va='top', color='white')
+        text_color = all_flags_plot_colors_text[key_index]
+        for all_flags_index, (text, height, bar_center) in list(enumerate(zip(text_this_layer, heights_this_layer, bar_centers))):
+            if int(text) != 0:
+                if (key_index % 2) == 0:
+                    ha = 'left'
+                    text_center = bar_center - (bar_width * 0.5)
+                else:
+                    ha = 'right'
+                    text_center = bar_center + (bar_width * 0.5)
+                ax.text(x=text_center, y=height, s=F"{'%i' % text}", ha=ha, va='top',
+                        color=text_color)
         bottom_data = heights_this_layer
     # spacing flags
     bar_centers = bar_group_centers + (1.0 / number_of_bars) * bar_width + 0.02
@@ -89,9 +100,17 @@ def yield_fraction_bars(ax, series_flags, series_of_all_flags):
         ax.bar(bar_centers, height=text_this_layer, width=bar_width, bottom=bottom_data,
                color=series_plot_colors[key_index], hatch=hatches[key_index % len_hatches],
                label=label)
-        for text, height, bar_center in zip(text_this_layer, heights_this_layer, bar_centers):
+        text_color = series_plot_colors_text[key_index]
+        for series_index, (text, height, bar_center) in list(enumerate(zip(text_this_layer, heights_this_layer, bar_centers))):
             if int(text) != 0:
-                ax.text(x=bar_center, y=height, s=F"{'%i' % text}", ha='center', va='top', color='white')
+                if (key_index % 2) == 0:
+                    ha = 'left'
+                    text_center = bar_center - (bar_width * 0.5)
+                else:
+                    ha = 'right'
+                    text_center = bar_center + (bar_width * 0.5)
+                ax.text(x=text_center, y=height, s=F"{'%i' % text}", ha=ha, va='top',
+                        color=text_color)
         bottom_data = heights_this_layer
 
     # finishing plot and output
