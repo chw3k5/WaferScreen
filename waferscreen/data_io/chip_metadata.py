@@ -64,45 +64,75 @@ class ChipMetaData:
 class WaferPosToBandAndGroup:
     def __init__(self):
         self.path = wafer_pos_metadata
-        self.from_wafer_pos = None
-        self.from_band_and_group = None
+        self.wafer_to_layout = None
+        self.default_layout_range = None
         self.read()
 
     def read(self):
-        self.from_wafer_pos = {}
-        self.from_band_and_group = {}
+        self.wafer_to_layout = {}
         with open(self.path, 'r') as f:
             raw_rows = [row.strip() for row in f.readlines()]
         header = raw_rows[0].split(',')
+        wafer_range = (None, None)
         for row_data in raw_rows[1:]:
-            data_dict = {column: num_format(value) for column, value in zip(header, row_data.split(','))}
-            x_pos = data_dict['x_pos']
-            y_pos = data_dict['y_pos']
-            so_band_num = data_dict['so_band_num']
-            group_num = data_dict['group_num']
-            self.from_wafer_pos[(x_pos, y_pos)] = data_dict
-            self.from_band_and_group[(so_band_num, group_num)] = data_dict
+            # let different wafers have different layouts.
+            if 'wafers:' in row_data.lower():
+                wafer_str_min, wafer_str_max = row_data.lower().replace('wafers:', '').replace(' ', '').split('to')
+                if wafer_str_max == 'max':
+                    wafer_range = (float(wafer_str_min), float('inf'))
+                    self.default_layout_range = wafer_range
+                else:
+                    wafer_range = (float(wafer_str_min), float(wafer_str_max))
+                self.wafer_to_layout[wafer_range] = {'from_wafer_pos': {}, 'from_band_and_group': {}}
+            else:
+                # parse the rows of layout data.
+                data_dict = {column: num_format(value) for column, value in zip(header, row_data.split(','))}
+                x_pos = data_dict['x_pos']
+                y_pos = data_dict['y_pos']
+                so_band_num = data_dict['so_band_num']
+                group_num = data_dict['group_num']
+                self.wafer_to_layout[wafer_range]['from_wafer_pos'][(x_pos, y_pos)] = data_dict
+                self.wafer_to_layout[wafer_range]['from_band_and_group'][(so_band_num, group_num)] = data_dict
 
-    def get_from_wafer_pos(self, x_pos, y_pos):
+    def get_range_from_wafer_num(self, wafer_num):
+        for wafer_num_min, wafer_num_max in self.wafer_to_layout.keys():
+            if wafer_num_min <= wafer_num <= wafer_num_max:
+                return wafer_num_min, wafer_num_max
+        else:
+            raise KeyError(F"Wafer_num: {wafer_num}, is not with in the available layout ranges: {self.wafer_to_layout.keys()}.")
+
+    def get_from_wafer_pos(self, x_pos, y_pos, wafer_num=None):
         if x_pos is None or y_pos is None:
             return None
+        if wafer_num is None:
+            wafer_layout_range = self.default_layout_range
+        else:
+            wafer_layout_range = self.get_range_from_wafer_num(wafer_num=wafer_num)
+        layout_data = self.wafer_to_layout[wafer_layout_range]
+        from_wafer_pos = layout_data['from_wafer_pos']
         pos_key = (int(x_pos), int(y_pos))
-        if pos_key in self.from_wafer_pos.keys():
-            return self.from_wafer_pos[pos_key]
+        if pos_key in from_wafer_pos.keys():
+            return from_wafer_pos[pos_key]
         else:
             return None
 
-    def form_pos_to_group_num(self, x_pos, y_pos):
-        data_dict = self.get_from_wafer_pos(x_pos=x_pos, y_pos=y_pos)
+    def from_pos_to_group_num(self, x_pos, y_pos, wafer_num=None):
+        data_dict = self.get_from_wafer_pos(x_pos=x_pos, y_pos=y_pos, wafer_num=wafer_num)
         if data_dict is None:
             return None
         else:
             return data_dict['group_num']
 
-    def get_from_band_and_group(self, so_band_num, group_num):
+    def get_from_band_and_group(self, so_band_num, group_num, wafer_num=None):
+        if wafer_num is None:
+            wafer_layout_range = self.default_layout_range
+        else:
+            wafer_layout_range = self.get_range_from_wafer_num(wafer_num=wafer_num)
+        layout_data = self.wafer_to_layout[wafer_layout_range]
+        from_band_and_group = layout_data['from_band_and_group']
         band_and_group_key = (int(so_band_num), int(group_num))
-        if band_and_group_key in self.from_band_and_group.keys():
-            return self.from_band_and_group[band_and_group_key]
+        if band_and_group_key in from_band_and_group.keys():
+            return from_band_and_group[band_and_group_key]
         else:
             return None
 

@@ -57,7 +57,7 @@ def delta_f_plot(device_records, show=True, output_dir=None, markersize=30, font
     ax.set_xlabel('Designed Frequency (GHz)', size=fontsize)
     # save the plot
     if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, "delta_f_per_wafer.pdf"))
+        plt.savefig(os.path.join(output_dir, "delta_f_per_wafer.png"))
     # show the plot
     if show:
         plt.show(block=True)
@@ -105,7 +105,7 @@ def histogram_per_wafer(device_records, column_name="lamb_at_minus95dbm", show=T
     else:
         ax.set_xlabel(column_name, size=fontsize)
     if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, F"{column_name}_per_wafer.pdf"))
+        plt.savefig(os.path.join(output_dir, F"{column_name}_per_wafer.png"))
     if show:
         plt.show(block=True)
     plt.close(fig=fig)

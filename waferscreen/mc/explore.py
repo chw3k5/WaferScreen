@@ -70,7 +70,17 @@ class SingleLamb:
             x_pos = self.metadata["x_position"]
             y_pos = self.metadata["y_position"]
             self.chip_position = (x_pos, y_pos)
-            self.group_num = wafer_pos_to_band_and_group.form_pos_to_group_num(x_pos=x_pos, y_pos=y_pos)
+            wafer_layout_dict = wafer_pos_to_band_and_group.get_from_wafer_pos(x_pos=x_pos, y_pos=y_pos,
+                                                                               wafer_num=self.wafer)
+            if wafer_layout_dict is None:
+                self.group_num = None
+            else:
+                self.group_num = wafer_layout_dict['group_num']
+                if self.so_band != wafer_layout_dict['so_band_num']:
+                    err_msg = F"Band are different between the measured chip band: {self.so_band},\n" + \
+                              F"and the band from  positional metadata: {wafer_layout_dict['so_band_num']}"
+                    print(err_msg)
+                    # raise KeyError(err_msg)
         if 'seed_base' in self.metadata.keys():
             self.seed_name = remove_processing_tags(self.metadata.seed_base)
             scan_freqs, meas_utc = self.seed_name.split("_")
