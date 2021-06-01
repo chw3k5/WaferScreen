@@ -122,8 +122,8 @@ class ChipIDCorrections:
                                                                              return_lamb_params=True)
             # do the replacement
             # get the metadata in this csv file
-            wafer = int(old_metadata['wafer'])
-            if 'so_band' in old_metadata.keys():
+            if 'wafer' in old_metadata.keys() and 'so_band' in old_metadata.keys():
+                wafer = int(old_metadata['wafer'])
                 so_band = band_str_to_num(old_metadata['so_band'])
                 if "x_position" in old_metadata.keys():
                     x_pos_old = float(old_metadata["x_position"])
