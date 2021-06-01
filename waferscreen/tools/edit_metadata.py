@@ -1,7 +1,6 @@
 import os
-
 import ref
-from ref import working_dir
+from ref import working_dir, parent_dir
 from waferscreen.data_io.s21_io import read_s21, write_s21
 from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.analyze.res_pipeline_config import processing_metadata_to_remove_from_seeds
@@ -100,7 +99,7 @@ def edit_all_csv_files(dir_name, replace_key, replace_value):
 
 class ChipIDCorrections:
     def __init__(self):
-        self.path = '/Users/cwheeler/PycharmProjects/WaferScreen/waferscreen/metadata_correction_may2021.csv'
+        self.path = os.path.join(parent_dir, "WaferScreen", "waferscreen", 'metadata_correction_may2021.csv')
         self.all_csv_paths = []
         [self.all_csv_paths.extend(list_files(filepath=output_dir, filetype='.csv')) for output_dir in ref.output_dirs]
         self.row_dicts = row_dict(self.path)
