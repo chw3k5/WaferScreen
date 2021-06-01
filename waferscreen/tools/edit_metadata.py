@@ -101,9 +101,21 @@ class ChipIDCorrections:
     def __init__(self):
         self.path = os.path.join(parent_dir, "WaferScreen", "waferscreen", 'metadata_correction_may2021.csv')
         self.all_csv_paths = []
-        [self.all_csv_paths.extend(list_files(filepath=output_dir, filetype='.csv')) for output_dir in ref.output_dirs]
+        # wafer number directory name can be converted to and integer,
+        # ignore calibration directories and others
+        wafer_dirs = []
+        for output_dir in ref.output_dirs:
+            for wafer_number_dir_name in os.listdir(output_dir):
+                wafer_number_dir_test = os.path.join(output_dir, wafer_number_dir_name)
+                if os.path.isdir(wafer_number_dir_test):
+                    try:
+                        int(wafer_number_dir_name)
+                    except ValueError:
+                        pass
+                    else:
+                        wafer_dirs.append(wafer_number_dir_test)
+        [self.all_csv_paths.extend(list_files(filepath=wafer_dir, filetype='.csv')) for wafer_dir in wafer_dirs]
         self.row_dicts = row_dict(self.path)
-
         self.by_wafer = {}
         for data_row in self.row_dicts:
             wafer = int(data_row['wafer'])
