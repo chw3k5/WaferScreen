@@ -78,6 +78,9 @@ if not os.path.isdir(device_summaries_dir):
 device_stats_dir = os.path.join(too_long_did_not_read_dir, 'device_stats')
 if not os.path.isdir(device_stats_dir):
     os.mkdir(device_stats_dir)
+layout_dir = os.path.join(too_long_did_not_read_dir, 'layout')
+if not os.path.isdir(layout_dir):
+    os.mkdir(layout_dir)
 starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
 chip_per_band_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux100k_v321_banddef_summary.csv")
 wafer_pos_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "wafer_pos_metadata.csv")

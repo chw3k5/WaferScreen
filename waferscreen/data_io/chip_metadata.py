@@ -1,7 +1,10 @@
+import os
 from typing import NamedTuple
 from operator import itemgetter
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from waferscreen.data_io.s21_metadata import MetaDataDict, num_format
-from ref import chip_per_band_metadata, wafer_pos_metadata
+from ref import chip_per_band_metadata, wafer_pos_metadata, layout_dir
 
 
 class ChipMetaDataID(NamedTuple):
@@ -62,14 +65,16 @@ class ChipMetaData:
 
 
 class WaferPosToBandAndGroup:
+    group_colors = {1: 'dodgerblue', 2: 'firebrick', 3: 'darkgoldenrod'}
+
     def __init__(self):
         self.path = wafer_pos_metadata
-        self.wafer_to_layout = None
+        self.wafer_range_to_layout = None
         self.default_layout_range = None
         self.read()
 
     def read(self):
-        self.wafer_to_layout = {}
+        self.wafer_range_to_layout = {}
         with open(self.path, 'r') as f:
             raw_rows = [row.strip() for row in f.readlines()]
         header = raw_rows[0].split(',')
@@ -83,7 +88,7 @@ class WaferPosToBandAndGroup:
                     self.default_layout_range = wafer_range
                 else:
                     wafer_range = (float(wafer_str_min), float(wafer_str_max))
-                self.wafer_to_layout[wafer_range] = {'from_wafer_pos': {}, 'from_band_and_group': {}}
+                self.wafer_range_to_layout[wafer_range] = {'from_wafer_pos': {}, 'from_band_and_group': {}}
             else:
                 # parse the rows of layout data.
                 data_dict = {column: num_format(value) for column, value in zip(header, row_data.split(','))}
@@ -91,15 +96,15 @@ class WaferPosToBandAndGroup:
                 y_pos = data_dict['y_pos']
                 so_band_num = data_dict['so_band_num']
                 group_num = data_dict['group_num']
-                self.wafer_to_layout[wafer_range]['from_wafer_pos'][(x_pos, y_pos)] = data_dict
-                self.wafer_to_layout[wafer_range]['from_band_and_group'][(so_band_num, group_num)] = data_dict
+                self.wafer_range_to_layout[wafer_range]['from_wafer_pos'][(x_pos, y_pos)] = data_dict
+                self.wafer_range_to_layout[wafer_range]['from_band_and_group'][(so_band_num, group_num)] = data_dict
 
     def get_range_from_wafer_num(self, wafer_num):
-        for wafer_num_min, wafer_num_max in self.wafer_to_layout.keys():
+        for wafer_num_min, wafer_num_max in self.wafer_range_to_layout.keys():
             if wafer_num_min <= wafer_num <= wafer_num_max:
                 return wafer_num_min, wafer_num_max
         else:
-            raise KeyError(F"Wafer_num: {wafer_num}, is not with in the available layout ranges: {self.wafer_to_layout.keys()}.")
+            raise KeyError(F"Wafer_num: {wafer_num}, is not with in the available layout ranges: {self.wafer_range_to_layout.keys()}.")
 
     def get_from_wafer_pos(self, x_pos, y_pos, wafer_num=None):
         if x_pos is None or y_pos is None:
@@ -108,7 +113,7 @@ class WaferPosToBandAndGroup:
             wafer_layout_range = self.default_layout_range
         else:
             wafer_layout_range = self.get_range_from_wafer_num(wafer_num=wafer_num)
-        layout_data = self.wafer_to_layout[wafer_layout_range]
+        layout_data = self.wafer_range_to_layout[wafer_layout_range]
         from_wafer_pos = layout_data['from_wafer_pos']
         pos_key = (int(x_pos), int(y_pos))
         if pos_key in from_wafer_pos.keys():
@@ -128,7 +133,7 @@ class WaferPosToBandAndGroup:
             wafer_layout_range = self.default_layout_range
         else:
             wafer_layout_range = self.get_range_from_wafer_num(wafer_num=wafer_num)
-        layout_data = self.wafer_to_layout[wafer_layout_range]
+        layout_data = self.wafer_range_to_layout[wafer_layout_range]
         from_band_and_group = layout_data['from_band_and_group']
         band_and_group_key = (int(so_band_num), int(group_num))
         if band_and_group_key in from_band_and_group.keys():
@@ -136,6 +141,36 @@ class WaferPosToBandAndGroup:
         else:
             return None
 
+    def plot(self, show=False):
+        for wafer_num_min, wafer_num_max in sorted(self.wafer_range_to_layout.keys()):
+            layout_data = self.wafer_range_to_layout[(wafer_num_min, wafer_num_max)]
+            from_wafer_pos = layout_data['from_wafer_pos']
+            if wafer_num_max == float('inf'):
+                wafer_max_str = 'MAX'
+            else:
+                wafer_max_str = F"{'%i' % wafer_num_max}"
+            plot_filename = F"ChipLayout_Wafers{'%i' % wafer_num_min}thru{wafer_max_str}.png"
+            plot_path = os.path.join(layout_dir, plot_filename)
+            fig = plt.figure(figsize=(8, 8))
+            ax = fig.add_axes([0.05, 0.05, 0.9, 0.9], frame_on=False)
+            for x_position, y_position in sorted(from_wafer_pos.keys()):
+                layout_data_this_chip = from_wafer_pos[(x_position, y_position)]
+                so_band_num = layout_data_this_chip['so_band_num']
+                group_num = layout_data_this_chip['group_num']
+                color = self.group_colors[group_num]
+                ax.add_patch(Rectangle(xy=(x_position - 0.45, y_position - 0.45), width=0.9, height=0.9,
+                                       facecolor=color))
+                patch_text = F"({'%i' % x_position}, {'%i' % y_position}) Band{'%02i' % so_band_num} Group-{group_num}"
+                ax.text(x=x_position, y=y_position, s=patch_text, color='black', ha='center', va='center')
+            ax.set_xlim((-1.5, 1.5))
+            ax.set_ylim((-7.5, 7.5))
+            if show:
+                plt.show(block=True)
+            plt.savefig(plot_path)
+            plt.close(fig=fig)
+
 
 chip_metadata = ChipMetaData()
 wafer_pos_to_band_and_group = WaferPosToBandAndGroup()
+if __name__ == '__main__':
+    wafer_pos_to_band_and_group.plot(show=True)
