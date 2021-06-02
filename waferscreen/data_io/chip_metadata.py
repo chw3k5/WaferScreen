@@ -149,10 +149,11 @@ class WaferPosToBandAndGroup:
                 wafer_max_str = 'MAX'
             else:
                 wafer_max_str = F"{'%i' % wafer_num_max}"
+            title_str = F"Chip Layout for Wafers {'%i' % wafer_num_min} though {wafer_max_str}"
             plot_filename = F"ChipLayout_Wafers{'%i' % wafer_num_min}thru{wafer_max_str}.png"
             plot_path = os.path.join(layout_dir, plot_filename)
             fig = plt.figure(figsize=(8, 8))
-            ax = fig.add_axes([0.05, 0.05, 0.9, 0.9], frame_on=False)
+            ax = fig.add_axes([0.05, 0.05, 0.93, 0.87], frame_on=False)
             for x_position, y_position in sorted(from_wafer_pos.keys()):
                 layout_data_this_chip = from_wafer_pos[(x_position, y_position)]
                 so_band_num = layout_data_this_chip['so_band_num']
@@ -164,13 +165,26 @@ class WaferPosToBandAndGroup:
                 ax.text(x=x_position, y=y_position, s=patch_text, color='black', ha='center', va='center')
             ax.set_xlim((-1.5, 1.5))
             ax.set_ylim((-7.5, 7.5))
+            plt.xticks(ticks=[-1, 0, 1])
+            plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=True)
+            plt.yticks(ticks=[-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7])
+            plt.tick_params(axis='y', which='both', bottom=False, top=False, labelbottom=True)
+            legend_lines = []
+            legend_labels = []
+            for group_num in sorted(self.group_colors.keys()):
+                color = self.group_colors[group_num]
+                legend_lines.append(Rectangle(xy=(0, 0), width=1.0, height=1.0, facecolor=color))
+                legend_labels.append(F"Group{group_num}")
+            ax.legend(legend_lines, legend_labels, loc=1, numpoints=5, handlelength=3, fontsize=12)
+            plt.suptitle(F"{title_str}", size=16)
+            plt.savefig(plot_path)
+            print("Saved Plot to:", plot_path)
             if show:
                 plt.show(block=True)
-            plt.savefig(plot_path)
             plt.close(fig=fig)
 
 
 chip_metadata = ChipMetaData()
 wafer_pos_to_band_and_group = WaferPosToBandAndGroup()
 if __name__ == '__main__':
-    wafer_pos_to_band_and_group.plot(show=True)
+    wafer_pos_to_band_and_group.plot(show=False)

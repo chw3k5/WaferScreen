@@ -5,7 +5,6 @@ pyserial~=3.4
 numba~=0.52.0
 pytz>=2021.1
 pyqt5>=5.15.4
-
 pandas~=1.2.4
 PyAutoGUI~=0.9.50
 httplib2~=0.19.0
