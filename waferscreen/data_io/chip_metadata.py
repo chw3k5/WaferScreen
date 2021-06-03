@@ -150,7 +150,7 @@ class WaferPosToBandAndGroup:
             else:
                 wafer_max_str = F"{'%i' % wafer_num_max}"
             title_str = F"Chip Layout for Wafers {'%i' % wafer_num_min} though {wafer_max_str}"
-            plot_filename = F"ChipLayout_Wafers{'%i' % wafer_num_min}thru{wafer_max_str}.png"
+            plot_filename = F"ChipLayout_Wafers{'%i' % wafer_num_min}thru{wafer_max_str}.pdf"
             plot_path = os.path.join(layout_dir, plot_filename)
             fig = plt.figure(figsize=(8, 8))
             ax = fig.add_axes([0.05, 0.05, 0.93, 0.87], frame_on=False)

@@ -57,7 +57,7 @@ def delta_f_plot(device_records, show=True, output_dir=None, markersize=30, font
     ax.set_xlabel('Designed Frequency (GHz)', size=fontsize)
     # save the plot
     if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, "delta_f_per_wafer.png"))
+        plt.savefig(os.path.join(output_dir, "delta_f_per_wafer.pdf"))
     # show the plot
     if show:
         plt.show(block=True)
