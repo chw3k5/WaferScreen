@@ -1,12 +1,21 @@
 # Copyright (C) 2021 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
 import os
-import numpy as np
+import time
 from datetime import datetime
-from pytz.reference import Mountain  # The local time zone on the computer logging data
-from operator import itemgetter
+from operator import attrgetter
 from typing import NamedTuple
+from threading import Thread, Event
+
+import numpy as np
+from pytz.reference import Mountain  # The local time zone on the computer logging data
 from ref import starcryo_logs_dir
+
+
+class StarCryoLogFile(NamedTuple):
+    path: str
+    log_type: str
+    datetime: datetime
 
 
 class StarCryoLogEntry(NamedTuple):
@@ -44,7 +53,7 @@ class StarCryoLogEntry(NamedTuple):
     sim923a2_r: float
 
 
-def get_and_dat_organize_log_files(logs_dir):
+def get_and_organize_log_files(logs_dir):
     """
 
 
@@ -65,10 +74,10 @@ def get_and_dat_organize_log_files(logs_dir):
         log_datetime = datetime(year=int(year_str), month=int(month_str), day=int(day_str),
                                 hour=int(hour_str), minute=int(min_str), second=int(sec_str),
                                 tzinfo=Mountain)
-
-        for_sorting.append((log_datetime, log_file_full_path))
+        file_record = StarCryoLogFile(path=log_file_full_path, datetime=log_datetime, log_type=log_type.lower())
+        for_sorting.append(file_record)
     # Sort the file and time list based on the times.
-    sorted_times_and_paths = sorted(for_sorting, key=itemgetter(0), reverse=True)
+    sorted_times_and_paths = sorted(for_sorting, key=attrgetter('datetime'), reverse=True)
     return sorted_times_and_paths
 
 
@@ -121,23 +130,75 @@ def get_all_log_entries(logs_dir=None):
     """
     if logs_dir is None:
         logs_dir = starcryo_logs_dir
-    # get all the log file name
-    sorted_logs = get_and_dat_organize_log_files(logs_dir=logs_dir)
+    # get all the log file names
+    sorted_logs = get_and_organize_log_files(logs_dir=logs_dir)
     # get all the log entries for each data file
     log_entries = []
-    [log_entries.extend(get_log_data_from_file(log_path)) for _log_datetime, log_path in sorted_logs]
+    [log_entries.extend(get_log_data_from_file(file_record.path)) for file_record in sorted_logs]
     return log_entries
 
 
 def get_most_recent_log_entries(logs_dir=None):
     if logs_dir is None:
         logs_dir = starcryo_logs_dir
-    # get all the log file name
-    sorted_logs = get_and_dat_organize_log_files(logs_dir=logs_dir)
+    # get all the log file names
+    sorted_logs = get_and_organize_log_files(logs_dir=logs_dir)
     # get all the log entries for the most recent log file
     most_recent_log = sorted_logs[0]
     return get_log_data_from_file(log_path=most_recent_log)
 
 
+class Monitor:
+    sleep_time_s = 10
+    most_recent_log_path = None
+    most_recent_log_datetime = None
+    most_recent_log_type = None
+    is_in_regulation = Event()
+
+    def __init__(self):
+        pass
+
+    def get_most_recent_log_filename(self):
+        sorted_logs = get_and_organize_log_files(logs_dir=starcryo_logs_dir)
+        log_record = sorted_logs[0]
+        self.most_recent_log_path = log_record.path
+        self.most_recent_log_type = log_record.log_type
+        self.most_recent_log_datetime = log_record.datetime
+        if self.most_recent_log_type == 'regul':
+            return self.is_in_regulation.set()
+        else:
+            return self.is_in_regulation.clear()
+
+    def damon_log_check(self):
+        while True:
+            self.get_most_recent_log_filename()
+            time.sleep(self.sleep_time_s)
+
+    def in_regulation(self):
+        if self.most_recent_log_type == 'regul':
+            return self.is_in_regulation.set()
+        else:
+            return self.is_in_regulation.clear()
+
+
+def log_checker(monitor_obj):
+    monitor_obj.damon_log_check()
+
+
+def measurement_simulator(monitor, loops=100, sleep=5):
+    for loop_index in range(loops):
+        if monitor.is_in_regulation.is_set():
+            print(F"In regulation - Measuring")
+        else:
+            print(F"Out of regulation - Measurements Paused")
+        time.sleep(sleep)
+
+
 if __name__ == "__main__":
-    log_entries = get_all_log_entries()
+    # log_entries = get_all_log_entries()
+    monitor = Monitor()
+    monitor.get_most_recent_log_filename()
+    t = Thread(target=log_checker, args=(monitor, ))
+    t.start()
+    measurement_simulator(monitor, loops=100, sleep=5)
+
