@@ -1,10 +1,11 @@
 # Copyright (C) 2021 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
-
+import datetime
 import os
 import time
 import numpy as np
 import logging
+from threading import Thread
 from ref import agilent8722es_address, today_str
 from waferscreen.inst_control.vnas import AbstractVNA
 from waferscreen.inst_control.srs import SRS_SIM928, SRS_Connect
@@ -13,6 +14,7 @@ from waferscreen.data_io.s21_io import write_s21, dirname_create, read_s21
 import waferscreen.inst_control.flux_sweep_config as fsc
 from waferscreen.data_io.screener_read import screener_sheet
 from waferscreen.analyze.res_pipeline_config import processing_metadata_to_remove_from_seeds
+from waferscreen.inst_control.starcryo_monitor import Monitor, log_checker
 import ref
 
 
@@ -65,7 +67,15 @@ class AbstractFluxSweep:
     # one connection is shared by all instances of this class
     flux_ramp_srs_connect = SRS_Connect(address=ref.flux_ramp_address)
 
-    def __init__(self, rf_chain_letter, vna_address=agilent8722es_address, verbose=True, working_dir=None):
+    def __init__(self, rf_chain_letter, vna_address=agilent8722es_address, verbose=True, working_dir=None,
+                 monitor_starcryo=True):
+        # For the star Cryo Monitoring system
+        self.monitor_thread = None
+        self.is_in_regulation = None
+        self.starcryo_monitor = Monitor()
+        if monitor_starcryo:
+            self.start_monitor()
+        # the instrument connections
         test_letter = rf_chain_letter.lower().strip()
         if test_letter == "a":
             self.ramp = SRS_SIM928(srs_port=1, srs_connect=self.flux_ramp_srs_connect)
@@ -88,6 +98,8 @@ class AbstractFluxSweep:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.end()
+        if self.monitor_thread is not None:
+            self.starcryo_monitor.stop_log_check()
 
     def power_on(self):
         self.ramp.output_on()
@@ -147,6 +159,14 @@ class AbstractFluxSweep:
         write_s21(output_file, freqs_ghz, s21_complex, metadata)
 
     def survey_ramp(self, resonator_metadata, dwell=None):
+        # only make measurements while the ADR system is in regulation
+        while not self.starcryo_monitor.is_in_regulation:
+            now = datetime.datetime.now()
+            print(F"\nThe flux ramp survey is paused while not the StarCryo System is not in regulation.")
+            print(F"  Current local time: {now.strftime('%H:%M:%S')}, rechecking regulation " +
+                  F"status every {self.starcryo_monitor.sleep_time_s} seconds")
+            time.sleep(self.starcryo_monitor.sleep_time_s)
+        # Start the flux ramp survey for this resonator
         for counter, flux_supply_V in list(enumerate(fsc.ramp_volts)):
             if counter == 0 and dwell is not None:
                 # dwell after the ramp is reset.
@@ -156,14 +176,14 @@ class AbstractFluxSweep:
             resonator_metadata['ramp_series_resistance_ohms'] = fsc.ramp_rseries
             self.step(**resonator_metadata)
 
-    def survey_power_ramp(self, resonator_metadata):
+    def survey_power_ramp(self, resonator_metadata, in_regulation=False):
         for port_power_dBm in fsc.power_sweep_dBm:
             resonator_metadata["port_power_dbm"] = port_power_dBm
             resonator_metadata["num_freq_points"] = fsc.ramp_num_freq_points
             resonator_metadata["sweeptype"] = fsc.sweeptype
             resonator_metadata["if_bw_hz"] = fsc.if_bw_Hz
             resonator_metadata["vna_avg"] = fsc.vna_avg
-            self.survey_ramp(resonator_metadata)
+            self.survey_ramp(resonator_metadata, in_regulation=in_regulation)
 
     def scan_for_resonators(self, fmin_GHz, fmax_GHz, group_delay_s=None, **kwargs):
         if fmin_GHz > fmax_GHz:
@@ -183,7 +203,7 @@ class AbstractFluxSweep:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
 
-    def single_res_survey_from_job_file(self, seed_files):
+    def single_res_survey_from_job_file(self, seed_files, in_regulation=False):
         for seed_file in seed_files:
             seed_dirname, seed_file_basename = os.path.split(seed_file)
             all_files_in_seed_dir = os.listdir(seed_dirname)
@@ -209,9 +229,12 @@ class AbstractFluxSweep:
                         if seed_key not in processing_metadata_to_remove_from_seeds \
                                 and seed_key not in resonator_metadata.keys():
                             resonator_metadata[seed_key] = metadata_seed[seed_key]
-                    self.survey_power_ramp(resonator_metadata)
+                    self.survey_power_ramp(resonator_metadata, in_regulation=in_regulation)
 
-
+    def start_monitor(self):
+        self.monitor_thread = Thread(target=log_checker, args=(self.starcryo_monitor,), daemon=True)
+        self.monitor_thread.start()
+        self.is_in_regulation = self.starcryo_monitor.is_in_regulation
 
 
 

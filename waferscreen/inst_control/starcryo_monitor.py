@@ -149,14 +149,13 @@ def get_most_recent_log_entries(logs_dir=None):
 
 
 class Monitor:
-    sleep_time_s = 10
-    most_recent_log_path = None
-    most_recent_log_datetime = None
-    most_recent_log_type = None
-    is_in_regulation = Event()
-
     def __init__(self):
-        pass
+        self.sleep_time_s = 10
+        self.most_recent_log_path = None
+        self.most_recent_log_datetime = None
+        self.most_recent_log_type = None
+        self.is_in_regulation = Event()
+        self._stop_event = Event()
 
     def get_most_recent_log_filename(self):
         sorted_logs = get_and_organize_log_files(logs_dir=starcryo_logs_dir)
@@ -169,16 +168,23 @@ class Monitor:
         else:
             return self.is_in_regulation.clear()
 
-    def damon_log_check(self):
-        while True:
+    def log_check(self):
+        while not self.is_log_check_stopped():
             self.get_most_recent_log_filename()
             time.sleep(self.sleep_time_s)
+        print("StarCryo Log Monitoring finished.")
 
     def in_regulation(self):
         if self.most_recent_log_type == 'regul':
             return self.is_in_regulation.set()
         else:
             return self.is_in_regulation.clear()
+
+    def stop_log_check(self):
+        self._stop_event.set()
+
+    def is_log_check_stopped(self):
+        return self._stop_event.is_set()
 
 
 def log_checker(monitor_obj):
