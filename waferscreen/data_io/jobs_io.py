@@ -15,12 +15,8 @@ class JobOrganizer:
     b_chain_new_job_int = 1
     job_file_matching_expression = re.compile("._chain_jobs_....\.csv")
 
-    def __init__(self, check_for_old_jobs=True):
+    def __init__(self):
         self.check_for_jobs()
-        self.check_for_old_jobs = check_for_old_jobs
-        if check_for_old_jobs:
-            self.a_chain_job_deque = deque(sorted(self.a_chain_job_deque))
-            self.b_chain_job_deque = deque(sorted(self.b_chain_job_deque))
 
     def get_seed_files_from_job(self, job_basename):
         job_full_path = os.path.join(self.working_dir, job_basename)
@@ -47,7 +43,7 @@ class JobOrganizer:
     def mark_job_completed(self, job_basename):
         rf_chain_letter, job_int = self.parse_job_file(job_basename)
         this_chain_job_deque = self.__getattribute__(F"{rf_chain_letter}_chain_job_deque")
-        # keep trying to remove the file, make sure it is deleted before removing it from the available files
+        # remove the file, make sure it is deleted before removing it from the available files
         os.remove(os.path.join(self.working_dir, job_basename))
         # delete the first element in the deque
         this_chain_job_deque.popleft()
@@ -99,6 +95,6 @@ class JobOrganizer:
             if os.path.isfile(full_path) and re.match(self.job_file_matching_expression, file_or_folder):
                 all_job_files.append(file_or_folder)
         # add files to the deque to be processed
-        for job_file in all_job_files:
+        for job_file in sorted(all_job_files):
             self.add_job_file_to_deque(job_basename=job_file)
         return

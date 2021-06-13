@@ -156,8 +156,6 @@ class ResPipe:
         self.res_plot_dir = os.path.join(self.dirname, F"resonator_plots")
         self.report_dir = os.path.join(self.dirname, F"report")
 
-        self.job_organizer = JobOrganizer(check_for_old_jobs=False)
-
         self.verbose = verbose
         self.metadata = None
         self.unprocessed_freq_ghz, self.unprocessed_reals21, self.unprocessed_imags21 = None, None, None
@@ -532,7 +530,10 @@ class ResPipe:
         scan_basename_dir = os.path.join(single_res_dir, self.basename_prefix)
         if not os.path.exists(scan_basename_dir):
             os.mkdir(scan_basename_dir)
-        job_file_name = self.job_organizer.get_new_job_name(rf_chain_letter=self.metadata['rf_chain'])
+        # refresh the job organizer's view of what files have been writen
+        job_organizer = JobOrganizer()
+        # get the next job name
+        job_file_name = job_organizer.get_new_job_name(rf_chain_letter=self.metadata['rf_chain'])
         return scan_basename_dir, job_file_name
 
     def make_res_seeds(self):
