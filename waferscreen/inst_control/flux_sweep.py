@@ -18,6 +18,16 @@ from waferscreen.inst_control.starcryo_monitor import Monitor, log_checker
 import ref
 
 
+def get_wafers_str():
+    wafers = screener_sheet.wafers_this_cool_down
+    if isinstance(wafers, int):
+        return str(wafers)
+    wafers_str = ''
+    for wafer_num in sorted(wafers):
+        wafers_str += F"{wafer_num}-"
+    return wafers_str[:-1]
+
+
 def ramp_name_parse(basename):
     res_num_str, current_uA_and_power_utc_str = basename.rstrip('.csv').lstrip("sdata_res_").split('_cur_')
     current_str, power_utc_str = current_uA_and_power_utc_str.split("uA_")
@@ -41,7 +51,7 @@ def ramp_name_create(power_dBm, current_uA, res_num, utc):
 
 def dirname_create_raw(sweep_type="scan", res_id=None):
     path_str = dirname_create(output_basedir=fsc.output_base_dir, location=fsc.location,
-                              wafer=screener_sheet.wafers_this_cool_down, date_str=today_str,
+                              wafer=get_wafers_str(), date_str=today_str,
                               is_raw=True, sweep_type=sweep_type, res_id=res_id)
     return path_str
 
@@ -158,14 +168,15 @@ class AbstractFluxSweep:
     def write(output_file, freqs_ghz, s21_complex, metadata):
         write_s21(output_file, freqs_ghz, s21_complex, metadata)
 
-    def survey_ramp(self, resonator_metadata, dwell=None):
+    def survey_ramp(self, resonator_metadata, dwell=None, require_in_regulation=False):
         # only make measurements while the ADR system is in regulation
-        while not self.starcryo_monitor.is_in_regulation:
-            now = datetime.datetime.now()
-            print(F"\nThe flux ramp survey is paused while not the StarCryo System is not in regulation.")
-            print(F"  Current local time: {now.strftime('%H:%M:%S')}, rechecking regulation " +
-                  F"status every {self.starcryo_monitor.sleep_time_s} seconds")
-            time.sleep(self.starcryo_monitor.sleep_time_s)
+        if require_in_regulation:
+            while not self.starcryo_monitor.check_regulation_status():
+                now = datetime.datetime.now()
+                print(F"\nThe flux ramp survey is paused while not the StarCryo System is not in regulation.")
+                print(F"  Current local time: {now.strftime('%H:%M:%S')}, rechecking regulation " +
+                      F"status every {self.starcryo_monitor.sleep_time_s} seconds")
+                time.sleep(self.starcryo_monitor.sleep_time_s)
         # Start the flux ramp survey for this resonator
         for counter, flux_supply_V in list(enumerate(fsc.ramp_volts)):
             if counter == 0 and dwell is not None:
@@ -176,14 +187,14 @@ class AbstractFluxSweep:
             resonator_metadata['ramp_series_resistance_ohms'] = fsc.ramp_rseries
             self.step(**resonator_metadata)
 
-    def survey_power_ramp(self, resonator_metadata, in_regulation=False):
+    def survey_power_ramp(self, resonator_metadata, require_in_regulation=False):
         for port_power_dBm in fsc.power_sweep_dBm:
             resonator_metadata["port_power_dbm"] = port_power_dBm
             resonator_metadata["num_freq_points"] = fsc.ramp_num_freq_points
             resonator_metadata["sweeptype"] = fsc.sweeptype
             resonator_metadata["if_bw_hz"] = fsc.if_bw_Hz
             resonator_metadata["vna_avg"] = fsc.vna_avg
-            self.survey_ramp(resonator_metadata, in_regulation=in_regulation)
+            self.survey_ramp(resonator_metadata, require_in_regulation=require_in_regulation)
 
     def scan_for_resonators(self, fmin_GHz, fmax_GHz, group_delay_s=None, **kwargs):
         if fmin_GHz > fmax_GHz:
@@ -194,7 +205,7 @@ class AbstractFluxSweep:
                               'ramp_series_resistance_ohms': fsc.ramp_rseries, "port_power_dbm": fsc.probe_power_dBm,
                               "sweeptype": fsc.sweeptype, "if_bw_Hz": fsc.if_bw_Hz, "vna_avg": fsc.vna_avg,
                               "fspan_ghz": fmax_GHz - fmin_GHz, "fcenter_ghz": (fmax_GHz + fmin_GHz) / 2.0,
-                              "location": fsc.location, "wafer": screener_sheet.wafers_this_cool_down}
+                              "location": fsc.location, "wafer": get_wafers_str()}
         # overwrite the default values with what ever was sent by the use
         for user_key in kwargs.keys():
             resonator_metadata[user_key] = kwargs[user_key]
@@ -203,7 +214,7 @@ class AbstractFluxSweep:
             resonator_metadata["group_delay_s"] = group_delay_s
         self.step(**resonator_metadata)
 
-    def single_res_survey_from_job_file(self, seed_files, in_regulation=False):
+    def single_res_survey_from_job_file(self, seed_files, require_in_regulation=False):
         for seed_file in seed_files:
             seed_dirname, seed_file_basename = os.path.split(seed_file)
             all_files_in_seed_dir = os.listdir(seed_dirname)
@@ -229,14 +240,17 @@ class AbstractFluxSweep:
                         if seed_key not in processing_metadata_to_remove_from_seeds \
                                 and seed_key not in resonator_metadata.keys():
                             resonator_metadata[seed_key] = metadata_seed[seed_key]
-                    self.survey_power_ramp(resonator_metadata, in_regulation=in_regulation)
+                    self.survey_power_ramp(resonator_metadata, require_in_regulation=require_in_regulation)
 
     def start_monitor(self):
         self.monitor_thread = Thread(target=log_checker, args=(self.starcryo_monitor,), daemon=True)
         self.monitor_thread.start()
         self.is_in_regulation = self.starcryo_monitor.is_in_regulation
 
-
+    def start_monitor(self):
+        self.monitor_thread = Thread(target=log_checker, args=(self.starcryo_monitor,), daemon=True)
+        self.monitor_thread.start()
+        self.is_in_regulation = self.starcryo_monitor.is_in_regulation
 
 
 

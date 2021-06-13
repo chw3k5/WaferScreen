@@ -549,10 +549,10 @@ class ResPipe:
                     seed_metadata["seed_base_path"] = self.path
                     seed_metadata["res_number"] = res_fit.res_number
                     # screener worksheet data on device package
-                    package_data = \
-                        screener_sheet.chain_and_band_to_package_data(rf_chain_letter=self.metadata['rf_chain'],
-                                                                      band_int=band_str_to_num(band_str))
-                    seed_metadata.update(package_data)
+                    # package_data = \
+                    #     screener_sheet.chain_and_band_to_package_data(rf_chain_letter=self.metadata['rf_chain'],
+                    #                                                   band_int=band_str_to_num(band_str))
+                    # seed_metadata.update(package_data)
 
                     # make the correct output file in the 'raw' directory
                     res_dir = os.path.join(scan_basename_dir, F"{'%04i' % res_fit.res_number}")

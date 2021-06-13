@@ -81,7 +81,12 @@ if not os.path.isdir(device_stats_dir):
 layout_dir = os.path.join(too_long_did_not_read_dir, 'layout')
 if not os.path.isdir(layout_dir):
     os.mkdir(layout_dir)
-starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
+if current_user == 'uvwave':
+    starcryo_logs_dir = F"C:\\Users\\{current_user}\\Documents\\_STARCryo\\ADRControlPanel\\DataLogs"
+elif current_user == 'chw3k5':
+    starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
+else:
+    starcryo_logs_dir = None
 chip_per_band_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux100k_v321_banddef_summary.csv")
 wafer_pos_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "wafer_pos_metadata.csv")
 

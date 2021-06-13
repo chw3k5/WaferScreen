@@ -15,8 +15,8 @@ if_bw_Hz = 300
 vna_avg = None
 
 # Scan configuration (A Scan searches the entire RF band)
-scan_f_min_GHz = 4.0
-scan_f_max_GHz = 6.1
+scan_f_min_GHz = 4.8
+scan_f_max_GHz = 6.0
 scan_stepsize_kHz = 10
 
 

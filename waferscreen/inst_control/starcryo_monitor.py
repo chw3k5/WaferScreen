@@ -180,6 +180,9 @@ class Monitor:
         else:
             return self.is_in_regulation.clear()
 
+    def check_regulation_status(self):
+        return self.is_in_regulation.is_set()
+
     def stop_log_check(self):
         self._stop_event.set()
 
@@ -188,7 +191,7 @@ class Monitor:
 
 
 def log_checker(monitor_obj):
-    monitor_obj.damon_log_check()
+    monitor_obj.log_check()
 
 
 def measurement_simulator(monitor, loops=100, sleep=5):

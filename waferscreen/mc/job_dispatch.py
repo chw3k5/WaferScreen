@@ -1,8 +1,6 @@
 # Copyright (C) 2021 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
 
-import time
-import numpy as np
 from ref import agilent8722es_address
 import waferscreen.inst_control.flux_sweep_config as fsc
 from waferscreen.inst_control.flux_sweep import AbstractFluxSweep
@@ -47,7 +45,7 @@ class JobDispatch:
                 job_type, seed_files = self.job_organizer.get_seed_files_from_job(job_basename=job_basename)
                 if job_type == "single_res":
                     this_chain_flux_sweep.single_res_survey_from_job_file(seed_files,
-                                                                          in_regulation=require_in_regulation)
+                                                                          require_in_regulation=require_in_regulation)
                 else:
                     raise TypeError(F"{job_type} is not a recognized job_type.")
                 # The jobs based on any number of seed files are now completed, mark this job completed

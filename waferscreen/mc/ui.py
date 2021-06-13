@@ -19,25 +19,23 @@ def to_raw_path(seed_name):
 
 
 # edit these to look at existing measurements
-start_date = datetime.date(year=2020, month=5, day=1)
-end_date = datetime.date(year=2022, month=5, day=30)
+start_date = datetime.date(year=2021, month=6, day=13)
+end_date = datetime.date(year=2021, month=6, day=30)
 
 scan_files = get_raw_scan_files_between_dates(start_date=start_date, end_date=end_date)
 raw_res_dirs = get_raw_res_dirs_between_dates(start_date=start_date, end_date=end_date)
 pro_dirs = get_pro_res_dirs_between_dates(start_date=start_date, end_date=end_date)
 
-
+# this statement is true if this file is run direct, it is false if this file imported from another file.
+# multithreading requires this statement to avoid infinite thread recursion.
 if __name__ == "__main__":
     do_quick_look = False
-    do_scan = False
+    do_scan = True
     do_res_sweeps = not do_scan
 
     if do_quick_look:
         do_scan = False
         do_res_sweeps = False
-
-    # this statement is true if this file is run direct, it is false if this file imported from another file.
-    # multithreading requires this statement to avoid infinite thread recursion.
     if do_quick_look:
         for test_scan_file in reversed(scan_files):
             induct_s21 = InductS21(path=test_scan_file)
