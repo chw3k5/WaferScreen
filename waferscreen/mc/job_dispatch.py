@@ -35,7 +35,7 @@ class JobDispatch:
             if job_basename is None:
                 # refresh and see if new job files were written to the disk
                 self.job_organizer = JobOrganizer()
-            job_basename = self.job_organizer.get_next_job_to_process(rf_chain_letter=rf_chain_letter)
+                job_basename = self.job_organizer.get_next_job_to_process(rf_chain_letter=rf_chain_letter)
             if job_basename is None or not self.job_organizer.job_exists(job_basename):
                 # Case: there are no jobs available for this RF chain
                 break
