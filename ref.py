@@ -4,9 +4,10 @@
 import os
 import sys
 import getpass
+from datetime import datetime
+import pytz
 import numpy as np
 import matplotlib as mpl
-from datetime import datetime
 
 # To change the backend for matplotlib we must change it before matplotlib.pyplot is imported.
 if sys.platform == 'win32':
@@ -63,6 +64,12 @@ else:
 
 output_dirs = [os.path.join(working_dir, output_folder) for output_folder in ["nist"]]
 
+
+def make_dir_if_not_exists(dir_path):
+    if not os.path.isdir(dir_path):
+        os.mkdir(dir_path)
+
+
 # reference file locations
 s21_metadata_nist = os.path.join(working_dir, "ref_data", "s21_metadata_nist.txt")
 runtime_log = os.path.join(working_dir, "runtime_log_waferscreeen.txt")
@@ -70,25 +77,26 @@ processing_log = os.path.join(working_dir, "processing_log_waferscreeen.txt")
 flag_file_path = os.path.join(parent_dir, "WaferScreen", "waferscreen", "res_flags.csv")
 umux_screener_assembly_path = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux_screener_assembly.csv")
 too_long_did_not_read_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen", "tldr")
-if not os.path.isdir(too_long_did_not_read_dir):
-    os.mkdir(too_long_did_not_read_dir)
+make_dir_if_not_exists(too_long_did_not_read_dir)
 device_summaries_dir = os.path.join(too_long_did_not_read_dir, 'device_summaries')
-if not os.path.isdir(device_summaries_dir):
-    os.mkdir(device_summaries_dir)
+make_dir_if_not_exists(device_summaries_dir)
 device_stats_dir = os.path.join(too_long_did_not_read_dir, 'device_stats')
-if not os.path.isdir(device_stats_dir):
-    os.mkdir(device_stats_dir)
+make_dir_if_not_exists(device_stats_dir)
 layout_dir = os.path.join(too_long_did_not_read_dir, 'layout')
-if not os.path.isdir(layout_dir):
-    os.mkdir(layout_dir)
+make_dir_if_not_exists(layout_dir)
+project_starcryo_logs_dir = os.path.join(parent_dir, "WaferScreen", "waferscreen", 'starcryo_logs')
+make_dir_if_not_exists(project_starcryo_logs_dir)
 if current_user == 'uvwave':
     starcryo_logs_dir = F"C:\\Users\\{current_user}\\Documents\\_STARCryo\\ADRControlPanel\\DataLogs"
 elif current_user == 'chw3k5':
     starcryo_logs_dir = os.path.join("C:\\Users\\chw3k5\\Downloads", "DataLogs")
 else:
-    starcryo_logs_dir = None
+    starcryo_logs_dir = project_starcryo_logs_dir
 chip_per_band_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "umux100k_v321_banddef_summary.csv")
 wafer_pos_metadata = os.path.join(parent_dir, "WaferScreen", "waferscreen", "wafer_pos_metadata.csv")
+
+# add temperature data to the git repository after this date
+earliest_log = datetime(year=2021, month=1, day=25, tzinfo=pytz.utc)
 
 if current_user == 'uvwave':
     if not os.path.isfile(runtime_log):

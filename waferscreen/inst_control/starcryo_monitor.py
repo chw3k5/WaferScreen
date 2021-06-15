@@ -8,10 +8,11 @@ from datetime import datetime, timedelta
 from operator import attrgetter
 from typing import NamedTuple
 from threading import Thread, Event
-
+from shutil import copyfile
 import numpy as np
+import pytz
 from pytz.reference import Mountain  # The local time zone on the computer logging data
-from ref import starcryo_logs_dir
+from ref import starcryo_logs_dir, earliest_log, project_starcryo_logs_dir
 
 
 class StarCryoLogFile(NamedTuple):
@@ -246,7 +247,7 @@ class StarCryoData:
         # the records need to be within the self.record_return_cutoff_seconds of the requested time to be returned
         if dt_right < timedelta(seconds=self.record_return_cutoff_seconds) \
                 or dt_right < timedelta(seconds=self.record_return_cutoff_seconds):
-            # choose what recore is closer
+            # choose what record is closer
             if dt_right < dt_left:
                 found_record = rec_right
             else:
@@ -258,6 +259,33 @@ class StarCryoData:
                 print(F"left record delta t (seconds):  {dt_left}")
                 print(F"right record delta t (seconds): {dt_right}")
         return found_record
+
+
+# this is only True on the data logging computer
+if project_starcryo_logs_dir != starcryo_logs_dir:
+    # import log files into the git repository.
+    logs_originals = get_and_organize_log_files(logs_dir=starcryo_logs_dir)
+    logs_basenames_originals = {os.path.basename(log_path) for log_path, log_type, log_start_time in logs_originals}
+    # find the files already saved in this project
+    logs_project = get_and_organize_log_files(logs_dir=project_starcryo_logs_dir)
+    logs_basenames_project = {os.path.basename(log_path) for log_path, log_type, log_start_time in logs_project}
+    # calculate which files are new
+    logs_basenames_new = logs_basenames_originals - logs_basenames_project
+    # always re-copy the latest file project, it may have been committed at an incomplete state
+    if logs_project:
+        logs_basenames_new.add(os.path.basename(logs_project[0][0]))
+    files_added = False
+    for new_basename in logs_basenames_new:
+        source_path = os.path.join(starcryo_logs_dir, new_basename)
+        destination_path = os.path.join(project_starcryo_logs_dir, new_basename)
+        # copy the file to the projects folder
+        copyfile(source_path, destination_path)
+        # add the new files to the git repository
+        os.system(F"git add {destination_path}")
+        files_added = True
+    if files_added:
+        # commit the files that have been added
+        os.system('''git commit -m "Automatically added star cryo log files."''')
 
 
 if __name__ == "__main__":

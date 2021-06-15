@@ -19,7 +19,7 @@ def to_raw_path(seed_name):
 
 
 # edit these to look at existing measurements
-start_date = datetime.date(year=2020, month=1, day=11)
+start_date = datetime.date(year=2021, month=1, day=11)
 end_date = datetime.date(year=2021, month=6, day=30)
 
 scan_files = get_raw_scan_files_between_dates(start_date=start_date, end_date=end_date)
