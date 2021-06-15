@@ -13,8 +13,8 @@ def utc_str_to_datetime(utc_str):
     try:
         sec_int_str, sec_dec_str = sec_float_str.split('.')
     except ValueError:
-        sec_int_str = int(sec_float_str)
-        sec_dec_str = 0
+        sec_int_str = sec_float_str
+        sec_dec_str = '0'
     micro_sec_int = int(np.round(float('0.' + sec_dec_str) * 1.0e6))
     utc_datetime = datetime(year=int(year_str), month=int(month_str), day=int(day_str),
                             hour=int(hour_str), minute=int(min_str), second=int(sec_int_str), microsecond=micro_sec_int,
