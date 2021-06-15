@@ -276,7 +276,8 @@ if project_starcryo_logs_dir != starcryo_logs_dir:
     files_added = False
     for original_log_path, original_log_type, original_log_start_time in logs_originals:
         original_basename = os.path.basename(original_log_path)
-        if original_basename in logs_basenames_new and earliest_log < original_log_start_time:
+        if original_basename in logs_basenames_new and earliest_log < original_log_start_time \
+                and original_log_type == 'regul':
             source_path = os.path.join(starcryo_logs_dir, original_basename)
             destination_path = os.path.join(project_starcryo_logs_dir, original_basename)
             # copy the file to the projects folder
