@@ -10,7 +10,6 @@ from typing import NamedTuple
 from threading import Thread, Event
 from shutil import copyfile
 import numpy as np
-import pytz
 from pytz.reference import Mountain  # The local time zone on the computer logging data
 from ref import starcryo_logs_dir, earliest_log, project_starcryo_logs_dir
 
@@ -275,14 +274,16 @@ if project_starcryo_logs_dir != starcryo_logs_dir:
     if logs_project:
         logs_basenames_new.add(os.path.basename(logs_project[0][0]))
     files_added = False
-    for new_basename in logs_basenames_new:
-        source_path = os.path.join(starcryo_logs_dir, new_basename)
-        destination_path = os.path.join(project_starcryo_logs_dir, new_basename)
-        # copy the file to the projects folder
-        copyfile(source_path, destination_path)
-        # add the new files to the git repository
-        os.system(F"git add {destination_path}")
-        files_added = True
+    for original_log_path, original_log_type, original_log_start_time in logs_originals:
+        original_basename = os.path.basename(original_log_path)
+        if original_basename in logs_basenames_new and earliest_log < original_log_start_time:
+            source_path = os.path.join(starcryo_logs_dir, original_basename)
+            destination_path = os.path.join(project_starcryo_logs_dir, original_basename)
+            # copy the file to the projects folder
+            copyfile(source_path, destination_path)
+            # add the new files to the git repository
+            os.system(F"git add {destination_path}")
+            files_added = True
     if files_added:
         # commit the files that have been added
         os.system('''git commit -m "Automatically added star cryo log files."''')
