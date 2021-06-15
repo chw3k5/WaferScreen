@@ -156,8 +156,26 @@ class SRS_SIM928(SRS_Module):
     def output_off(self):
         self.write_to_port('OPOF')
 
+class SRS_SIM921(SRS_Module):
+    """These are the AC resistance bridges"""
+    def get_temperature(self):
+        resp = self.query_from_port(write_to_port_str='TVAL?', len_str=str(128))
+        return float(resp)
+
+    def get_resistance(self):
+        resp = self.query_from_port(write_to_port_str="RVAL?", len_str=str(128))
+        return float(resp)
 
 if __name__ == "__main__":
+
+    # JCG 6/15/21: test code while setting up thermometer readout
+    test_srs = get_test_srs(is_gpib=True)
+    ac_bridge_1 = SRS_SIM921(srs_port=3, srs_connect=test_srs) # a sample thermometer?
+    ac_bridge_2 = SRS_SIM921(srs_port=5, srs_connect=test_srs) # somewhere between the ADR and the sample?
+    print(f"mK thermometer 1 temperature: {ac_bridge_1.get_temperature()*1.e3:.1f} mK")
+    print(f"mK thermometer 2 temperature: {ac_bridge_2.get_temperature()*1.e3:.1f} mK")
+
+    """ JCG 6/15/21: old test code that doesn't run anymore, not mine
     test_srs = get_test_srs(is_gpib=False)
     volatage_source1 = SRS_SIM928(srs_port=1, srs_connect=test_srs)
     volatage_source2 = SRS_SIM928(srs_port=2, srs_connect=test_srs)
@@ -176,5 +194,7 @@ if __name__ == "__main__":
         volatage_source2.setvolt(voltage=0.666)
         print(volatage_source2.getvolt())
         print()
+    """
+
 
     test_srs.close()
