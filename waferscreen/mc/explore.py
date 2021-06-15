@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_between_dates
 from waferscreen.data_io.lamb_io import remove_processing_tags
-from waferscreen.data_io.s21_io import read_s21
+from waferscreen.data_io.s21_io import read_s21, write_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_and_group
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
@@ -35,8 +35,9 @@ starcryo = StarCryoData(logs_dir=project_starcryo_logs_dir)
 
 
 class SingleLamb:
-    def __init__(self, path, auto_load=True):
+    def __init__(self, path, auto_load=True, get_temperatures=False):
         self.path = path
+        self.get_temperatures = get_temperatures
         self.lamb_dir, self.basename = os.path.split(self.path)
         self.report_dir, _lamb_foldername = os.path.split(self.lamb_dir)
         self.pro_scan_dir, _rportt_foldername = os.path.split(self.report_dir)
@@ -61,8 +62,8 @@ class SingleLamb:
             self.read(lamb_path=self.path)
 
     def read(self, lamb_path):
-        _s21, metadata, self.res_fits, lamb_fits = read_s21(path=lamb_path, return_res_params=True,
-                                                            return_lamb_params=True)
+        s21, metadata, self.res_fits, lamb_fits = read_s21(path=lamb_path, return_res_params=True,
+                                                           return_lamb_params=True)
         self.metadata = AttrDict(**metadata)
 
         self.lamb_fit = lamb_fits[0]
@@ -100,6 +101,8 @@ class SingleLamb:
                                         if_bw_hz=self.metadata.if_bw_hz)
         if 'port_power_dbm' in self.metadata.keys():
             self.port_power_dbm = self.metadata["port_power_dbm"]
+        if 'adr_50mk' in self.metadata.keys():
+            self.adr_50mk = self.metadata['adr_50mk']
         self.res_number = self.lamb_fit.res_num
 
         # make a unique-within-a-wafer chip ID
@@ -112,22 +115,35 @@ class SingleLamb:
                                                                            self.chip_position[1]))
 
         # get the starcryo data records for these measurements
-        if self.res_fits is not None:
-            self.res_fit_to_starcryo_record = {}
-            for res_record in self.res_fits:
-                utc_this_record = res_record.utc
-                if utc_this_record is not None:
-                    starcryo_record = starcryo.get_record(utc=utc_this_record)
-                    if starcryo_record is not None:
-                        self.res_fit_to_starcryo_record[res_record] = starcryo_record
-            if self.res_fit_to_starcryo_record == {}:
-                self.res_fit_to_starcryo_record = None
+        if self.get_temperatures and self.adr_50mk is None:
+            if self.res_fits is not None:
+                self.res_fit_to_starcryo_record = {}
+                for res_record in self.res_fits:
+                    utc_this_record = res_record.utc
+                    if utc_this_record is not None:
+                        starcryo_record = starcryo.get_record(utc=utc_this_record)
+                        if starcryo_record is not None:
+                            self.res_fit_to_starcryo_record[res_record] = starcryo_record
+                if self.res_fit_to_starcryo_record == {}:
+                    self.res_fit_to_starcryo_record = None
 
-        # calculate an average temperature
-        if self.res_fit_to_starcryo_record is not None:
-            temperature_array = np.array([self.res_fit_to_starcryo_record[res_record].adr_50mk
-                                          for res_record in self.res_fit_to_starcryo_record.keys()])
-            self.adr_50mk = np.mean(temperature_array)
+            # calculate an average temperature
+            if self.res_fit_to_starcryo_record is not None:
+                temperature_array = np.array([self.res_fit_to_starcryo_record[res_record].adr_50mk
+                                              for res_record in self.res_fit_to_starcryo_record.keys()])
+                self.adr_50mk = np.mean(temperature_array)
+                # save this result
+                metadata['adr_50mk'] = self.adr_50mk
+                if s21 is None:
+                    s21_complex = None
+                    freqs_ghz = None
+                else:
+                    s21_complex = s21['real'] + (1j * s21['imag'])
+                    freqs_ghz = s21['freq_ghz']
+                write_s21(output_file=lamb_path, freqs_ghz=freqs_ghz,
+                          s21_complex=s21_complex, metadata=metadata,
+                          fitted_resonators_parameters=self.res_fits, lamb_params_fits=lamb_fits)
+
 
 
 def set_if(thing, other_thing, type_of_thing='unknown'):
@@ -294,7 +310,7 @@ class LambExplore:
     device_records_cvs_path = os.path.join(too_long_did_not_read_dir, "device_summary.csv")
     device_plot_path = os.path.join(too_long_did_not_read_dir, "device_frequencies_plot.pdf")
 
-    def __init__(self, start_date=None, end_date=None, lambda_params_data=None):
+    def __init__(self, start_date=None, end_date=None, lambda_params_data=None, get_temperatures=False):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                            or None. None will set the minimum date for data retrieval to be 0001-01-01
@@ -310,6 +326,7 @@ class LambExplore:
             self.end_date = datetime.date.max
         else:
             self.end_date = end_date
+        self.get_temperatures = get_temperatures
         self.lamb_params_data = None
         self.available_seed_handles = set()
         self.available_chip_id_strs = set()
@@ -325,7 +342,8 @@ class LambExplore:
         if lambda_params_data is None:
             # 1) A a read-in from the lambda csv files
             if start_date is None and end_date is None:
-                self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
+                self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True,
+                                                               get_temperatures=self.get_temperatures)
                                          for lamb_path in get_all_lamb_files()}
             else:
                 self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
@@ -734,9 +752,9 @@ class LambExplore:
             frequencies_plot(self.measurement_records, plot_path=self.measurement_plot_path)
 
 
-def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=None):
+def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=None, get_temperatures=False):
     if lamb_explore is None:
-        lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
+        lamb_explore = LambExplore(start_date=start_date, end_date=end_date, get_temperatures=get_temperatures)
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.summary_reports(multi_page_summary=True, show=False)
@@ -776,7 +794,7 @@ if __name__ == "__main__":
     example_lamb_explore = None
     if do_summary_report_plots:
         example_lamb_explore = standard_summary_report_plots(start_date=example_start_date, end_date=example_end_date,
-                                                             lamb_explore=example_lamb_explore)
+                                                             lamb_explore=example_lamb_explore, get_temperatures=False)
 
     if do_frequency_report_plot:
         example_lamb_explore = frequency_report_plot(start_date=example_start_date, end_date=example_end_date,

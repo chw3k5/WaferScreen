@@ -2,13 +2,19 @@
 # Please refer to the LICENSE file in the root of this repository.
 from datetime import datetime
 from typing import NamedTuple, Optional
+from dateutil.tz import tzoffset
 import numpy as np
-import pytz
 
 
 def utc_str_to_datetime(utc_str):
-    date_str, time_str = utc_str.split(' ')
+    date_str, time_and_tz_str = utc_str.split(' ')
     year_str, month_str, day_str = date_str.split('-')
+    if '+' in time_and_tz_str or '-' in time_and_tz_str:
+        time_str = time_and_tz_str[:-6]
+        tz_str = time_and_tz_str[-6:]
+    else:
+        time_str = time_and_tz_str
+        tz_str = None
     hour_str, min_str, sec_float_str = time_str.split(':')
     try:
         sec_int_str, sec_dec_str = sec_float_str.split('.')
@@ -16,10 +22,15 @@ def utc_str_to_datetime(utc_str):
         sec_int_str = sec_float_str
         sec_dec_str = '0'
     micro_sec_int = int(np.round(float('0.' + sec_dec_str) * 1.0e6))
-    utc_datetime = datetime(year=int(year_str), month=int(month_str), day=int(day_str),
-                            hour=int(hour_str), minute=int(min_str), second=int(sec_int_str), microsecond=micro_sec_int,
-                            tzinfo=pytz.utc)
-    return utc_datetime
+    if tz_str is None:
+        tz_str = '+00:00'
+    tz_hour_str, tz_min_str = tz_str.split(':')
+    if '+' in tz_hour_str:
+        tz_hour_str = tz_hour_str[1:]
+    a_datetime = datetime(year=int(year_str), month=int(month_str), day=int(day_str),
+                          hour=int(hour_str), minute=int(min_str), second=int(sec_int_str), microsecond=micro_sec_int,
+                          tzinfo=tzoffset(None, 60 * ((int(tz_hour_str) * 60) + int(tz_min_str))))
+    return a_datetime
 
 
 def read_res_params(path):
