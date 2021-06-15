@@ -14,14 +14,13 @@ from waferscreen.data_io.s21_io import read_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_and_group
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
-    chip_id_str_to_chip_id_handle, chip_id_handle_chip_id_str, chip_id_tuple_to_chip_id_str, \
-    chip_id_str_to_chip_id_tuple, band_str_to_num, FrequencyReportEntry, frequency_report_entry_header, \
-    optional_frequency_report_entry_header, calc_metadata_header, CalcMetadataAtNeg75dbm, CalcMetadataAtNeg95dbm,\
-    PhysicalChipData, power_ints_and_mata_data_classes, power_str_and_column_name_to_metadata_str, power_to_power_str,\
-    calc_metadata_header_full
+    chip_id_str_to_chip_id_handle, chip_id_tuple_to_chip_id_str, chip_id_str_to_chip_id_tuple, band_str_to_num, \
+    FrequencyReportEntry, frequency_report_entry_header, calc_metadata_header, PhysicalChipData, \
+    power_ints_and_mata_data_classes, power_str_and_column_name_to_metadata_str, power_to_power_str
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
-from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, get_band_name, min_spacings_khz
+from waferscreen.inst_control.starcryo_monitor import StarCryoData
+from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, min_spacings_khz, project_starcryo_logs_dir
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -29,6 +28,10 @@ class AttrDict(dict):
     def __init__(self, *args, **kwargs):
         super(AttrDict, self).__init__(*args, **kwargs)
         self.__dict__ = self
+
+
+# star cryo data
+starcryo = StarCryoData(logs_dir=project_starcryo_logs_dir)
 
 
 class SingleLamb:
@@ -46,13 +49,14 @@ class SingleLamb:
 
         self.metadata = None
         self.res_fits = None
+        self.res_fit_to_starcryo_record = None
         self.lamb_fit = None
         self.res_number = None
         self.location = None
         self.series_key = None
 
         self.wafer = self.so_band = self.chip_id_str = self.chip_position = self.meas_time = self.seed_name = None
-        self.port_power_dbm = self.group_num = None
+        self.port_power_dbm = self.group_num = self.adr_50mk = None
         if auto_load:
             self.read(lamb_path=self.path)
 
@@ -106,6 +110,24 @@ class SingleLamb:
             self.chip_id_str = chip_id_tuple_to_chip_id_str(chip_id_tuple=(band_str_to_num(self.so_band),
                                                                            self.chip_position[0],
                                                                            self.chip_position[1]))
+
+        # get the starcryo data records for these measurements
+        if self.res_fits is not None:
+            self.res_fit_to_starcryo_record = {}
+            for res_record in self.res_fits:
+                utc_this_record = res_record.utc
+                if utc_this_record is not None:
+                    starcryo_record = starcryo.get_record(utc=utc_this_record)
+                    if starcryo_record is not None:
+                        self.res_fit_to_starcryo_record[res_record] = starcryo_record
+            if self.res_fit_to_starcryo_record == {}:
+                self.res_fit_to_starcryo_record = None
+
+        # calculate an average temperature
+        if self.res_fit_to_starcryo_record is not None:
+            temperature_array = np.array([self.res_fit_to_starcryo_record[res_record].adr_50mk
+                                          for res_record in self.res_fit_to_starcryo_record.keys()])
+            self.adr_50mk = np.mean(temperature_array)
 
 
 def set_if(thing, other_thing, type_of_thing='unknown'):

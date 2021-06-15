@@ -5,7 +5,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from waferscreen.data_io.s21_metadata import MetaDataDict, num_format
-from waferscreen.data_io.res_io import res_params_header, ResParams
+from waferscreen.data_io.res_io import res_params_header, ResParams, utc_str_to_datetime
 from waferscreen.data_io.lamb_io import lambda_header, LambdaParams
 from waferscreen.tools.band_calc import find_band_edges, find_center_band
 from waferscreen.plot.quick_plots import ls, len_ls
@@ -81,6 +81,11 @@ def read_s21(path, return_res_params=False, return_lamb_params=False):
         elif res_fits_trigger:
             res_fits_dict = {column_name: num_format(row_value)
                              for column_name, row_value in zip(res_fits_header, raw_line.split(","))}
+            if 'utc' in res_fits_dict.keys():
+                utc_str = res_fits_dict['utc']
+                if utc_str is not None:
+                    utc_datetime = utc_str_to_datetime(utc_str)
+                    res_fits_dict['utc'] = utc_datetime
             res_fits.append(ResParams(**res_fits_dict))
         elif lamb_fits_trigger:
             lamb_fits_dict = {column_name: num_format(row_value)

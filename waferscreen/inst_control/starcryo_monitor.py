@@ -208,8 +208,10 @@ def measurement_simulator(monitor, loops=100, sleep=5):
 class StarCryoData:
     record_return_cutoff_seconds = 5.0
 
-    def __init__(self):
-        self.starcryo_file_info = get_and_organize_log_files(logs_dir=starcryo_logs_dir)
+    def __init__(self, logs_dir=None):
+        if logs_dir is None:
+            logs_dir = starcryo_logs_dir
+        self.starcryo_file_info = get_and_organize_log_files(logs_dir=logs_dir)
         self.starcryo_file_info_unread = deque(self.starcryo_file_info[:])
         self.history_begin_datetime = datetime(9999, 12, 31, 23, 59, 59, 999999, Mountain)
         self.raw_records = []

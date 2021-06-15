@@ -34,7 +34,11 @@ def num_format(a_string):
                 return float(a_string)
             except ValueError:
                 # this can only be represented as a string
-                return a_string.strip()
+                a_string = a_string.strip()
+                if a_string.lower() == 'none':
+                    return None
+                else:
+                    return a_string
 
 
 def metadata_key_format(key):
@@ -70,6 +74,8 @@ class MetaDataDict(UserDict):
                 for letter in formatted_value:
                     if letter in forbidden_characters:
                         raise TypeError(F"The characters {forbidden_characters} are not allowed for metadata values.")
+                self.data[formatted_key] = formatted_value
+            elif formatted_value is None:
                 self.data[formatted_key] = formatted_value
             elif isinstance(formatted_value, allowed_meta_data_types):
                 self.data[formatted_key] = formatted_value
