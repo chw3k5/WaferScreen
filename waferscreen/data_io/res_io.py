@@ -1,6 +1,6 @@
 # Copyright (C) 2021 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
-
+from datetime import datetime
 from typing import NamedTuple, Optional
 
 
@@ -45,6 +45,7 @@ class ResParams(NamedTuple):
     parent_file: Optional[str] = None
     res_number: Optional[int] = None
     flux_ramp_current_ua: Optional[float] = None
+    utc: Optional[datetime] = None
 
     def __str__(self):
         value_list = [self.__getattribute__(item_name) for item_name in res_params_head_list]

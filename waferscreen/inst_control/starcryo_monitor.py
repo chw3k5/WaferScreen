@@ -225,23 +225,38 @@ class StarCryoData:
                 if log_start_time < utc:
                     break
 
-    def get_record(self, utc):
+    def get_record(self, utc, verbose=True):
         found_record = None
+        # dynamically read in data you need, going back as far as necessary in history to retive the request record
         if utc < self.history_begin_datetime:
             self.read_records(utc=utc)
+        # In order of increasing values order is needed for the bisect method
         time_stamps = list(reversed([rec.timestamp for rec in self.raw_records]))
-        rec_left_index = (len(self.raw_records) - 1) - bisect.bisect(a=time_stamps, x=utc)
+        # do the binary search for the record index
+        time_stamps_left_index = bisect.bisect(a=time_stamps, x=utc)
+        # transform the index into the index for the record lists
+        rec_left_index = (len(self.raw_records) - 1) - time_stamps_left_index
+        # get the record index to the right of the requested time
         rec_right_index = rec_left_index + 1
+        # a few calculations
         rec_right = self.raw_records[rec_right_index]
         rec_left = self.raw_records[rec_left_index]
         dt_right = utc - rec_right.timestamp
         dt_left = rec_left.timestamp - utc
+        # the records need to be within the self.record_return_cutoff_seconds of the requested time to be returned
         if dt_right < timedelta(seconds=self.record_return_cutoff_seconds) \
                 or dt_right < timedelta(seconds=self.record_return_cutoff_seconds):
+            # choose what recore is closer
             if dt_right < dt_left:
                 found_record = rec_right
             else:
                 found_record = rec_left
+        else:
+            if verbose:
+                print(F"\nNo StarCryo Log records within {self.record_return_cutoff_seconds} seconds of the")
+                print(F"requested time: {utc})")
+                print(F"left record delta t (seconds):  {dt_left}")
+                print(F"right record delta t (seconds): {dt_right}")
         return found_record
 
 
