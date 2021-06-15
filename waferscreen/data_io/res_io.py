@@ -1,7 +1,25 @@
 # Copyright (C) 2021 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
-
+from datetime import datetime
 from typing import NamedTuple, Optional
+import numpy as np
+import pytz
+
+
+def utc_str_to_datetime(utc_str):
+    date_str, time_str = utc_str.split(' ')
+    year_str, month_str, day_str = date_str.split('-')
+    hour_str, min_str, sec_float_str = time_str.split(':')
+    try:
+        sec_int_str, sec_dec_str = sec_float_str.split('.')
+    except ValueError:
+        sec_int_str = int(sec_float_str)
+        sec_dec_str = 0
+    micro_sec_int = int(np.round(float('0.' + sec_dec_str) * 1.0e6))
+    utc_datetime = datetime(year=int(year_str), month=int(month_str), day=int(day_str),
+                            hour=int(hour_str), minute=int(min_str), second=int(sec_int_str), microsecond=micro_sec_int,
+                            tzinfo=pytz.utc)
+    return utc_datetime
 
 
 def read_res_params(path):
@@ -20,7 +38,7 @@ primary_res_params = ["fcenter_ghz", "q_i", "q_c", "base_amplitude_abs", "a_phas
 res_params_header = "res_number,"
 for param_type in primary_res_params:
     res_params_header += param_type + "," + param_type + "_error,"
-res_params_header += "flux_ramp_current_ua,parent_file"
+res_params_header += "flux_ramp_current_ua,parent_file,utc"
 res_params_head_list = res_params_header.split(",")
 res_params_header = "# Resfits:" + res_params_header
 
@@ -45,6 +63,7 @@ class ResParams(NamedTuple):
     parent_file: Optional[str] = None
     res_number: Optional[int] = None
     flux_ramp_current_ua: Optional[float] = None
+    utc: Optional[datetime] = None
 
     def __str__(self):
         value_list = [self.__getattribute__(item_name) for item_name in res_params_head_list]

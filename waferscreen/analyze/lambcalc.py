@@ -1,6 +1,6 @@
 # Copyright (C) 2018 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
-
+import datetime
 import os
 import numpy as np
 from operator import itemgetter
@@ -9,6 +9,7 @@ from waferscreen.analyze.lambfit import f0_of_I, guess_lamb_fit_params
 from waferscreen.data_io.s21_io import write_s21, read_s21
 from waferscreen.data_io.lamb_io import remove_processing_tags, prep_lamb_dirs, LambdaParams
 from waferscreen.data_io.s21_metadata import MetaDataDict
+from waferscreen.data_io.res_io import ResParams, utc_str_to_datetime
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.plot.s21_plots import lamb_plot, multi_lamb_plot
 from waferscreen.data_io.exceptions import NotEnoughDataForCurveFit, NoDataForCurveFit
@@ -95,9 +96,16 @@ class LambCalc:
         else:
             lamb_basename += F"_{self.lamb_type_key}.csv"
         self.lamb_output_path = os.path.join(self.lamb_outputs_dir, lamb_basename)
-        res_fits = [a_tup[1] for a_tup in self.resfits_and_metadata]
+        res_fits_time_update = []
+        for a_uA, a_res_fit, a_metadata in self.resfits_and_metadata:
+            utc_str = a_metadata['utc']
+            utc_datetime = utc_str_to_datetime(utc_str)
+            update_res_fit_dict = {fit_param: a_res_fit.__getattribute__(fit_param) for fit_param in ResParams._fields}
+            update_res_fit_dict['utc'] = utc_datetime
+            updated_res_fit = ResParams(**update_res_fit_dict)
+            res_fits_time_update.append(updated_res_fit)
         write_s21(output_file=self.lamb_output_path, metadata=self.unified_metadata,
-                  fitted_resonators_parameters=res_fits, lamb_params_fits=[self.lamb_params_fit])
+                  fitted_resonators_parameters=res_fits_time_update, lamb_params_fits=[self.lamb_params_fit])
 
     def set_lamb_type_key(self):
         self.lamb_type_key = SeriesKey(port_power_dbm=self.unified_metadata["port_power_dbm"],
