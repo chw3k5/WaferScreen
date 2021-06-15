@@ -2,7 +2,9 @@
 # Please refer to the LICENSE file in the root of this repository.
 import os
 import time
-from datetime import datetime
+import bisect
+from collections import deque
+from datetime import datetime, timedelta
 from operator import attrgetter
 from typing import NamedTuple
 from threading import Thread, Event
@@ -70,7 +72,7 @@ def get_and_organize_log_files(logs_dir):
         log_type, date_str, time_str = log_file_basename.split("-")
         month_str, day_str, year_str = date_str.split("_")
         hour_str, min_str, sec_str = time_str.split("_")
-        # time object is useful for comparson and sorting
+        # time object is useful for sorting
         log_datetime = datetime(year=int(year_str), month=int(month_str), day=int(day_str),
                                 hour=int(hour_str), minute=int(min_str), second=int(sec_str),
                                 tzinfo=Mountain)
@@ -172,7 +174,7 @@ class Monitor:
         while not self.is_log_check_stopped():
             self.get_most_recent_log_filename()
             time.sleep(self.sleep_time_s)
-        print("StarCryo Log Monitoring finished.")
+        print("StarCryo Log Monitoring Finished.")
 
     def in_regulation(self):
         if self.most_recent_log_type == 'regul':
@@ -203,11 +205,63 @@ def measurement_simulator(monitor, loops=100, sleep=5):
         time.sleep(sleep)
 
 
-if __name__ == "__main__":
-    # log_entries = get_all_log_entries()
-    monitor = Monitor()
-    monitor.get_most_recent_log_filename()
-    t = Thread(target=log_checker, args=(monitor, ))
-    t.start()
-    measurement_simulator(monitor, loops=100, sleep=5)
+class StarCryoData:
+    record_return_cutoff_seconds = 5.0
 
+    def __init__(self):
+        self.starcryo_file_info = get_and_organize_log_files(logs_dir=starcryo_logs_dir)
+        self.starcryo_file_info_unread = deque(self.starcryo_file_info[:])
+        self.history_begin_datetime = datetime(9999, 12, 31, 23, 59, 59, 999999, Mountain)
+        self.raw_records = []
+
+    def read_records(self, utc=None):
+        if utc is None:
+            self.raw_records = get_all_log_entries(logs_dir=None)
+        else:
+            for log_path, log_type, log_start_time in list(self.starcryo_file_info_unread):
+                self.raw_records.extend(get_log_data_from_file(log_path=log_path))
+                self.starcryo_file_info_unread.popleft()
+                self.history_begin_datetime = self.raw_records[-1].timestamp
+                if log_start_time < utc:
+                    break
+
+    def get_record(self, utc):
+        found_record = None
+        if utc < self.history_begin_datetime:
+            self.read_records(utc=utc)
+        time_stamps = list(reversed([rec.timestamp for rec in self.raw_records]))
+        rec_left_index = (len(self.raw_records) - 1) - bisect.bisect(a=time_stamps, x=utc)
+        rec_right_index = rec_left_index + 1
+        rec_right = self.raw_records[rec_right_index]
+        rec_left = self.raw_records[rec_left_index]
+        dt_right = utc - rec_right.timestamp
+        dt_left = rec_left.timestamp - utc
+        if dt_right < timedelta(seconds=self.record_return_cutoff_seconds) \
+                or dt_right < timedelta(seconds=self.record_return_cutoff_seconds):
+            if dt_right < dt_left:
+                found_record = rec_right
+            else:
+                found_record = rec_left
+        return found_record
+
+
+if __name__ == "__main__":
+    get_all_logs_records = False
+    monitor_thead_test = False
+    get_log_record = True
+    # datetime(year, month, day, hour, minute, second, microsecond)
+    request_time = datetime(2021, 4, 13, 6, 0, 0, 0, Mountain)
+
+    if get_all_logs_records:
+        all_log_entries = get_all_log_entries()
+
+    if monitor_thead_test:
+        a_monitor = Monitor()
+        a_monitor.get_most_recent_log_filename()
+        t = Thread(target=log_checker, args=(a_monitor, ))
+        t.start()
+        measurement_simulator(a_monitor, loops=100, sleep=5)
+
+    if get_log_record:
+        star_cryo_data = StarCryoData()
+        requested_record = star_cryo_data.get_record(utc=request_time)
