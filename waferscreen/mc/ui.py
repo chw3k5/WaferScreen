@@ -19,7 +19,7 @@ def to_raw_path(seed_name):
 
 
 # edit these to look at existing measurements
-start_date = datetime.date(year=2021, month=5, day=13)
+start_date = datetime.date(year=2020, month=1, day=11)
 end_date = datetime.date(year=2021, month=6, day=30)
 
 scan_files = get_raw_scan_files_between_dates(start_date=start_date, end_date=end_date)
@@ -51,5 +51,5 @@ if __name__ == "__main__":
                            make_band_seeds=False, make_single_res_seeds=True)
     if do_res_sweeps:
         dm.full_loop_single_res(raw_res_dirs=raw_res_dirs, do_raw=False, save_phase_plot=True,
-                                pro_res_dirs=pro_dirs, do_pro=True, save_res_plots=True, reprocess_res=False,
+                                pro_res_dirs=pro_dirs, do_pro=False, save_res_plots=True, reprocess_res=False,
                                 do_lamb=True, lamb_plots=True)  # lamb_plots is not properly toggling the plots
