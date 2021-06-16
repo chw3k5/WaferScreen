@@ -12,7 +12,7 @@ from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.res_io import ResParams, utc_str_to_datetime
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.plot.s21_plots import lamb_plot, multi_lamb_plot
-from waferscreen.data_io.exceptions import NotEnoughDataForCurveFit, NoDataForCurveFit
+from waferscreen.data_io.exceptions import NotEnoughDataForCurveFit, NoDataForCurveFit, OptimalParametersNotFoundForCurveFit
 import ref
 
 
@@ -138,6 +138,9 @@ class LambCalc:
         except TypeError:
             print("\nCurve Fit for lambda fitting has more free parameters then data points, fit failed\n")
             raise NotEnoughDataForCurveFit
+        except RuntimeError:
+            print("\nCurve Fit Optimal parameters not found: Number of calls to function has reached maxfev\n")
+            raise OptimalParametersNotFoundForCurveFit
         else:
             i0fit, mfit, f2fit, pfit, lambfit = popt
             i0fit_err = pcov[0, 0]

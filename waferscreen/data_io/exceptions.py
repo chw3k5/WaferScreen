@@ -32,3 +32,8 @@ class NoDataForCurveFit(LambdaProcessingError):
 class NotEnoughDataForCurveFit(LambdaProcessingError):
     """Curve Fit for lambda fitting has more free parameters then data points"""
     pass
+
+
+class OptimalParametersNotFoundForCurveFit(LambdaProcessingError):
+    """Optimal parameters not found: Number of calls to function has reached maxfev"""
+    pass
