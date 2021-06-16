@@ -22,7 +22,7 @@ flux_ramp_address = "GPIB0::17::INSTR"
 volt_source_port = 1
 
 # Debug mode
-debug_mode = False
+debug_mode = True
 # multiprocessing
 # the 'assumption' of max threads is that we are cpu limited in processing,
 # so we use should not use more than a computer's available threads

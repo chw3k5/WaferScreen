@@ -37,7 +37,7 @@ def write_s21(output_file, freqs_ghz=None, s21_complex=None, metadata=None,
 
 def read_s21(path, return_res_params=False, return_lamb_params=False):
     with open(path, "r") as f:
-        raw_lines = f.readlines()
+        raw_lines = [raw_line.strip() for raw_line in f.readlines()]
     metadata = MetaDataDict()
     header = default_header  # this is only used if a the expected header is absent
     # get the metadata and header and other ancillary data types
@@ -80,12 +80,11 @@ def read_s21(path, return_res_params=False, return_lamb_params=False):
                     lamb_fits_header = [column_name.strip().lower() for column_name in context_data.split(",")]
         elif res_fits_trigger:
             res_fits_dict = {column_name: num_format(row_value)
-                             for column_name, row_value in zip(res_fits_header, raw_line.split(","))}
+                             for column_name, row_value in zip(res_fits_header, raw_line.split(",")) if row_value != ''}
             if 'utc' in res_fits_dict.keys():
                 utc_str = res_fits_dict['utc']
-                if utc_str is not None:
-                    utc_datetime = utc_str_to_datetime(utc_str)
-                    res_fits_dict['utc'] = utc_datetime
+                utc_datetime = utc_str_to_datetime(utc_str)
+                res_fits_dict['utc'] = utc_datetime
             res_fits.append(ResParams(**res_fits_dict))
         elif lamb_fits_trigger:
             lamb_fits_dict = {column_name: num_format(row_value)
