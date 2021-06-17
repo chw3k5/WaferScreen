@@ -214,40 +214,43 @@ class StarCryoData:
         self.starcryo_file_info = get_and_organize_log_files(logs_dir=logs_dir)
         self.starcryo_file_info_unread = deque(self.starcryo_file_info[:])
         self.history_begin_datetime = datetime(9999, 12, 31, 23, 59, 59, 999999, Mountain)
-        self.raw_records = []
+        # Newest records are delivered first.
+        self.raw_records_reversed = []
+        # In order of increasing values order is needed for the bisect method
+        self.raw_records = None
+        self.time_stamps = None
 
     def read_records(self, utc=None):
         if utc is None:
-            self.raw_records = get_all_log_entries(logs_dir=None)
+            self.raw_records_reversed = get_all_log_entries(logs_dir=None)
         else:
             for log_path, log_type, log_start_time in list(self.starcryo_file_info_unread):
-                self.raw_records.extend(get_log_data_from_file(log_path=log_path))
+                self.raw_records_reversed.extend(get_log_data_from_file(log_path=log_path))
                 self.starcryo_file_info_unread.popleft()
                 self.history_begin_datetime = self.raw_records[-1].timestamp
                 if log_start_time < utc:
                     break
+        # In order of increasing values order is needed for the bisect method
+        self.raw_records = list(reversed(self.raw_records_reversed))
+        self.time_stamps = [rec.timestamp for rec in self.raw_records]
 
     def get_record(self, utc, verbose=True):
         found_record = None
         # dynamically read in data you need, going back as far as necessary in history to retive the request record
         if utc < self.history_begin_datetime:
             self.read_records(utc=utc)
-        # In order of increasing values order is needed for the bisect method
-        time_stamps = list(reversed([rec.timestamp for rec in self.raw_records]))
         # do the binary search for the record index
-        time_stamps_left_index = bisect.bisect(a=time_stamps, x=utc)
-        # transform the index into the index for the record lists
-        rec_left_index = (len(self.raw_records) - 1) - time_stamps_left_index
-        # get the record index to the right of the requested time
-        rec_right_index = rec_left_index + 1
+        time_stamps_right_index = bisect.bisect(a=self.time_stamps, x=utc)
+        # get the record index to the right of the requested tim
+        time_stamps_left_index = time_stamps_right_index - 1
         # a few calculations
-        rec_right = self.raw_records[rec_right_index]
-        rec_left = self.raw_records[rec_left_index]
+        rec_right = self.raw_records[time_stamps_right_index]
+        rec_left = self.raw_records[time_stamps_left_index]
         dt_right = utc - rec_right.timestamp
         dt_left = rec_left.timestamp - utc
         # the records need to be within the self.record_return_cutoff_seconds of the requested time to be returned
         if dt_right < timedelta(seconds=self.record_return_cutoff_seconds) \
-                or dt_right < timedelta(seconds=self.record_return_cutoff_seconds):
+                or dt_left < timedelta(seconds=self.record_return_cutoff_seconds):
             # choose what record is closer
             if dt_right < dt_left:
                 found_record = rec_right
@@ -257,8 +260,8 @@ class StarCryoData:
             if verbose:
                 print(F"\nNo StarCryo Log records within {self.record_return_cutoff_seconds} seconds of the")
                 print(F"requested time: {utc})")
-                print(F" left record delta t: {dt_left}")
-                print(F"right record delta t: {dt_right}")
+                print(F" left (after) record delta t: {dt_left}")
+                print(F"right (before) record delta t: {dt_right}")
         return found_record
 
 
@@ -275,20 +278,21 @@ if project_starcryo_logs_dir != starcryo_logs_dir:
     # always re-copy the latest file project, it may have been committed at an incomplete state
     if logs_project:
         logs_basenames_new.add(os.path.basename(logs_project[0][0]))
-    files_added = set()
+    files_to_add = set()
     for original_log_path, original_log_type, original_log_start_time in logs_originals:
         original_basename = os.path.basename(original_log_path)
         if original_basename in logs_basenames_new and earliest_log < original_log_start_time \
                 and original_log_type == 'regul':
             source_path = os.path.join(starcryo_logs_dir, original_basename)
             destination_path = os.path.join(project_starcryo_logs_dir, original_basename)
+            files_to_add.add((source_path, destination_path))
+    if 1 < len(files_to_add):
+        for source_path, destination_path in files_to_add:
             # copy the file to the projects folder
             copyfile(source_path, destination_path)
             # add the new files to the git repository
             os.system(F"git add {destination_path}")
             print(F"git add for StarCryo Log File:{destination_path}")
-            files_added.add(original_basename)
-    if 1 < len(files_added):
         # commit the files that have been added if there is at least 2 files
         os.system('''git commit -m "Automatically added star cryo log files."''')
         print(F"git commit -m 'Automatically added star cryo log files'")

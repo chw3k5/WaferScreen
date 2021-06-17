@@ -37,9 +37,10 @@ starcryo = StarCryoData(logs_dir=starcryo_logs_dir)
 
 
 class SingleLamb:
-    def __init__(self, path, auto_load=True, get_temperatures=False):
+    def __init__(self, path, auto_load=True, get_temperatures=False, redo_get_temps=False):
         self.path = path
         self.get_temperatures = get_temperatures
+        self.redo_get_temps = redo_get_temps
         self.lamb_dir, self.basename = os.path.split(self.path)
         self.report_dir, _lamb_foldername = os.path.split(self.lamb_dir)
         self.pro_scan_dir, _rportt_foldername = os.path.split(self.report_dir)
@@ -117,7 +118,7 @@ class SingleLamb:
                                                                            self.chip_position[1]))
 
         # get the starcryo data records for these measurements
-        if self.get_temperatures and self.adr_50mk is None:
+        if self.get_temperatures and (self.adr_50mk is None or self.redo_get_temps):
             if self.res_fits is not None:
                 self.res_fit_to_starcryo_record = {}
                 for res_record in self.res_fits:
@@ -315,7 +316,8 @@ class LambExplore:
     device_records_cvs_path = os.path.join(too_long_did_not_read_dir, "device_summary.csv")
     device_plot_path = os.path.join(too_long_did_not_read_dir, "device_frequencies_plot.pdf")
 
-    def __init__(self, start_date=None, end_date=None, lambda_params_data=None, get_temperatures=False, verbose=True):
+    def __init__(self, start_date=None, end_date=None, lambda_params_data=None, get_temperatures=False,
+                 redo_get_temps=False, verbose=True):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                            or None. None will set the minimum date for data retrieval to be 0001-01-01
@@ -332,6 +334,7 @@ class LambExplore:
         else:
             self.end_date = end_date
         self.get_temperatures = get_temperatures
+        self.redo_get_temps = redo_get_temps
         self.lamb_params_data = None
         self.available_seed_handles = set()
         self.available_chip_id_strs = set()
@@ -353,7 +356,8 @@ class LambExplore:
                 print_interval = 1  # max(int(np.round(len_path * 0.01)), 1)
                 for lamb_index, lamb_path in list(enumerate(lamb_paths)):
                     self.lamb_params_data[lamb_path] = SingleLamb(path=lamb_path, auto_load=True,
-                                                                  get_temperatures=self.get_temperatures)
+                                                                  get_temperatures=self.get_temperatures,
+                                                                  redo_get_temps=self.redo_get_temps)
                     if self.verbose and lamb_index % print_interval == 0:
                         index_plus_one = lamb_index + 1
                         percent_value = 100.0 * float(index_plus_one) / len_path
@@ -769,9 +773,11 @@ class LambExplore:
             frequencies_plot(self.measurement_records, plot_path=self.measurement_plot_path)
 
 
-def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=None, get_temperatures=False):
+def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=None,
+                                  get_temperatures=False, redo_get_temps=False):
     if lamb_explore is None:
-        lamb_explore = LambExplore(start_date=start_date, end_date=end_date, get_temperatures=get_temperatures)
+        lamb_explore = LambExplore(start_date=start_date, end_date=end_date,
+                                   get_temperatures=get_temperatures, redo_get_temps=redo_get_temps)
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
     lamb_explore.summary_reports(multi_page_summary=True, show=False)
@@ -805,13 +811,14 @@ if __name__ == "__main__":
     do_summary_report_plots = False
     do_frequency_report_plot = False
 
-    example_start_date = datetime.date(year=2020, month=5, day=1)
+    example_start_date = datetime.date(year=2021, month=1, day=1)
     example_end_date = datetime.date(year=2022, month=5, day=30)
 
     example_lamb_explore = None
     if do_summary_report_plots:
         example_lamb_explore = standard_summary_report_plots(start_date=example_start_date, end_date=example_end_date,
-                                                             lamb_explore=example_lamb_explore, get_temperatures=False)
+                                                             lamb_explore=example_lamb_explore,
+                                                             get_temperatures=False, redo_get_temps=False)
 
     if do_frequency_report_plot:
         example_lamb_explore = frequency_report_plot(start_date=example_start_date, end_date=example_end_date,
