@@ -5,7 +5,6 @@ import os
 import datetime
 import itertools
 from operator import itemgetter
-from multiprocessing import Pool
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -354,26 +353,17 @@ class LambExplore:
             self.lamb_params_data = {}
             # 1) A a read-in from the lambda csv files
             lamb_paths = get_lamb_files_between_dates(start_date=self.start_date, end_date=self.end_date)
-            if multiprocessing_threads is None or multiprocessing_threads < 2:
-                len_path = len(lamb_paths)
-                print_interval = 1  # max(int(np.round(len_path * 0.01)), 1)
-                for lamb_index, lamb_path in list(enumerate(lamb_paths)):
-                    self.lamb_params_data[lamb_path] = SingleLamb(path=lamb_path, auto_load=True,
-                                                                  get_temperatures=self.get_temperatures,
-                                                                  redo_get_temps=self.redo_get_temps)
-                    if self.verbose and lamb_index % print_interval == 0:
-                        index_plus_one = lamb_index + 1
-                        percent_value = 100.0 * float(index_plus_one) / len_path
-                        print(F"{'%6.2f' % percent_value}% of explore.py Lambda files read: " +
-                              F"{'%6i' % index_plus_one} of {len_path} files")
-            else:
-                single_lamb_pro_args = [(lamb_path, True, get_temps, redos) for lamb_path, get_temps, redos,
-                                        in zip(lamb_paths, [self.get_temperatures] * len(lamb_paths),
-                                               [self.redo_get_temps] * len(lamb_paths))]
-                with Pool(multiprocessing_threads) as p:
-                    single_lambs = p.starmap(single_lamb_pro, single_lamb_pro_args)
-                    self.lamb_params_data = {lamb_path: single_lamb for lamb_path, single_lamb
-                                             in zip(lamb_paths, single_lambs)}
+            len_path = len(lamb_paths)
+            print_interval = 1  # max(int(np.round(len_path * 0.01)), 1)
+            for lamb_index, lamb_path in list(enumerate(lamb_paths)):
+                self.lamb_params_data[lamb_path] = SingleLamb(path=lamb_path, auto_load=True,
+                                                              get_temperatures=self.get_temperatures,
+                                                              redo_get_temps=self.redo_get_temps)
+                if self.verbose and lamb_index % print_interval == 0:
+                    index_plus_one = lamb_index + 1
+                    percent_value = 100.0 * float(index_plus_one) / len_path
+                    print(F"{'%6.2f' % percent_value}% of explore.py Lambda files read: " +
+                          F"{'%6i' % index_plus_one} of {len_path} files")
         else:
             # 2) A lambda_params_data from a prior read-in
             self.lamb_params_data = lambda_params_data
