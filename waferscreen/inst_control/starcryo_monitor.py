@@ -275,7 +275,7 @@ if project_starcryo_logs_dir != starcryo_logs_dir:
     # always re-copy the latest file project, it may have been committed at an incomplete state
     if logs_project:
         logs_basenames_new.add(os.path.basename(logs_project[0][0]))
-    files_added = False
+    files_added = set()
     for original_log_path, original_log_type, original_log_start_time in logs_originals:
         original_basename = os.path.basename(original_log_path)
         if original_basename in logs_basenames_new and earliest_log < original_log_start_time \
@@ -286,9 +286,9 @@ if project_starcryo_logs_dir != starcryo_logs_dir:
             copyfile(source_path, destination_path)
             # add the new files to the git repository
             os.system(F"git add {destination_path}")
-            files_added = True
-    if files_added:
-        # commit the files that have been added
+            files_added.add(original_basename)
+    if 1 < len(files_added):
+        # commit the files that have been added if there is at least 2 files
         os.system('''git commit -m "Automatically added star cryo log files."''')
 
 
