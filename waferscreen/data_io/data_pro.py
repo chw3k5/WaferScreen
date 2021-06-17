@@ -51,7 +51,7 @@ def get_lamb_dirs():
     return lamb_data_dirs
 
 
-def get_dirs_between_dates(start_date, end_date):
+def get_dirs_between_dates(start_date=None, end_date=None):
     """
     At the "date" level of directory hierarchy (the folder names ar in the format (YYYY-MM-DD)
     Get all the directory names between the date arguments
@@ -61,6 +61,10 @@ def get_dirs_between_dates(start_date, end_date):
     :return: list - empty or elements that are the full paths (str) for 'date'
                     directories (YYYY-MM-DD) between the date arguments
     """
+    if start_date is None:
+        start_date = datetime.datetime.min
+    if end_date is None:
+        end_date = datetime.datetime.max
     date_dirs_in_range = []
     for location_dir in ref.output_dirs:
         # get all the wafer-number directories

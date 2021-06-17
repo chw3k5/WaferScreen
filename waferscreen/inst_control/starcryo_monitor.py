@@ -257,8 +257,8 @@ class StarCryoData:
             if verbose:
                 print(F"\nNo StarCryo Log records within {self.record_return_cutoff_seconds} seconds of the")
                 print(F"requested time: {utc})")
-                print(F"left record delta t (seconds):  {dt_left}")
-                print(F"right record delta t (seconds): {dt_right}")
+                print(F" left record delta t: {dt_left}")
+                print(F"right record delta t: {dt_right}")
         return found_record
 
 
@@ -286,10 +286,12 @@ if project_starcryo_logs_dir != starcryo_logs_dir:
             copyfile(source_path, destination_path)
             # add the new files to the git repository
             os.system(F"git add {destination_path}")
+            print(F"git add for StarCryo Log File:{destination_path}")
             files_added.add(original_basename)
     if 1 < len(files_added):
         # commit the files that have been added if there is at least 2 files
         os.system('''git commit -m "Automatically added star cryo log files."''')
+        print(F"git commit -m 'Automatically added star cryo log files'")
 
 
 if __name__ == "__main__":

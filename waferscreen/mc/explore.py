@@ -3,9 +3,10 @@
 
 import os
 import datetime
-import numpy as np
-from operator import itemgetter
 import itertools
+from operator import itemgetter
+from multiprocessing import Pool
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from waferscreen.data_io.data_pro import get_all_lamb_files, get_lamb_files_between_dates
@@ -20,7 +21,8 @@ from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, r
 from waferscreen.plot.explore_plots import report_plot
 from waferscreen.plot.explore_frequency import frequencies_plot
 from waferscreen.inst_control.starcryo_monitor import StarCryoData
-from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, min_spacings_khz, project_starcryo_logs_dir
+from ref import too_long_did_not_read_dir, in_smurf_keepout, in_band, min_spacings_khz, project_starcryo_logs_dir, \
+    starcryo_logs_dir, multiprocessing_threads
 
 
 # Pure magic, https://stackoverflow.com/questions/2641484/class-dict-self-init-args
@@ -31,7 +33,7 @@ class AttrDict(dict):
 
 
 # star cryo data
-starcryo = StarCryoData(logs_dir=project_starcryo_logs_dir)
+starcryo = StarCryoData(logs_dir=starcryo_logs_dir)
 
 
 class SingleLamb:
@@ -143,7 +145,6 @@ class SingleLamb:
                 write_s21(output_file=lamb_path, freqs_ghz=freqs_ghz,
                           s21_complex=s21_complex, metadata=metadata,
                           fitted_resonators_parameters=self.res_fits, lamb_params_fits=lamb_fits)
-
 
 
 def set_if(thing, other_thing, type_of_thing='unknown'):
@@ -302,6 +303,10 @@ class WafersSWB:
             self.__setattr__(wafer_handle, ChipIDsSWB(single_lamb=single_lamb))
 
 
+def single_lamb_pro(lamb_path, auto_load, get_temperatures):
+    return SingleLamb(path=lamb_path, auto_load=auto_load, get_temperatures=get_temperatures)
+
+
 class LambExplore:
     measurement_stats_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_stats.csv")
     measurement_records_cvs_path = os.path.join(too_long_did_not_read_dir, "measurement_summary.csv")
@@ -310,14 +315,14 @@ class LambExplore:
     device_records_cvs_path = os.path.join(too_long_did_not_read_dir, "device_summary.csv")
     device_plot_path = os.path.join(too_long_did_not_read_dir, "device_frequencies_plot.pdf")
 
-    def __init__(self, start_date=None, end_date=None, lambda_params_data=None, get_temperatures=False):
+    def __init__(self, start_date=None, end_date=None, lambda_params_data=None, get_temperatures=False, verbose=True):
         """
         :param start_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                            or None. None will set the minimum date for data retrieval to be 0001-01-01
         :param end_date: expecting the class datetime.date, as in start_date=datetime.date(year=2020, month=4, day=25)
                          or None. None will set the maximum date for data to be retrieved as 9999-12-31
         """
-
+        self.verbose = verbose
         if start_date is None:
             self.start_date = datetime.date.min
         else:
@@ -340,15 +345,27 @@ class LambExplore:
         self.spacing_dict_keys = None
         # there are two ways to initiate this class
         if lambda_params_data is None:
+            self.lamb_params_data = {}
             # 1) A a read-in from the lambda csv files
-            if start_date is None and end_date is None:
-                self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True,
-                                                               get_temperatures=self.get_temperatures)
-                                         for lamb_path in get_all_lamb_files()}
+            lamb_paths = get_lamb_files_between_dates(start_date=self.start_date, end_date=self.end_date)
+            if multiprocessing_threads is None or multiprocessing_threads < 2:
+                len_path = len(lamb_paths)
+                print_interval = 1  # max(int(np.round(len_path * 0.01)), 1)
+                for lamb_index, lamb_path in list(enumerate(lamb_paths)):
+                    self.lamb_params_data[lamb_path] = SingleLamb(path=lamb_path, auto_load=True,
+                                                                  get_temperatures=self.get_temperatures)
+                    if self.verbose and lamb_index % print_interval == 0:
+                        index_plus_one = lamb_index + 1
+                        percent_value = 100.0 * float(index_plus_one) / len_path
+                        print(F"{'%6.2f' % percent_value}% of explore.py Lambda files read: " +
+                              F"{'%6i' % index_plus_one} of {len_path} files")
             else:
-                self.lamb_params_data = {lamb_path: SingleLamb(path=lamb_path, auto_load=True)
-                                         for lamb_path in get_lamb_files_between_dates(start_date=self.start_date,
-                                                                                       end_date=self.end_date)}
+                single_lamb_pro_args = [(lamb_path, True, get_temps) for lamb_path, get_temps
+                                        in zip(lamb_paths, [self.get_temperatures] * len(lamb_paths))]
+                with Pool(multiprocessing_threads) as p:
+                    single_lambs = p.starmap(single_lamb_pro, single_lamb_pro_args)
+                    self.lamb_params_data = {lamb_path: single_lamb for lamb_path, single_lamb
+                                             in zip(lamb_paths, single_lambs)}
         else:
             # 2) A lambda_params_data from a prior read-in
             self.lamb_params_data = lambda_params_data
