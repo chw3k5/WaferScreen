@@ -227,7 +227,7 @@ class StarCryoData:
             for log_path, log_type, log_start_time in list(self.starcryo_file_info_unread):
                 self.raw_records_reversed.extend(get_log_data_from_file(log_path=log_path))
                 self.starcryo_file_info_unread.popleft()
-                self.history_begin_datetime = self.raw_records[-1].timestamp
+                self.history_begin_datetime = self.raw_records_reversed[-1].timestamp
                 if log_start_time < utc:
                     break
         # In order of increasing values order is needed for the bisect method

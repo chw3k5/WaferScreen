@@ -808,7 +808,7 @@ def full_analysis(start_date=None, end_date=None, lamb_explore=None,
 
 
 if __name__ == "__main__":
-    do_summary_report_plots = False
+    do_summary_report_plots = True
     do_frequency_report_plot = False
 
     example_start_date = datetime.date(year=2021, month=1, day=1)
@@ -818,7 +818,7 @@ if __name__ == "__main__":
     if do_summary_report_plots:
         example_lamb_explore = standard_summary_report_plots(start_date=example_start_date, end_date=example_end_date,
                                                              lamb_explore=example_lamb_explore,
-                                                             get_temperatures=False, redo_get_temps=False)
+                                                             get_temperatures=True, redo_get_temps=True)
 
     if do_frequency_report_plot:
         example_lamb_explore = frequency_report_plot(start_date=example_start_date, end_date=example_end_date,
