@@ -240,28 +240,39 @@ class StarCryoData:
         if utc < self.history_begin_datetime:
             self.read_records(utc=utc)
         # do the binary search for the record index
-        time_stamps_right_index = bisect.bisect(a=self.time_stamps, x=utc)
+        time_stamps_left_index = bisect.bisect(a=self.time_stamps, x=utc)
         # get the record index to the right of the requested tim
-        time_stamps_left_index = time_stamps_right_index - 1
+        time_stamps_right_index = time_stamps_left_index - 1
         # a few calculations
-        rec_right = self.raw_records[time_stamps_right_index]
-        rec_left = self.raw_records[time_stamps_left_index]
-        dt_right = utc - rec_right.timestamp
-        dt_left = rec_left.timestamp - utc
-        # the records need to be within the self.record_return_cutoff_seconds of the requested time to be returned
-        if dt_right < timedelta(seconds=self.record_return_cutoff_seconds) \
-                or dt_left < timedelta(seconds=self.record_return_cutoff_seconds):
-            # choose what record is closer
-            if dt_right < dt_left:
+        if time_stamps_left_index == len(self.time_stamps):
+            rec_right = self.raw_records[time_stamps_right_index]
+            dt_right = rec_right.timestamp - utc
+            if dt_right < timedelta(seconds=self.record_return_cutoff_seconds):
                 found_record = rec_right
             else:
-                found_record = rec_left
-        else:
-            if verbose:
                 print(F"\nNo StarCryo Log records within {self.record_return_cutoff_seconds} seconds of the")
                 print(F"requested time: {utc})")
-                print(F" left (after) record delta t: {dt_left}")
+                print(F"No left (after) records")
                 print(F"right (before) record delta t: {dt_right}")
+        else:
+            rec_right = self.raw_records[time_stamps_right_index]
+            rec_left = self.raw_records[time_stamps_left_index]
+            dt_right = utc - rec_right.timestamp
+            dt_left = rec_left.timestamp - utc
+            # the records need to be within the self.record_return_cutoff_seconds of the requested time to be returned
+            if dt_right < timedelta(seconds=self.record_return_cutoff_seconds) \
+                    or dt_left < timedelta(seconds=self.record_return_cutoff_seconds):
+                # choose what record is closer
+                if dt_right < dt_left:
+                    found_record = rec_right
+                else:
+                    found_record = rec_left
+            else:
+                if verbose:
+                    print(F"\nNo StarCryo Log records within {self.record_return_cutoff_seconds} seconds of the")
+                    print(F"requested time: {utc})")
+                    print(F" left (after) record delta t: {dt_left}")
+                    print(F"right (before) record delta t: {dt_right}")
         return found_record
 
 

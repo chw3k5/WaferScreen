@@ -14,6 +14,7 @@ from waferscreen.data_io.lamb_io import remove_processing_tags
 from waferscreen.data_io.s21_io import read_s21, write_s21
 from waferscreen.data_io.series_io import SeriesKey, series_key_header
 from waferscreen.data_io.chip_metadata import chip_metadata, wafer_pos_to_band_and_group
+from waferscreen.data_io.s21_metadata import MetaDataDict
 from waferscreen.data_io.explore_io import wafer_num_to_str, wafer_str_to_num, res_num_to_str, seed_name_to_handle, \
     chip_id_str_to_chip_id_handle, chip_id_tuple_to_chip_id_str, chip_id_str_to_chip_id_tuple, band_str_to_num, \
     FrequencyReportEntry, frequency_report_entry_header, calc_metadata_header, PhysicalChipData, \
@@ -136,6 +137,8 @@ class SingleLamb:
                                               for res_record in self.res_fit_to_starcryo_record.keys()])
                 self.adr_50mk = np.mean(temperature_array)
                 # save this result
+                if 'adr_50mk' in metadata.keys():
+                    metadata = MetaDataDict({a_key: metadata[a_key] for a_key in set(metadata.keys()) - {'adr_50mk'}})
                 metadata['adr_50mk'] = self.adr_50mk
                 if s21 is None:
                     s21_complex = None
@@ -304,8 +307,8 @@ class WafersSWB:
             self.__setattr__(wafer_handle, ChipIDsSWB(single_lamb=single_lamb))
 
 
-def single_lamb_pro(lamb_path, auto_load, get_temperatures):
-    return SingleLamb(path=lamb_path, auto_load=auto_load, get_temperatures=get_temperatures)
+def single_lamb_pro(lamb_path, auto_load, get_temperatures, redo):
+    return SingleLamb(path=lamb_path, auto_load=auto_load, get_temperatures=get_temperatures, redo_get_temps=redo)
 
 
 class LambExplore:
@@ -364,8 +367,9 @@ class LambExplore:
                         print(F"{'%6.2f' % percent_value}% of explore.py Lambda files read: " +
                               F"{'%6i' % index_plus_one} of {len_path} files")
             else:
-                single_lamb_pro_args = [(lamb_path, True, get_temps) for lamb_path, get_temps
-                                        in zip(lamb_paths, [self.get_temperatures] * len(lamb_paths))]
+                single_lamb_pro_args = [(lamb_path, True, get_temps, redos) for lamb_path, get_temps, redos,
+                                        in zip(lamb_paths, [self.get_temperatures] * len(lamb_paths),
+                                               [self.redo_get_temps] * len(lamb_paths))]
                 with Pool(multiprocessing_threads) as p:
                     single_lambs = p.starmap(single_lamb_pro, single_lamb_pro_args)
                     self.lamb_params_data = {lamb_path: single_lamb for lamb_path, single_lamb
