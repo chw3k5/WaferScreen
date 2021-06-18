@@ -778,9 +778,11 @@ def standard_summary_report_plots(start_date=None, end_date=None, lamb_explore=N
     return lamb_explore
 
 
-def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
+def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None,
+                          get_temperatures=False, redo_get_temps=False):
     if lamb_explore is None:
-        lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
+        lamb_explore = LambExplore(start_date=start_date, end_date=end_date,
+                                   get_temperatures=get_temperatures, redo_get_temps=redo_get_temps)
     lamb_explore.frequency_report()
     lamb_explore.organize(structure_key="swb")
     lamb_explore.organize(structure_key="wbs")
@@ -788,9 +790,11 @@ def frequency_report_plot(start_date=None, end_date=None, lamb_explore=None):
 
 
 def full_analysis(start_date=None, end_date=None, lamb_explore=None,
+                  get_temperatures=False, redo_get_temps=False,
                   do_device_scale=True, do_measurement_scale=True):
     if lamb_explore is None:
-        lamb_explore = LambExplore(start_date=start_date, end_date=end_date)
+        lamb_explore = LambExplore(start_date=start_date, end_date=end_date,
+                                   get_temperatures=get_temperatures, redo_get_temps=redo_get_temps)
     # lamb_explore.do_frequencies_analysis()
     lamb_explore.frequency_report(do_device_scale=do_device_scale, do_measurement_scale=do_measurement_scale)
     lamb_explore.organize(structure_key="swb")
@@ -802,8 +806,11 @@ def full_analysis(start_date=None, end_date=None, lamb_explore=None,
 
 
 if __name__ == "__main__":
-    do_summary_report_plots = True
+    do_summary_report_plots = False
     do_frequency_report_plot = False
+
+    get_temperatures = True
+    redo_get_temps = True
 
     example_start_date = datetime.date(year=2021, month=1, day=1)
     example_end_date = datetime.date(year=2022, month=5, day=30)
@@ -812,12 +819,16 @@ if __name__ == "__main__":
     if do_summary_report_plots:
         example_lamb_explore = standard_summary_report_plots(start_date=example_start_date, end_date=example_end_date,
                                                              lamb_explore=example_lamb_explore,
-                                                             get_temperatures=True, redo_get_temps=True)
+                                                             get_temperatures=get_temperatures,
+                                                             redo_get_temps=redo_get_temps)
 
     if do_frequency_report_plot:
         example_lamb_explore = frequency_report_plot(start_date=example_start_date, end_date=example_end_date,
-                                                     lamb_explore=example_lamb_explore)
+                                                     lamb_explore=example_lamb_explore,
+                                                     get_temperatures=get_temperatures,
+                                                     redo_get_temps=redo_get_temps)
 
     if all([not do_summary_report_plots, not do_frequency_report_plot]):
         full_analysis(start_date=example_start_date, end_date=example_end_date, lamb_explore=example_lamb_explore,
+                      get_temperatures=get_temperatures, redo_get_temps=redo_get_temps,
                       do_device_scale=True, do_measurement_scale=True)
