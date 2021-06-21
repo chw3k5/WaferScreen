@@ -354,12 +354,12 @@ class LambExplore:
             # 1) A a read-in from the lambda csv files
             lamb_paths = get_lamb_files_between_dates(start_date=self.start_date, end_date=self.end_date)
             len_path = len(lamb_paths)
-            print_interval = 1  # max(int(np.round(len_path * 0.01)), 1)
+            print_interval = 10  # max(int(np.round(len_path * 0.01)), 1)
             for lamb_index, lamb_path in list(enumerate(lamb_paths)):
                 self.lamb_params_data[lamb_path] = SingleLamb(path=lamb_path, auto_load=True,
                                                               get_temperatures=self.get_temperatures,
                                                               redo_get_temps=self.redo_get_temps)
-                if self.verbose and lamb_index % print_interval == 0:
+                if self.verbose and (lamb_index % print_interval == 0 or lamb_index == len_path - 1):
                     index_plus_one = lamb_index + 1
                     percent_value = 100.0 * float(index_plus_one) / len_path
                     print(F"{'%6.2f' % percent_value}% of explore.py Lambda files read: " +
@@ -490,8 +490,11 @@ class LambExplore:
             # make a new data container for port_power_dbm
             if port_power_dbm not in wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name].keys():
                 wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm] = set()
-            # take the average of the resonator fit
+            # frequency in GHz - take the average of the resonator fit
             f_ghz = float(np.mean(np.array([res_fit.fcenter_ghz for res_fit in lambda_data_this_lap.res_fits])))
+            # temperature in Kelvin
+            adr_50mk_k = lambda_data_this_lap.adr_50mk
+
             # collect the data record information
             is_in_band = in_band(band_str=lambda_data_this_lap.so_band, f_ghz=f_ghz)
             is_in_keepout = in_smurf_keepout(f_ghz=f_ghz)
@@ -506,7 +509,7 @@ class LambExplore:
             frequency_report_entry = FrequencyReportEntry(f_ghz=f_ghz, so_band=so_band_num,
                                                           is_in_band=is_in_band, is_in_keepout=is_in_keepout,
                                                           lambda_path=lambda_path, group_num=group_num,
-                                                          flags=flags_str)
+                                                          flags=flags_str, adr_fiftymk_k=adr_50mk_k)
             # add the data record
             wafer_scale_frequencies_data[wafer_num][chip_id_str][seed_name][port_power_dbm].add(frequency_report_entry)
         # With all the data collected we do some statistics and order the data
@@ -810,7 +813,7 @@ if __name__ == "__main__":
     do_frequency_report_plot = False
 
     get_temperatures = True
-    redo_get_temps = True
+    redo_get_temps = False
 
     example_start_date = datetime.date(year=2021, month=1, day=1)
     example_end_date = datetime.date(year=2022, month=5, day=30)

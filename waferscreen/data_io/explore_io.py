@@ -101,7 +101,7 @@ required_frequency_report_entry_header = ['lambda_path', 'f_ghz', 'so_band', 'is
 optional_frequency_report_entry_header = ['res_num', 'designed_f_ghz', 'x_pos_mm_on_chip', 'y_pos_mm_on_chip',
                                           'resonator_height_um', 'wiggles', 'sliders', 'slider_delta_um',
                                           'resonator_impedance_ohms', 'coupling_capacitance_f',
-                                          'coupling_inductance_h',
+                                          'coupling_inductance_h', 'adr_fiftymk_k',
                                           'group_num', 'flags']
 
 frequency_report_entry_header = []
@@ -134,6 +134,7 @@ class FrequencyReportEntry(NamedTuple):
     resonator_impedance_ohms: Optional[float] = None
     coupling_capacitance_f: Optional[float] = None
     coupling_inductance_h: Optional[float] = None
+    adr_fiftymk_k: Optional[float] = None
 
     def __str__(self):
         return_str = ""

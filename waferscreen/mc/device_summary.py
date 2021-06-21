@@ -12,9 +12,13 @@ wafer_num_to_color_dict = {9: "seagreen", 11: "crimson", 12: "darkgoldenrod", 13
                            15: "rebeccapurple", 16: "DarkOrange"}
 column_name_to_axis_label = {'lamb_at_minus95dbm': "Lambda (-95dBm est. at devices)",
                              'flux_ramp_pp_khz_at_minus95dbm': 'Flux Ramp peak-to-peak (kHz) (-95dBm est. at devices)',
-                             'q_i_mean_at_minus75dbm': 'Qi (-75dBm est. at devices)'}
+                             'flux_ramp_pp_khz_at_minus75dbm': 'Flux Ramp peak-to-peak (kHz) (-75dBm est. at devices)',
+                             'q_i_mean_at_minus75dbm': 'Qi (-75dBm est. at devices)',
+                             'adr_fiftymk_k': 'Temperature (K) at ADR rod'}
 column_name_to_range = {'flux_ramp_pp_khz_at_minus95dbm': (30, 0, 250),
-                        'lamb_at_minus95dbm': (60, 0, 0.7)}
+                        'flux_ramp_pp_khz_at_minus75dbm': (30, 0, 250),
+                        'lamb_at_minus95dbm': (60, 0.0, 0.7),
+                        'adr_fiftymk_k': (50, 0.0, 0.300)}
 hatches = ['/', '*', '|', '\\', 'x', 'o', '-', '.', '0', '+']
 len_hatches = len(hatches)
 
@@ -116,6 +120,9 @@ if __name__ == '__main__':
 
     device_records = pandas.read_csv(filepath_or_buffer=device_records_cvs_path, index_col=0)
     delta_f_plot(device_records=device_records, show=False, output_dir=device_summaries_dir)
-    for column_name in ['lamb_at_minus95dbm', 'flux_ramp_pp_khz_at_minus95dbm', 'q_i_mean_at_minus75dbm']:
+
+    hist_columns = ['lamb_at_minus95dbm', 'flux_ramp_pp_khz_at_minus75dbm', 'q_i_mean_at_minus75dbm',
+                    'adr_fiftymk_k']
+    for column_name in hist_columns:
         histogram_per_wafer(device_records=device_records, column_name=column_name,
                             show=False, output_dir=device_summaries_dir, num_of_bins=20, alpha=0.4)
