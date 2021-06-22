@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from ref import device_stats_dir, min_spacings_khz
@@ -198,12 +197,14 @@ class DeviceStats:
             self.device_stats_by_chip[chip_id][group_id] = chip_row
         self.available_chip_ids = set(self.device_stats_by_chip.keys())
 
-    def wafer_yield_study(self):
+    def wafer_yield_study(self, verbose=True):
         """
         Make a single pdf of plot, one wafer per page, each page is a trade study of yield as a function of
         resonator spacing.
         :return:
         """
+        if verbose:
+            print('\nStarting wafer_yield_study in device_stats.py')
         # default figure settings
         figure_size = (12, 8)
         frameon = False
@@ -250,6 +251,8 @@ class DeviceStats:
                 pdf_pages.savefig(fig_this_wafer)
                 # close all the figures and free up the resources
                 plt.close(fig=fig_this_wafer)
+        if verbose:
+            print(F"  Saved plot: {wafer_yield_study_path}")
 
 
 if __name__ == '__main__':

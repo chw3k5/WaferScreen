@@ -92,7 +92,9 @@ def delta_f_plot(device_records, show=True, output_dir=None, markersize=30, font
     ax.set_xlabel('Designed Frequency (GHz)', size=fontsize)
     # save the plot
     if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, "delta_f_per_wafer.pdf"))
+        plot_path = os.path.join(output_dir, "delta_f_per_wafer.pdf")
+        plt.savefig(plot_path)
+        print(F"  Plot saved: {plot_path}")
     # show the plot
     if show:
         plt.show(block=True)
@@ -187,7 +189,9 @@ def histogram_per_wafer(device_records, column_name="lamb_at_minus95dbm", show=T
         ax.set_xlabel(column_name, size=fontsize)
     # save the plot if requested
     if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, F"{column_name}_per_wafer.png"))
+        plot_path = os.path.join(output_dir, F"{column_name}_per_wafer.png")
+        plt.savefig(plot_path)
+        print(F"  Plot saved: {plot_path}")
     # show the plot if requested
     if show:
         plt.show(block=True)
@@ -195,14 +199,49 @@ def histogram_per_wafer(device_records, column_name="lamb_at_minus95dbm", show=T
     plt.close(fig=fig)
 
 
-if __name__ == '__main__':
-    device_records_cvs_path = LambExplore.device_records_cvs_path
+def standard_summary_plots(device_records_cvs_path, output_dir=None, hist_columns=None,
+                           hist_num_of_bins=20, hist_alpha=0.4, verbose=False):
+    """
+    A single definition to run all of the standard device_summaries plots at once. This can be used as a starting
+    point or an example for someone making that own analysis and plots.
 
+    This function automatically makes summary plots, and can be maintained to include additional plots for analysis.
+
+    :param device_records_cvs_path: str - the path to device_summaries.csv. See the example path at the bottom of
+                                          this file, device_summaries_path
+    :param output_dir: str - the output path for the saved data plot. None, the default, does not save any plots.
+    :param hist_columns: iterable of stings - each string is a column name in device_summary.csv
+    :param hist_num_of_bins: int - number of histograms bins, Note: this value is overridden if column_name is in
+                                   column_name_to_range.keys() as defined at the top of this file.
+    :param hist_alpha: float - 0.0 (invisible) to 1.0 (opaque) to control the transparency of the
+                               bar graphs of the histograms.
+    :return: pandas.DataFrame - the pandas DataFrame for all the data in device_summaries.csv
+    """
+    if verbose:
+        print('\nDoing standard_summary_plots() in device_summary.py')
+    # set defaults
+    if hist_columns is None:
+        hist_columns = ['lamb_at_minus95dbm', 'flux_ramp_pp_khz_at_minus75dbm', 'q_i_mean_at_minus75dbm',
+                        'adr_fiftymk_k']
+    # import the all the data in in device_summary.csv
     device_records = pandas.read_csv(filepath_or_buffer=device_records_cvs_path, index_col=0)
-    delta_f_plot(device_records=device_records, show=False, output_dir=device_summaries_dir)
-
-    hist_columns = ['lamb_at_minus95dbm', 'flux_ramp_pp_khz_at_minus75dbm', 'q_i_mean_at_minus75dbm',
-                    'adr_fiftymk_k']
+    # plot and save the delta_f plot
+    delta_f_plot(device_records=device_records, show=False, output_dir=output_dir)
+    # plot and save the each histogram in hist_columns
     for column_name in hist_columns:
         histogram_per_wafer(device_records=device_records, column_name=column_name,
-                            show=False, output_dir=device_summaries_dir, num_of_bins=20, alpha=0.4)
+                            show=False, output_dir=output_dir, num_of_bins=hist_num_of_bins, alpha=hist_alpha)
+    return device_records
+
+
+if __name__ == '__main__':
+    # get the path of this python file
+    ref_file_path = os.path.dirname(os.path.realpath(__file__))
+    # find the path to the WaferScreen directory
+    parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
+    # this is the standard path to device_summary.csv that is created by explore.py
+    device_summaries_path = os.path.join(parent_dir, "WaferScreen", "waferscreen", "tldr", "device_summary.csv")
+    # run the standard data summary plots
+    example_device_records = standard_summary_plots(device_records_cvs_path=device_summaries_path,
+                                                    output_dir=None, hist_columns=None,
+                                                    hist_num_of_bins=20, hist_alpha=0.4)
