@@ -6,9 +6,6 @@ import pandas
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-# only used to get input and output directory information
-from ref import device_summaries_dir
-from waferscreen.mc.explore import LambExplore
 
 
 # A warning that we are changing and smaller version of a larger table
