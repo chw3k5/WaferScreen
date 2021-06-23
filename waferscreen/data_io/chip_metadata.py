@@ -21,12 +21,14 @@ class ChipMetaData:
         # initialized values
         self.by_band_res_num = None
         self.by_band = None
+        self.by_band_sorted_by_x_pos = None
         # read the data from file
         self.read()
 
     def read(self):
         self.by_band_res_num = {}
         self.by_band = {}
+        self.by_band_sorted_by_x_pos = {}
         with open(self.path, 'r') as f:
             raw_lines = [a_line.strip() for a_line in f.readlines()]
         header = raw_lines[0].split(",")
@@ -48,6 +50,11 @@ class ChipMetaData:
         for so_band_num in self.by_band.keys():
             res_data_by_band = self.by_band[so_band_num]
             self.by_band[so_band_num] = sorted(res_data_by_band, key=itemgetter("res_num_per_chip"))
+            for data_dict in res_data_by_band:
+                x_pos_mm = data_dict['x_pos_mm']
+                if x_pos_mm is None:
+                    print('test point')
+            self.by_band_sorted_by_x_pos[so_band_num] = sorted(res_data_by_band, key=itemgetter("x_pos_mm"))
 
     def return_res_metadata(self, so_band_num, res_num):
         chip_metadata_id = ChipMetaDataID(so_band=int(so_band_num), res_num_per_chip=int(res_num))
@@ -56,9 +63,11 @@ class ChipMetaData:
         else:
             return None
 
-    def return_band_metadata(self, so_band_num):
+    def return_band_metadata(self, so_band_num, sorted_by_x_pos=False):
         so_band_num = int(so_band_num)
         if so_band_num in self.by_band.keys():
+            if sorted_by_x_pos:
+                return self.by_band_sorted_by_x_pos[so_band_num]
             return self.by_band[so_band_num]
         else:
             return None
