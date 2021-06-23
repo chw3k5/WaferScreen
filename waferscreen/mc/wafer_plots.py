@@ -15,6 +15,12 @@ column_name_to_range = {'flux_ramp_pp_khz_at_minus95dbm': (0, 250),  # (color_mi
                         'lamb_at_minus95dbm': (0.0, 0.7),
                         'adr_fiftymk_k': (0.0, 0.300)}
 
+column_name_to_axis_label = {'lamb_at_minus95dbm': "Lambda (-95dBm est. at devices)",
+                             'flux_ramp_pp_khz_at_minus95dbm': 'Flux Ramp peak-to-peak (kHz) (-95dBm est. at devices)',
+                             'flux_ramp_pp_khz_at_minus75dbm': 'Flux Ramp peak-to-peak (kHz) (-75dBm est. at devices)',
+                             'q_i_mean_at_minus75dbm': 'Qi (-75dBm est. at devices)',
+                             'adr_fiftymk_k': 'Temperature (K) at ADR rod'}
+
 
 def read_device_summaries(path):
     # read in raw data
@@ -34,32 +40,39 @@ class ParameterSurveys:
     # plot options
     figure_size = (10, 10)
     frameon = False
-    left_ax_margin = 0.10
+    colormap = 'gist_rainbow'
+
+    # spacing of the main plot axis
+    left_ax_margin = 0.06
     right_ax_margin = 0.00
-    bottom_ax_margin = 0.24
+    bottom_ax_margin = 0.14
     top_ax_margin = 0.04
     width = 1.0 - left_ax_margin - right_ax_margin
     height = 1.0 - bottom_ax_margin - top_ax_margin
     axis_in_figure_coord = [left_ax_margin, bottom_ax_margin, width, height]
 
-    inter_axis_spacing = 0.04
+    # spacing for the color bar axis
+    inter_axis_spacing = 0.07
     colorbar_bottom_ax_margin = 0.06
     colorbar_height = bottom_ax_margin - colorbar_bottom_ax_margin - inter_axis_spacing
     colorbar_x_pad = 0.02
-    colorbar_left_ax_margin = left_ax_margin + colorbar_x_pad
-    colorbar_width = width - (2.0 * colorbar_x_pad)
-
+    colorbar_left_ax_margin = colorbar_x_pad
+    colorbar_width = 1.0 - (2.0 * colorbar_x_pad)
     colorbar_axis_in_figure_coord = [colorbar_left_ax_margin, colorbar_bottom_ax_margin,
                                      colorbar_width, colorbar_height]
 
+    # chip level layout spacing and rules
     group_colors = {1: 'dodgerblue', 2: 'firebrick', 3: 'darkgoldenrod'}
 
-    chip_zone_width = 0.9
+    chip_zone_width = 0.95
     half_chip_zone_width = chip_zone_width * 0.5
     chip_zone_height = 0.9
     half_chip_zone_height = chip_zone_height * 0.5
 
-    colormap = 'gist_rainbow'
+    rug_left = -half_chip_zone_width + 0.01
+    rug_right = half_chip_zone_width - 0.01
+    rug_bottom = -half_chip_zone_height + 0.12
+    rug_top = half_chip_zone_height - 0.20
 
     def __init__(self, device_summaries_path, params=None, output_dir=None):
         self.params = params
@@ -91,50 +104,63 @@ class ParameterSurveys:
             data_per_patch_ids[patch_id].append(device_plot_dict)
         # loop chips ids
         for patch_id in sorted(data_per_patch_ids.keys()):
-            # plot the bounding boxed that indicate the chip and band information
             x_chip_pos, y_chip_pos, group_num, so_band_num = patch_id
-            color = self.group_colors[group_num]
+            group_color = self.group_colors[group_num]
+            # in plot coordinated
             rectangle_left = x_chip_pos - self.half_chip_zone_width
             rectangle_bottom = y_chip_pos - self.half_chip_zone_height
             rectangle_right = x_chip_pos + self.half_chip_zone_width
             rectangle_top = y_chip_pos + self.half_chip_zone_height
+            # get the bound of the resonators threads (inside the rectangle)
+            rug_left = self.rug_left + x_chip_pos
+            rug_right = self.rug_right + x_chip_pos
+            rug_bottom = self.rug_bottom + y_chip_pos
+            rug_top = self.rug_top + y_chip_pos
+            # plot the bounding boxed that indicate the chip and band information
             ax_this_wafer.add_patch(Rectangle(xy=(rectangle_left, rectangle_bottom),
                                               width=self.chip_zone_width, height=self.chip_zone_height,
-                                              edgecolor=color, facecolor='white'))
+                                              edgecolor=group_color, facecolor='white'))
             patch_text = F"({'%i' % x_chip_pos}, {'%i' % y_chip_pos}) Band{'%02i' % so_band_num} Group-{group_num}"
-            ax_this_wafer.text(x=x_chip_pos, y=y_chip_pos + self.half_chip_zone_height, s=patch_text,
-                               color=color, ha='center', va='top', fontsize=6)
+            chip_label_y_pos_center = (rectangle_top + rug_top) * 0.5
+            ax_this_wafer.text(x=x_chip_pos, y=chip_label_y_pos_center, s=patch_text,
+                               color=group_color, ha='center', va='center', fontsize=6)
             # sort the data to plot by 'x_pos_mm_on_chip'
             device_plot_dicts = sorted(data_per_patch_ids[patch_id], key=itemgetter('x_pos_mm_on_chip'))
             x_pos_mm_on_chip_min = device_plot_dicts[0]['x_pos_mm_on_chip']
             x_pos_mm_on_chip_max = device_plot_dicts[-1]['x_pos_mm_on_chip']
-            plot_pos_chip_pos_slope = (rectangle_right - rectangle_left) / (x_pos_mm_on_chip_max - x_pos_mm_on_chip_min)
             # sort the data to plot by 'designed_f_ghz'
             device_plot_dicts_by_designed_f_ghz = sorted(data_per_patch_ids[patch_id], key=itemgetter('designed_f_ghz'))
             designed_f_ghz_min = device_plot_dicts_by_designed_f_ghz[0]['designed_f_ghz']
             designed_f_ghz_max = device_plot_dicts_by_designed_f_ghz[-1]['designed_f_ghz']
             designed_f_span_ghz = designed_f_ghz_max - designed_f_ghz_min
 
+            plot_pos_chip_pos_slope = (rug_right - rug_left) / (x_pos_mm_on_chip_max - x_pos_mm_on_chip_min)
+
             def x_plot_pos(x_pos_mm_on_chip, designed_f_ghz, f_ghz):
-                x_plot_coord = x_chip_pos + plot_pos_chip_pos_slope * x_pos_mm_on_chip
+                x_plot_coord = plot_pos_chip_pos_slope * (x_pos_mm_on_chip - x_pos_mm_on_chip_min) + rug_left
                 return x_plot_coord
 
             for device_plot_dict in device_plot_dicts:
                 parameter_value = device_plot_dict['parameter_value']
                 x_pos_mm_on_chip = device_plot_dict['x_pos_mm_on_chip']
-                y_pos_mm_on_chip = device_plot_dict['y_pos_mm_on_chip']
+                # y_pos_mm_on_chip = device_plot_dict['y_pos_mm_on_chip']
                 chip_id_str = device_plot_dict['chip_id_str']
                 chip_id_so_band_num = device_plot_dict['chip_id_so_band_num']
                 res_num = device_plot_dict['res_num']
                 designed_f_ghz = device_plot_dict['designed_f_ghz']
                 f_ghz = device_plot_dict['f_ghz']
                 x_plot_coord = x_plot_pos(x_pos_mm_on_chip, designed_f_ghz, f_ghz)
-                ax_this_wafer.plot((x_plot_coord, x_plot_coord), (rectangle_bottom, rectangle_top),
-                                   color=scalar_map.to_rgba(parameter_value), linewidth=1)
+                value_color = scalar_map.to_rgba(parameter_value)
+                ax_this_wafer.plot((x_plot_coord, x_plot_coord), (rug_bottom, rug_top), color=value_color, linewidth=2)
+                ax_this_wafer.text(x=x_plot_coord, y=rug_bottom, s=F"{'%02i' % res_num}  ",
+                                   color='black', ha='center', va='top', fontsize=2, rotation=90.0)
 
         # colorbar
         cb1 = matplotlib.colorbar.ColorbarBase(ax=ax_colorbar, cmap=cmap, norm=norm, orientation='horizontal')
-        cb1.set_label(F'{parameter}')
+        if parameter in column_name_to_axis_label.keys():
+            cb1.set_label(F'{column_name_to_axis_label[parameter]}')
+        else:
+            cb1.set_label(F'{parameter}')
         # wafer axis tick marks
         ax_this_wafer.set_xlim((-1.5, 1.5))
         ax_this_wafer.set_ylim((-7.5, 7.5))
@@ -142,6 +168,10 @@ class ParameterSurveys:
         ax_this_wafer.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=True)
         ax_this_wafer.set_yticks(ticks=[-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7])
         ax_this_wafer.tick_params(axis='y', which='both', bottom=False, top=False, labelbottom=True)
+        # axis labels
+        ax_this_wafer.set_ylabel(F"Y Chip Position Label")
+        ax_this_wafer.set_xlabel(F"X Chip Position Label")
+        # legend
         legend_lines = []
         legend_labels = []
         for group_num in sorted(self.group_colors.keys()):
