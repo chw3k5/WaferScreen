@@ -8,15 +8,18 @@ import datetime
 This is not PEP8 formatting, breaking up the import statements. I will explain:
 
 The working direction for this project should always be ~/WaferScreen/
-if you are in the python terminal then you should  cd to this directory and start python and ui.py as follows
+if you are in the python terminal then you should cd to this directory and start python and ui.py as follows
     $ cd your_path/WaferScreen/
     $ python
     >>> exec(open(waferscreen/mc/ui.py).read())
 
 People can not remember this. So I have this code below that figures out where the WaferScreen project is on
 the local computer and then manually add that to sys.path so that all the other modules of this project 
-import properly. The hope is that this reduces the number of emails I get from people who refuse to use 
-PyCharm and think project is something other than pure Python. 
+import properly. My hope is that this reduces the number of emails I get from people who refuse to use 
+PyCharm and think project is something other than pure Python.
+
+If you are no long making changes to this project, consider making a distribution from the setup.py file.
+This way you can import WaferScreen like any other Python module.
 """
 ref_file_path = os.path.dirname(os.path.realpath(__file__))
 parent_dir, _ = ref_file_path.rsplit("WaferScreen", 1)
@@ -31,6 +34,8 @@ from waferscreen.data_io.data_pro import get_raw_scan_files_between_dates, get_r
 from waferscreen.mc.explore import full_analysis, LambExplore
 from waferscreen.mc.device_summary import standard_summary_plots
 from waferscreen.mc.device_stats import DeviceStats
+from waferscreen.mc.wafer_plots import ParameterSurveys
+from ref import device_summaries_dir
 
 
 # edit these to look at existing measurements
@@ -41,6 +46,7 @@ do_model_fit_processing = False  # takes a very long time
 do_fit_exploration = True  # much less time
 do_device_summaries = do_fit_exploration  # very fast
 do_device_stats = do_fit_exploration  # very fast
+do_wafer_coord_visualization = do_fit_exploration  # fast
 
 # model fit processing in data_pro and s21_inductor
 do_quick_look = False
@@ -100,8 +106,16 @@ if __name__ == "__main__":
     # analysis of the per-device data in device_summary.csv
     if do_device_summaries:
         standard_summary_plots(device_records_cvs_path=LambExplore.device_records_cvs_path,
-                               output_dir=None, hist_columns=None, hist_num_of_bins=20, hist_alpha=0.4)
+                               output_dir=device_summaries_dir, hist_columns=None, hist_num_of_bins=20, hist_alpha=0.4)
     # analysis of the per-device statistics data in device_stats.csv
     if do_device_stats:
         device_stats = DeviceStats()
         device_stats.wafer_yield_study()
+    # see per-device results presented as a function of wafer position
+    if do_wafer_coord_visualization:
+        requested_params = ['lamb_at_minus95dbm', 'flux_ramp_pp_khz_at_minus75dbm', 'q_i_mean_at_minus75dbm']
+
+        example_per_wafer_dsd = ParameterSurveys(device_summaries_path=LambExplore.device_records_cvs_path,
+                                                 params=requested_params,
+                                                 output_dir=device_summaries_dir,
+                                                 show_f_shift=False)

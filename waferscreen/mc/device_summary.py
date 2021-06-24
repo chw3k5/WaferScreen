@@ -206,7 +206,8 @@ def standard_summary_plots(device_records_cvs_path, output_dir=None, hist_column
 
     :param device_records_cvs_path: str - the path to device_summaries.csv. See the example path at the bottom of
                                           this file, device_summaries_path
-    :param output_dir: str - the output path for the saved data plot. None, the default, does not save any plots.
+    :param output_dir: str - the output directory path for the saved data plot.
+                             None, the default, does not save any plots.
     :param hist_columns: iterable of stings - each string is a column name in device_summary.csv
     :param hist_num_of_bins: int - number of histograms bins, Note: this value is overridden if column_name is in
                                    column_name_to_range.keys() as defined at the top of this file.
