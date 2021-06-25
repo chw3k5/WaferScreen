@@ -13,12 +13,13 @@ from waferscreen.data_io.explore_io import chip_id_str_to_chip_id_tuple
 min_value_flux_ramp_pp_khz = 0
 green_value_flux_ramp_pp_khz = 130.0
 max_scale_flux_ramp_pp_khz = (16.0 / 7.0) * (green_value_flux_ramp_pp_khz - min_value_flux_ramp_pp_khz)
-
+# set ranges for specific parameters
 column_name_to_range = {'flux_ramp_pp_khz_at_minus95dbm': (min_value_flux_ramp_pp_khz, max_scale_flux_ramp_pp_khz),  # (color_min, color_max)
                         'flux_ramp_pp_khz_at_minus75dbm': (min_value_flux_ramp_pp_khz, max_scale_flux_ramp_pp_khz),
                         'lamb_at_minus95dbm': (-0.05, 0.75),
                         'adr_fiftymk_k': (0.0, 0.300)}
 
+# set axis labels for specific parameters
 column_name_to_axis_label = {'lamb_at_minus95dbm': "Lambda (-95dBm est. at devices)",
                              'flux_ramp_pp_khz_at_minus95dbm': 'Flux Ramp peak-to-peak (kHz) (-95dBm est. at devices)',
                              'flux_ramp_pp_khz_at_minus75dbm': 'Flux Ramp peak-to-peak (kHz) (-75dBm est. at devices)',
@@ -122,7 +123,7 @@ class ParameterSurveys:
                                  passing 'None', the default, does not save any plots.
         :param show_d_shift_in_x: bool - True adds an offset in the data's x position relative to the offset of from
                                          (f_measured - f_designed) / f_span_available_designed_frequencies_this_chip.
-                                         This can shift the dat out to the rectangular chip zone and make the data
+                                         This can shift the data out to the rectangular chip zone and make the data
                                          look messy. When this option is selected, the plot automatically resizes to
                                          capture all the available data when the data goes outside the plot bounds.
         :param show_f_design_shift_in_y: bool - True adds an offset in the data's y position relative to that
@@ -199,7 +200,7 @@ class ParameterSurveys:
             # in plot coordinated
             rectangle_left = x_chip_pos - self.half_chip_zone_width
             rectangle_bottom = y_chip_pos - self.half_chip_zone_height
-            rectangle_right = x_chip_pos + self.half_chip_zone_width
+            # rectangle_right = x_chip_pos + self.half_chip_zone_width
             rectangle_top = y_chip_pos + self.half_chip_zone_height
             # get the bound of the resonators threads (inside the rectangle)
             rug_left = self.rug_left + x_chip_pos

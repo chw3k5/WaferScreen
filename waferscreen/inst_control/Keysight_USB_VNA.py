@@ -7,7 +7,7 @@ import time
 class USBVNA():
     """ Keysight USB VNA instrument class. """
 
-    def __init__(self, address="GPIB::16"):
+    def __init__(self, address="TCPIP0::687UWAVE-TEST::hislip_PXI10_CHASSIS1_SLOT1_INDEX0,4880::INSTR"):
         self.ResourceManager = visa.ResourceManager()
         self.ctrl = self.ResourceManager.open_resource("%s" % address, write_termination='\n')
         self.ctrl.timeout = 1000000

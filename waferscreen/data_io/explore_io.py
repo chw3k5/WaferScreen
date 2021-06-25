@@ -43,7 +43,7 @@ def chip_id_str_to_chip_id_tuple(chip_id_str):
         x_pos, y_pos = pos_str_to_nums(pos_str=pos_str)
         return band_num, x_pos, y_pos
     else:
-        # just a band_str
+        # just a band
         return band_str_to_num(band_str=chip_id_str), None, None
 
 

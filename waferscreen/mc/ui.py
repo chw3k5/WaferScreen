@@ -114,8 +114,8 @@ if __name__ == "__main__":
     # see per-device results presented as a function of wafer position
     if do_wafer_coord_visualization:
         requested_params = ['lamb_at_minus95dbm', 'flux_ramp_pp_khz_at_minus75dbm', 'q_i_mean_at_minus75dbm']
-
-        example_per_wafer_dsd = ParameterSurveys(device_summaries_path=LambExplore.device_records_cvs_path,
+        # Data displayed by resonator position on wafer. Makes single file for each parameter that is 1 wafers per page.
+        example_per_wafer_dsd = ParameterSurveys(device_summary_path=LambExplore.device_records_cvs_path,
                                                  params=requested_params,
                                                  output_dir=device_summaries_dir,
-                                                 show_f_shift=False)
+                                                 show_d_shift_in_x=False, show_f_design_shift_in_y=True)
