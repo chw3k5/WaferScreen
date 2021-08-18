@@ -1,4 +1,5 @@
-# derived of code by Jake Conners
+# Low-level fitting routines for S21 of individual resonators and also multi-resonator measurements
+# derived from code by Jake Conners
 from scipy.signal import savgol_filter
 from scipy.optimize import curve_fit
 import numpy as np
@@ -7,6 +8,9 @@ from waferscreen.data_io.res_io import ResParams
 
 def simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope,
                                         tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio):
+    """
+    Given a list of frequencies and various model parameters, returns the (complex) forward transmission for a SINGLE resonator
+    """
     A = base_amplitude_abs * (1 + base_amplitude_slope * (freq_GHz - fcenter_GHz)) * (
                 np.cos(a_phase_rad) + 1j * np.sin(a_phase_rad))  # complex gain factor A
     phase_delay = np.exp(-1j * (freq_GHz - fcenter_GHz) * 2.0 * np.pi * tau_ns)  # tau_ns in ns, freq_GHz in GHz
@@ -20,7 +24,10 @@ def simple_res_gain_slope_complex_model(freq_GHz, base_amplitude_abs, a_phase_ra
 def fit_simple_res_gain_slope_complex(freqs_GHz, base_amplitude_abs, a_phase_rad, base_amplitude_slope,
                                       tau_ns, fcenter_GHz, q_i, q_c, impedance_ratio):
     """
-    Lorentzian Resonator w/ gain slope and complex feedline impedance
+    Despite the name, this function does not perform a fit.  Rather, it is a wrapper for simple_res_gain_slope_complex_model()
+    with the only difference being that it returns a 1-dimensional numpy ndarray, presumably for more convenient fitting
+    The mapping from the return array of simple_res_gain_slope_complex_model() to the return value of this function is:
+    [a+ib, c+id, e+if, ...] -> [a, b, c, d, e, f, ...]
     """
     s21data = []
     for freq_GHz in freqs_GHz:
@@ -33,7 +40,9 @@ def fit_simple_res_gain_slope_complex(freqs_GHz, base_amplitude_abs, a_phase_rad
 
 def rebound_starting_vals(bounds, starting_vals):
     """
-    Takes starting guess for resonator and makes sure it's within bounds
+    Takes the user's starting guess for a resonator fit parameter and makes sure it's within the bounds for the fit
+    If not, it adjusts the guess to be the closest in-bounds value
+    Returns a new list of guess parameters, which should be the list actually supplied to the fitter
     """
     new_starting_vals = []
     for i in range(0, len(starting_vals)):
@@ -48,6 +57,13 @@ def rebound_starting_vals(bounds, starting_vals):
 
 
 def package_res_results(popt, pcov, res_number=None, flux_ramp_current_ua=None, parent_file=None, verbose=False):
+    """
+    Do some parsing of the outputs of the fitting routine, wrap_simple_res_gain_slope_complex()
+    Optionally prints to the console a human-readable blurb
+    Inputs:
+    - (popt, pcov) = (list of optimal parameters from the fit, covariance matrix from the fit)
+    The return value is a ResParams object
+    """
     fit_base_amplitude_abs = popt[0]
     fit_a_phase_rad = popt[1]
     fit_base_amplitude_slope = popt[2]
@@ -101,7 +117,19 @@ def wrap_simple_res_gain_slope_complex(freqs_GHz, s21_complex, s21_linear_mag,
                                        base_amplitude_abs_guess, a_phase_rad_guess, fcenter_GHz_guess, q_i_guess, q_c_guess,
                                        base_amplitude_slope_guess, tau_ns_guess,
                                        impedance_ratio_guess):
-
+    """
+    Despite the name, this function performs a fit to a single resonator model using the scipy.optimize.curve_fit routine
+    Data inputs:
+    - freqs_GHz
+    - s21_complex
+    - s21_linear_mag
+    All other inputs are initial guesses for the fit
+    Returns (popt, pcov) which are:
+    - popt: an array of the optimal fit parameters
+    - pcov: the covariance matrix from the fit
+    Note that 1-sigma uncertainties can be calculated via numpy.sqrt(numpy.diag(pcov)), with the same indexing as popt
+    Also note that the package_res_results() function does some interpretation of popt and pcov for you
+    """
     error_ravel = np.array([[a_s21_linear_mag, a_s21_linear_mag] for a_s21_linear_mag in s21_linear_mag]).ravel()
     s21data_ravel = np.array([[s21.real, s21.imag] for s21 in s21_complex]).ravel()
     starting_vals = [base_amplitude_abs_guess, a_phase_rad_guess, base_amplitude_slope_guess, tau_ns_guess,
@@ -126,6 +154,12 @@ def jake_res_finder(unprocessed_freq_GHz,
                     baseline_scale_kHz=3000,
                     baseline_order=3,
                     verbose=True):
+    """
+    A resonance finding routine.  Given a measurement of the (complex) forward transmission, this attempts to locate
+    where all the physical resonances lie.  Most of the parameters deal with the mechanics of the peak/dip finding.
+    Returns a list of the identified resonance frequencies
+    Users beware that perfect identification is not guaranteed and some parameter tweaking may help significantly.
+    """
     freq_GHz = unprocessed_freq_GHz
     s21_complex = unprocessed_reals21 + 1j * unprocessed_imags21
     # figure out complex gain and gain slope
